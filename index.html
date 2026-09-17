@@ -1,0 +1,34 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Data Reclaim</title>
+<meta name="description" content="Local-first workstation for GDPR erasure requests and email alias hygiene.">
+<meta name="color-scheme" content="light dark">
+<link rel="stylesheet" href="assets/css/app.css">
+<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🛡️</text></svg>">
+</head>
+<body>
+<a class="skip" href="#main">Skip to content</a>
+
+<header class="topbar">
+  <div class="brand">
+    <span class="mark" aria-hidden="true">🛡️</span>
+    <span>Data Reclaim</span>
+  </div>
+  <nav id="nav" aria-label="Sections"></nav>
+  <span class="local-badge" title="No server, no account. Everything is stored in this browser only.">local only</span>
+</header>
+
+<main id="main"></main>
+
+<footer class="foot">
+  <p>Everything you type stays in this browser (<code>localStorage</code>). No account, no server, no analytics.
+  Back it up from <a href="#/profile">Your details → Export</a>.</p>
+  <p class="muted">Guidance here is practical, not legal advice. Deadlines and rights cited are GDPR (EU/NL) and CCPA/CPRA (California).</p>
+</footer>
+
+<script type="module" src="src/app.js"></script>
+</body>
+</html>
