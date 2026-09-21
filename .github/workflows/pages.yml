@@ -2,7 +2,11 @@ name: Deploy to GitHub Pages
 
 on:
   push:
-    branches: [main]
+    # This repo has no `main` yet: the first branch pushed became the default.
+    # Both are listed so the deploy fires now and keeps working after a rename.
+    branches:
+      - main
+      - claude/data-breach-spam-blocker-7kvnrh
   workflow_dispatch:
 
 permissions:
