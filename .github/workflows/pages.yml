@@ -27,6 +27,12 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - uses: actions/configure-pages@v5
+        with:
+          # Creates the Pages site through the API when it does not exist yet,
+          # so enabling Pages needs no trip through repository settings. Needs
+          # the `pages: write` permission granted above, and a repo eligible for
+          # Pages (public, or private on a paid plan).
+          enablement: true
       - uses: actions/upload-pages-artifact@v3
         with:
           path: .
