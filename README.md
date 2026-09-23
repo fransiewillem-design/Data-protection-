@@ -38,9 +38,18 @@ python3 -m http.server 8000
 # open http://localhost:8000
 ```
 
-To have it always available, push to GitHub and enable **Settings → Pages → Deploy from a branch**.
-The included workflow (`.github/workflows/pages.yml`) publishes it on every push to `main`. That is
-safe: the app is all client-side, so a public URL exposes the code, never your data.
+### Hosting it on GitHub Pages
+
+`.github/workflows/pages.yml` publishes the site on every push. It sets `enablement: true`, so the
+workflow creates the Pages site itself on its first successful run — no repository settings to change.
+
+The one requirement is that **the repository must be eligible for Pages**: public, or private on a paid
+plan. Pages is not available for private repositories on the Free plan, and a Pages site built from a
+private repository is served at a public URL anyway (access-controlled Pages is Enterprise-only), so
+making the repository public is usually the honest choice.
+
+Publishing is safe here: the app is entirely client-side and the repository holds no keys and no
+personal data. A public URL exposes the code, never your data — what you enter stays in your browser.
 
 ## The pages
 
