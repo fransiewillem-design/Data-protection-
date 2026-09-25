@@ -6,6 +6,23 @@
 <title>Data Reclaim</title>
 <meta name="description" content="Local-first workstation for GDPR erasure requests and email alias hygiene.">
 <meta name="color-scheme" content="light dark">
+<!--
+  The local-first promise, enforced by the browser rather than by our own discipline.
+  connect-src names the only two hosts this app may ever talk to, so even a bug that
+  injected script could not post your identity file to an arbitrary server.
+  style-src allows 'unsafe-inline' because the views use inline style attributes;
+  script-src does not, and there are no inline handlers or third-party scripts.
+  (frame-ancestors is omitted: a <meta> CSP cannot carry it — it needs a real header.)
+-->
+<meta http-equiv="Content-Security-Policy" content="
+  default-src 'self';
+  script-src 'self';
+  style-src 'self' 'unsafe-inline';
+  img-src 'self' data:;
+  connect-src 'self' https://haveibeenpwned.com https://api.pwnedpasswords.com;
+  form-action 'none';
+  base-uri 'none';
+  object-src 'none'">
 <link rel="stylesheet" href="assets/css/app.css">
 <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🛡️</text></svg>">
 </head>
