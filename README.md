@@ -109,19 +109,54 @@ The list is a plain JSON file: edit it, or add companies through the UI.
 
 ## Privacy and threat model
 
-Your data lives in `localStorage` under the key `data-reclaim/v1`, in one browser profile.
+Your data lives in `localStorage` under the key `data-reclaim/v1`, in one browser profile. The point of
+that design: this app holds your name, date of birth, address and every email address you own. On a
+server, that file is a target — exactly the kind of target that produced the breaches this tool exists
+to clean up after. So there is no server.
 
-- It is **not encrypted**. Anyone with access to your unlocked machine and this browser profile can
-  read it. That is the same exposure as your saved passwords, but worth knowing.
+**What leaves your device, exhaustively.** Three requests, each only when you click something:
+
+| Request | What it carries |
+| --- | --- |
+| `data/brokers.json` | Nothing — it is a file in this repo |
+| `haveibeenpwned.com/api/v3/breaches` | Nothing about you — the public breach list |
+| `api.pwnedpasswords.com/range/XXXXX` | Five characters of your password's SHA-1 hash |
+
+**The one exception, stated plainly:** if you add a HIBP API key and check an address, that address is
+sent to Have I Been Pwned. There is no k-anonymous form of that lookup, so the feature cannot exist
+without it. It is optional, it is off unless you add a key, and the UI says so at the point of use.
+
+Nothing else goes anywhere. The letters are generated on your device and sent by your own mail client.
+
+**This is enforced, not just intended.** `index.html` carries a Content Security Policy whose
+`connect-src` names only those two hosts, so even a bug in this code could not post your data to
+another server — the browser refuses the connection. `script-src` is `'self'`: no third-party scripts,
+no CDN, no fonts, no analytics, no tracking pixels. Verified by test: an attempt to `POST` the stored
+profile to an arbitrary host is blocked, while the legitimate hosts still work.
+
+**Hostile input is contained.** Everything rendered is HTML-escaped, and link targets are restricted to
+`http(s)` — a `javascript:` URL smuggled in through an imported backup file cannot be clicked into
+running code. Verified by test with a deliberately malicious backup: no script executed, no such link
+was rendered, and the payloads appeared as visible text.
+
+**What this does not protect against:**
+
+- The stored file is **not encrypted**. Anyone with your unlocked machine and this browser profile can
+  read it — the same exposure as your saved passwords, but worth knowing.
 - Clearing site data **erases it**. Export a backup from *Your details*.
-- The only outbound requests the app makes are to `haveibeenpwned.com` and `api.pwnedpasswords.com`,
-  and only when you click a check. The password check never transmits your password or its full hash.
-- The letters are generated locally; nothing is sent until you press send in your own mail client.
+- Hosting on GitHub Pages means GitHub sees ordinary web-server request logs (your IP, your browser).
+  That is true of any hosted page, and it is about the visit, not your data. Running it locally avoids
+  even that.
 
 ## Status
 
 Verified in-browser: routing, persistence across reloads, profile → letter rendering (English and
 Dutch), deadline and overdue calculation, escalation templates, alias tracking, import/export.
+
+Verified adversarially: XSS payloads in every text field render as inert text; a `javascript:` URL in an
+imported backup is never rendered as a link; exfiltration of the stored profile to an unlisted host is
+refused by the CSP; and the CSP blocks nothing the app legitimately needs (zero violations across all
+views).
 
 **Not verified end-to-end:** the Have I Been Pwned calls. The network this was built on blocks those
 domains at the proxy, so the requests could not be exercised against the live service. The code follows

@@ -14,11 +14,13 @@ export async function allBreaches() {
   return res.json();
 }
 
+// NOTE: this is the only call in the app that transmits personal data — the address
+// being checked goes to HIBP, because there is no k-anonymous form of this lookup.
 export async function breachesForAccount(email, apiKey) {
   if (!apiKey) throw new Error('needs-key');
   const res = await fetch(
     `${API}/breachedaccount/${encodeURIComponent(email)}?truncateResponse=false`,
-    { headers: { 'hibp-api-key': apiKey, 'user-agent': 'data-reclaim' } }
+    { headers: { 'hibp-api-key': apiKey } }   // browsers forbid setting user-agent here
   );
   if (res.status === 404) return [];              // clean, as far as HIBP knows
   if (res.status === 401) throw new Error('That API key was rejected.');
@@ -37,9 +39,16 @@ export async function pwnedPasswordCount(password) {
   const prefix = hash.slice(0, 5);
   const suffix = hash.slice(5);
 
-  const res = await fetch(`https://api.pwnedpasswords.com/range/${prefix}`, {
-    headers: { 'Add-Padding': 'true' }
-  });
+  // Add-Padding hides the real response size, but being a custom header it needs a
+  // CORS preflight. If that is refused, fall back to the plain request rather than
+  // failing the check outright.
+  const url = `https://api.pwnedpasswords.com/range/${prefix}`;
+  let res;
+  try {
+    res = await fetch(url, { headers: { 'Add-Padding': 'true' } });
+  } catch {
+    res = await fetch(url);
+  }
   if (!res.ok) throw new Error(`Pwned Passwords returned ${res.status}`);
 
   const text = await res.text();

@@ -5,6 +5,18 @@ import { allBreaches, breachesForAccount, pwnedPasswordCount } from './hibp.js';
 export const esc = s => String(s ?? '').replace(/[&<>"']/g,
   c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 
+// esc() stops an attribute breakout but not a `javascript:` payload, and broker
+// entries can arrive from an imported backup file. Only ever emit http(s) hrefs:
+// a script URL here would run with access to everything in localStorage.
+export function safeUrl(u) {
+  try {
+    const parsed = new URL(String(u ?? ''), location.href);
+    return ['http:', 'https:'].includes(parsed.protocol) ? parsed.href : '';
+  } catch {
+    return '';
+  }
+}
+
 export function toast(msg) {
   document.querySelector('.toast')?.remove();
   const el = document.createElement('div');
@@ -126,6 +138,9 @@ export function exposure(state) {
 
   <div class="card">
     <h2>Which breaches include your address?</h2>
+    <p class="small muted"><strong>The one request in this app that transmits personal data.</strong>
+    Checking an address sends that address to Have I Been Pwned. The password check below does not — it
+    sends five characters of a hash. Everything else happens on this device.</p>
     ${state.hibpKey ? '' : `<p class="small muted">Checking an address against HIBP needs a paid API key
     (a few dollars a month, from haveibeenpwned.com/API/Key). Add one on
     <a href="#/profile">Your details</a>, or skip it and use the browser below.</p>`}
@@ -322,7 +337,7 @@ function targetRow(b, state) {
       ${b.notes ? `<div class="meta">${esc(b.notes)}</div>` : ''}
     </div>
     <div class="actions">
-      ${b.optOutUrl ? `<a class="btn" href="${esc(b.optOutUrl)}" target="_blank" rel="noopener noreferrer">Opt-out page ↗</a>` : ''}
+      ${safeUrl(b.optOutUrl) ? `<a class="btn" href="${esc(safeUrl(b.optOutUrl))}" target="_blank" rel="noopener noreferrer">Opt-out page ↗</a>` : ''}
       <a class="btn primary" href="#/letter?b=${encodeURIComponent(b.id)}">Letter</a>
       <select data-action="set-status" data-id="${esc(b.id)}" style="width:auto">
         ${Object.entries(store.STATUSES).map(([k, v]) =>
@@ -387,9 +402,9 @@ export function letter(state, catalog, params) {
     behind beats a maximalist one you cannot.</p>
   </div>
 
-  ${b.method === 'form' && b.optOutUrl ? `<div class="notice no-print">
+  ${b.method === 'form' && safeUrl(b.optOutUrl) ? `<div class="notice no-print">
     <p><strong>This one has a self-serve form.</strong> Use
-    <a href="${esc(b.optOutUrl)}" target="_blank" rel="noopener noreferrer">their opt-out page</a> first —
+    <a href="${esc(safeUrl(b.optOutUrl))}" target="_blank" rel="noopener noreferrer">their opt-out page</a> first —
     it is usually faster. Send this letter if the form fails, asks for ID, or nothing happens.</p>
   </div>` : ''}
 
