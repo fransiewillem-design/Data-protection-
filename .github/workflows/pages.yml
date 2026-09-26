@@ -37,6 +37,21 @@ jobs:
           # Actions. After that this step finds the existing site and no
           # creation is attempted.
           enablement: true
+      # Without this, a browser happily mixes a fresh index.html with month-old
+      # cached modules and the deploy looks like it did nothing. Stamping the
+      # commit into every asset URL makes each deploy a distinct set of files.
+      - name: Stamp the build into asset URLs
+        run: |
+          SHA="${GITHUB_SHA::7}"
+          sed -i "s|src=\"src/app.js\"|src=\"src/app.js?v=$SHA\"|" index.html
+          sed -i "s|href=\"assets/css/app.css\"|href=\"assets/css/app.css?v=$SHA\"|" index.html
+          sed -i "s|__BUILD__|$SHA|g" index.html
+          sed -i -E "s|(from '\./[A-Za-z0-9_-]+\.js)'|\1?v=$SHA'|g" src/*.js
+          sed -i "s|fetch('data/brokers.json')|fetch('data/brokers.json?v=$SHA')|" src/app.js
+          echo "--- stamped as $SHA ---"
+          grep -o 'src/app.js?v=[a-f0-9]*' index.html
+          grep -ho "from '\./[a-z]*\.js?v=[a-f0-9]*'" src/*.js | sort -u
+
       - uses: actions/upload-pages-artifact@v3
         with:
           path: .
