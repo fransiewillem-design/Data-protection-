@@ -1,6 +1,7 @@
 import * as store from './store.js';
 import { TEMPLATES, render as renderLetter, suggestedTemplate } from './letters.js';
 import { allBreaches, breachesForAccount, pwnedPasswordCount } from './hibp.js';
+import { parseMessages, groupBySender } from './mailscan.js';
 
 export const esc = s => String(s ?? '').replace(/[&<>"']/g,
   c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
@@ -141,22 +142,49 @@ export function exposure(state) {
   </div>
 
   <div class="card">
-    <h2>1. Your own mailbox — the best register there is</h2>
-    <p class="small muted">No service can tell you this, because no service knows it. Your mailbox does. Every
-    company that ever sent you a signup, a receipt or a policy update is holding your data right now. This
-    costs nothing, involves no third party, and nothing leaves your device.</p>
-    <p class="small muted">Search your mail for each of these, in Apple Mail, Gmail or Outlook:</p>
+    <h2>1. Scan your mail</h2>
+    <p class="small muted">Drag messages out of your Junk or Inbox folder and drop them here. The file is read
+    on this device by this page — it is not uploaded, and there is no server to upload it to. Works with any
+    provider, including iCloud.</p>
 
-    ${QUERIES.map(([q, why]) => `
-      <div class="item">
-        <div class="body">
-          <div class="name mono">${esc(q)}</div>
-          <div class="meta">${esc(why)}</div>
-        </div>
-        <div class="actions"><button data-action="copy-query" data-q="${esc(q)}">Copy</button></div>
-      </div>`).join('')}
+    <div id="drop" class="drop">
+      <p><strong>Drop .eml or .mbox files here</strong></p>
+      <p class="small muted">or <button data-action="pick">choose files</button></p>
+      <input type="file" id="files" multiple accept=".eml,.mbox,.txt,message/rfc822" style="display:none">
+    </div>
 
-    <p class="small" style="margin-top:14px"><strong>Add each company you find:</strong></p>
+    <details style="margin-top:12px">
+      <summary class="small muted" style="cursor:pointer">How do I get the files out of my mail app?</summary>
+      <ul class="small muted" style="margin-top:10px">
+        <li><strong>Apple Mail (iCloud):</strong> open the Junk mailbox, select all (<code>Cmd+A</code>), then
+        drag the selection onto your Desktop. You get one <code>.eml</code> per message. Drop them here.</li>
+        <li><strong>Outlook (desktop):</strong> same — select in Junk Email and drag to a Finder or Explorer
+        window.</li>
+        <li><strong>Gmail:</strong> Google Takeout → deselect all → select <em>Mail</em> → export. You get an
+        <code>.mbox</code>; drop that in directly.</li>
+      </ul>
+    </details>
+
+    <div id="scan-result" style="margin-top:14px"></div>
+  </div>
+
+  <div class="card">
+    <h2>1b. Or find them by searching your mail</h2>
+    <p class="small muted">No export needed — run these searches in your mail app and add what you find by
+    hand. Slower, but it reaches mail you would never think to export.</p>
+    <details>
+      <summary class="small muted" style="cursor:pointer">Show the searches</summary>
+      ${QUERIES.map(([q, why]) => `
+        <div class="item">
+          <div class="body">
+            <div class="name mono">${esc(q)}</div>
+            <div class="meta">${esc(why)}</div>
+          </div>
+          <div class="actions"><button data-action="copy-query" data-q="${esc(q)}">Copy</button></div>
+        </div>`).join('')}
+    </details>
+
+    <p class="small" style="margin-top:14px"><strong>Add a company by hand:</strong></p>
     <div class="row">
       <input id="qa-company" placeholder="Company name" style="flex:1;min-width:160px">
       <input id="qa-domain" placeholder="their-domain.com (optional)" style="flex:1;min-width:160px">
@@ -270,6 +298,20 @@ export function mountExposure(root, state, rerender) {
       }
     }
 
+    if (action === 'pick') root.querySelector('#files').click();
+
+    if (action === 'add-sender') {
+      addSenderAsTarget(btn.dataset.name, btn.dataset.domain);
+      btn.outerHTML = '<span class="pill done">letter ready</span>';
+    }
+
+    if (action === 'add-all-senders') {
+      const list = window.__drSenders || [];
+      let n = 0;
+      for (const sn of list) if (addSenderAsTarget(sn.name, sn.domain, true)) n++;
+      toast(`${n} companies added — see Targets`);
+    }
+
     if (action === 'copy-query') {
       try {
         await navigator.clipboard.writeText(btn.dataset.q);
@@ -366,6 +408,97 @@ export function mountExposure(root, state, rerender) {
       toast(`${name} added to your targets`);
     }
   });
+
+  function addSenderAsTarget(name, domain, quiet) {
+    const label = name && name !== domain ? name : domain;
+    const id = 'mail:' + domain;
+    if (state.custom.some(c => c.id === id)) return false;
+    store.update(st => st.custom.push({
+      id, name: label, category: 'breach', regions: ['EU'], site: domain,
+      optOutUrl: `https://${domain}`, email: `privacy@${domain}`,
+      method: 'email', confidence: 'low',
+      notes: `Found in your own mail: ${domain} has been sending to you, so it holds your address. Confirm their privacy contact before sending.`
+    }));
+    if (!quiet) toast(`${label} added — letter ready`);
+    return true;
+  }
+
+  // ---- mail scanning ------------------------------------------------------
+
+  const drop = root.querySelector('#drop');
+  const fileInput = root.querySelector('#files');
+
+  async function handleFiles(fileList) {
+    const files = [...fileList];
+    if (!files.length) return;
+    const out = root.querySelector('#scan-result');
+    out.innerHTML = `<p class="small muted">Reading ${files.length} file(s)…</p>`;
+    try {
+      const texts = await Promise.all(files.map(f => f.text()));
+      const messages = texts.flatMap(t => parseMessages(t));
+      if (!messages.length) {
+        out.innerHTML = `<div class="notice warn"><p>No mail headers found in those files. Make sure they are
+          <code>.eml</code> or <code>.mbox</code> exports rather than screenshots or PDFs.</p></div>`;
+        return;
+      }
+      renderScan(out, groupBySender(messages), messages.length, files.length);
+    } catch (err) {
+      out.innerHTML = `<div class="notice bad"><p>Could not read those files: ${esc(err.message)}</p></div>`;
+    }
+  }
+
+  function renderScan(out, senders, msgCount, fileCount) {
+    const withUnsub = senders.filter(x => x.unsubHttp || x.unsubMailto);
+    out.innerHTML = `
+      <div class="notice">
+        <p><strong>${msgCount} messages from ${senders.length} companies</strong>, read from ${fileCount}
+        file(s) on this device. ${withUnsub.length} of them offer a working unsubscribe.</p>
+      </div>
+      <div class="row" style="margin-bottom:10px">
+        <button class="primary" data-action="add-all-senders">Add all ${senders.length} as targets</button>
+      </div>
+      ${senders.map(sn => {
+        const legit = !!(sn.unsubHttp || sn.unsubMailto);
+        return `
+        <div class="item" data-sender="${esc(sn.domain)}">
+          <div class="body">
+            <div class="name">${esc(sn.name)}
+              <span class="pill ${legit ? 'sent' : 'overdue'}">${legit ? 'real sender' : 'no unsubscribe'}</span>
+              <span class="pill">${sn.count} mail${sn.count === 1 ? '' : 's'}</span>
+            </div>
+            <div class="meta mono">${esc(sn.domain)}</div>
+            ${sn.subjects.length ? `<div class="meta">${esc(sn.subjects[0])}</div>` : ''}
+          </div>
+          <div class="actions">
+            ${sn.unsubHttp && safeUrl(sn.unsubHttp)
+              ? `<a class="btn" href="${esc(safeUrl(sn.unsubHttp))}" target="_blank" rel="noopener noreferrer">Unsubscribe ↗</a>`
+              : ''}
+            <button data-action="add-sender" data-name="${esc(sn.name)}" data-domain="${esc(sn.domain)}">Demand deletion</button>
+          </div>
+        </div>`;
+      }).join('')}
+      <div class="notice warn" style="margin-top:14px">
+        <p><strong>Treat the two groups differently.</strong> A sender marked <em>real sender</em> published a
+        standards-compliant unsubscribe link, which means a real company with a legal department — unsubscribe
+        works, and so does an erasure demand.</p>
+        <p>A sender marked <em>no unsubscribe</em> is usually a criminal operation on a throwaway domain.
+        <strong>Do not click anything in those messages</strong>: it confirms a human reads the mailbox and
+        raises your value on the lists. An erasure letter to them will bounce. Report as junk and move on —
+        the fix for those is a fresh alias, not a letter.</p>
+      </div>`;
+    window.__drSenders = senders;   // handed to the bulk-add handler
+  }
+
+  if (drop) {
+    ['dragenter', 'dragover'].forEach(ev => drop.addEventListener(ev, e => {
+      e.preventDefault(); drop.classList.add('over');
+    }));
+    ['dragleave', 'drop'].forEach(ev => drop.addEventListener(ev, e => {
+      e.preventDefault(); drop.classList.remove('over');
+    }));
+    drop.addEventListener('drop', e => handleFiles(e.dataTransfer.files));
+  }
+  fileInput?.addEventListener('change', () => handleFiles(fileInput.files));
 
   root.addEventListener('input', e => {
     if (e.target.id === 'breach-q' && breaches) renderBreachList(root, breaches, state);
