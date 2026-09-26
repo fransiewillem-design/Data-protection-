@@ -137,22 +137,49 @@ export function exposure(state) {
   </div>
 
   <div class="card">
-    <h2>Which breaches include your address?</h2>
-    <p class="small muted"><strong>The one request in this app that transmits personal data.</strong>
-    Checking an address sends that address to Have I Been Pwned. The password check below does not — it
-    sends five characters of a hash. Everything else happens on this device.</p>
-    ${state.hibpKey ? '' : `<p class="small muted">Checking an address against HIBP needs a paid API key
-    (a few dollars a month, from haveibeenpwned.com/API/Key). Add one on
-    <a href="#/profile">Your details</a>, or skip it and use the browser below.</p>`}
-    <div class="row">
-      <select id="acct-email" style="flex:1;min-width:200px">
-        ${state.profile.emails.length
-          ? state.profile.emails.map(e => `<option>${esc(e)}</option>`).join('')
-          : '<option value="">Add an email on "Your details" first</option>'}
-      </select>
-      <button data-action="check-account" ${state.hibpKey ? '' : 'disabled'}>Check address</button>
-    </div>
-    <div id="acct-result" style="margin-top:10px"></div>
+    <h2>Which companies have leaked your address?</h2>
+    <p class="small muted">Free, and no API key needed. Have I Been Pwned charges for the <em>automated</em>
+    lookup — they put that behind a paywall in 2019 because spammers were bulk-querying it to find out which
+    addresses are real. Searching your own address on their own site has always been free.</p>
+
+    ${state.profile.emails.length ? `
+      <p class="small"><strong>Check each address you own:</strong></p>
+      ${state.profile.emails.map(e => `
+        <div class="item">
+          <div class="body"><div class="name mono">${esc(e)}</div></div>
+          <div class="actions">
+            <button data-action="hibp-open" data-email="${esc(e)}">Copy &amp; open HIBP ↗</button>
+          </div>
+        </div>`).join('')}
+      <p class="small muted" style="margin-top:10px">That copies the address and opens their site — paste it
+      into their search box. Whatever comes back is your target list: find each company in the
+      <strong>breach browser</strong> below and click <strong>Add as target</strong>.</p>
+    ` : `<p class="small muted">Add your email addresses on <a href="#/profile">Your details</a> first, then
+      check each one here.</p>`}
+
+    <p class="small muted"><strong>One gap to know about:</strong> breaches they class as sensitive (dating,
+    adult, and similar) are hidden from the public search. To see those you have to prove the address is
+    yours, using the <em>Notify me</em> section of their site, which then emails you. It is free too, and it
+    also warns you about future breaches — worth doing once per address.</p>
+
+    <details style="margin-top:12px">
+      <summary class="small muted" style="cursor:pointer">Optional: automate this inside the app with a paid API key</summary>
+      <p class="small muted" style="margin-top:10px">Only worth it if you own a lot of addresses and want the
+      results listed here instead of on their site. <strong>This is the one request in this app that transmits
+      personal data</strong> — it sends the address being checked to HIBP. The password check below does not;
+      it sends five characters of a hash.</p>
+      <div class="row">
+        <select id="acct-email" style="flex:1;min-width:200px">
+          ${state.profile.emails.length
+            ? state.profile.emails.map(e => `<option>${esc(e)}</option>`).join('')
+            : '<option value="">Add an email on "Your details" first</option>'}
+        </select>
+        <button data-action="check-account" ${state.hibpKey ? '' : 'disabled'}>Check address</button>
+      </div>
+      ${state.hibpKey ? '' : `<p class="small muted" style="margin-top:8px">No key saved — add one on
+        <a href="#/profile">Your details</a> to enable this.</p>`}
+      <div id="acct-result" style="margin-top:10px"></div>
+    </details>
   </div>
 
   <div class="card">
@@ -191,6 +218,18 @@ export function mountExposure(root, state, rerender) {
       } catch (err) {
         out.innerHTML = `<span class="pill overdue">Could not reach the service</span>
           ${esc(err.message)}. Check your connection — some networks and content blockers block this API.`;
+      }
+    }
+
+    if (action === 'hibp-open') {
+      // Open before copying: awaiting the clipboard first breaks the user-gesture
+      // chain and the popup blocker eats the new tab.
+      window.open('https://haveibeenpwned.com/', '_blank', 'noopener,noreferrer');
+      try {
+        await navigator.clipboard.writeText(btn.dataset.email);
+        toast('Address copied — paste it into their search box');
+      } catch {
+        toast('Opened HIBP — type the address into their search box');
       }
     }
 
@@ -630,8 +669,9 @@ export function profile(state) {
 
   <div class="card">
     <h2>Have I Been Pwned API key <span class="muted small">optional</span></h2>
-    <p class="small muted">Only needed to check an address against the breach database. The password check and
-    the breach browser work without it.</p>
+    <p class="small muted">You almost certainly do not need this. Checking your address is free on
+    haveibeenpwned.com — see <a href="#/exposure">Exposure</a>. A key only buys you the same answer listed
+    inside this app instead of on their site.</p>
     <div class="row">
       <input id="hibpKey" type="password" value="${esc(state.hibpKey)}" placeholder="hibp-api-key" style="flex:1;min-width:200px">
       <button data-action="save-key">Save key</button>
