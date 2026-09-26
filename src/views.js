@@ -118,56 +118,105 @@ export function dashboard(state, catalog) {
 // ----------------------------------------------------------------- exposure
 
 export function exposure(state) {
+  const added = state.custom;
+
+  const QUERIES = [
+    ['"privacy policy" update',
+     'The highest-yield search there is. When a company changes its privacy policy it must notify everyone whose data it holds — so every hit is a company holding your data, including ones you forgot about years ago.'],
+    ['"welcome to"',
+     'Signup confirmations. Every account you have ever opened.'],
+    ['"verify your email"',
+     'Catches accounts the welcome search misses.'],
+    ['unsubscribe',
+     'Every marketing list you are on. If they can mail you, they hold your data.'],
+    ['"your order"',
+     'Shops. These hold your postal address and often your card details too.']
+  ];
+
   return `
   <div class="head">
-    <h1>Exposure</h1>
-    <p>Work out which companies actually hold your data. Every breach you appear in is a company you can
-    send an erasure request to — and a reason to retire that email address.</p>
+    <h1>Who has your data</h1>
+    <p>Three sources, in order of how much they turn up. Everything you find becomes a company you can order
+    to erase you under Article 17 GDPR — that is what the next page does with it.</p>
   </div>
 
   <div class="card">
-    <h2>Is a password of yours in a breach corpus?</h2>
-    <p class="small muted">Safe to use: your password is hashed here, and only the first five characters of that
-    hash are sent. This is the k-anonymity model — the service cannot tell which password you asked about.</p>
+    <h2>1. Your own mailbox — the best register there is</h2>
+    <p class="small muted">No service can tell you this, because no service knows it. Your mailbox does. Every
+    company that ever sent you a signup, a receipt or a policy update is holding your data right now. This
+    costs nothing, involves no third party, and nothing leaves your device.</p>
+    <p class="small muted">Search your mail for each of these, in Apple Mail, Gmail or Outlook:</p>
+
+    ${QUERIES.map(([q, why]) => `
+      <div class="item">
+        <div class="body">
+          <div class="name mono">${esc(q)}</div>
+          <div class="meta">${esc(why)}</div>
+        </div>
+        <div class="actions"><button data-action="copy-query" data-q="${esc(q)}">Copy</button></div>
+      </div>`).join('')}
+
+    <p class="small" style="margin-top:14px"><strong>Add each company you find:</strong></p>
     <div class="row">
-      <input type="password" id="pw" placeholder="Password to check" autocomplete="off" style="flex:1;min-width:200px">
-      <button class="primary" data-action="check-pw">Check</button>
+      <input id="qa-company" placeholder="Company name" style="flex:1;min-width:160px">
+      <input id="qa-domain" placeholder="their-domain.com (optional)" style="flex:1;min-width:160px">
+      <button class="primary" data-action="quick-add">Add &amp; write letter</button>
     </div>
-    <div id="pw-result" class="small" style="margin-top:10px"></div>
+    <div id="qa-added" style="margin-top:10px">
+      ${added.length ? `<p class="small muted">${added.length} added so far:</p>` + added.map(c => `
+        <div class="item">
+          <div class="body"><div class="name">${esc(c.name)}</div></div>
+          <div class="actions"><a class="btn" href="#/letter?b=${encodeURIComponent(c.id)}">Letter</a></div>
+        </div>`).join('') : ''}
+    </div>
   </div>
 
   <div class="card">
-    <h2>Which companies have leaked your address?</h2>
-    <p class="small muted">Free, and no API key needed. Have I Been Pwned charges for the <em>automated</em>
-    lookup — they put that behind a paywall in 2019 because spammers were bulk-querying it to find out which
-    addresses are real. Searching your own address on their own site has always been free.</p>
+    <h2>2. Data brokers — assume they already have you</h2>
+    <p class="small muted">These never emailed you and never will. They buy, merge and resell personal data on
+    almost every adult in Europe, which is why there is nothing to discover here: assume you are in their
+    files and make them prove otherwise. 37 are already loaded, with their opt-out pages and a letter each.</p>
+    <p class="small muted">Do the marketing brokers first — they are the upstream suppliers, so cutting them
+    off reduces what everyone downstream can buy about you.</p>
+    <div class="row">
+      <a class="btn primary" href="#/brokers?cat=marketing-data">Start with the marketing brokers →</a>
+      <a class="btn" href="#/brokers">See all 37 targets</a>
+    </div>
+  </div>
+
+  <div class="card">
+    <h2>3. Public breach records</h2>
+    <p class="small muted">Companies that lost your data to attackers. Free to check — the breach database
+    charges only for automated lookups, never for searching your own address on their site.</p>
 
     ${state.profile.emails.length ? `
-      <p class="small"><strong>Check each address you own:</strong></p>
       ${state.profile.emails.map(e => `
         <div class="item">
           <div class="body"><div class="name mono">${esc(e)}</div></div>
           <div class="actions">
-            <button data-action="hibp-open" data-email="${esc(e)}">Copy &amp; open HIBP ↗</button>
+            <button data-action="hibp-open" data-email="${esc(e)}">Copy &amp; check ↗</button>
           </div>
         </div>`).join('')}
-      <p class="small muted" style="margin-top:10px">That copies the address and opens their site — paste it
-      into their search box. Whatever comes back is your target list: find each company in the
-      <strong>breach browser</strong> below and click <strong>Add as target</strong>.</p>
+      <p class="small muted" style="margin-top:10px">Copies the address and opens the database — paste it into
+      their search box. Add anything it finds using the box in section 1, or the browser below.</p>
     ` : `<p class="small muted">Add your email addresses on <a href="#/profile">Your details</a> first, then
       check each one here.</p>`}
 
-    <p class="small muted"><strong>One gap to know about:</strong> breaches they class as sensitive (dating,
-    adult, and similar) are hidden from the public search. To see those you have to prove the address is
-    yours, using the <em>Notify me</em> section of their site, which then emails you. It is free too, and it
-    also warns you about future breaches — worth doing once per address.</p>
+    <p class="small muted">Breaches classed as sensitive are hidden from the public search. To see those,
+    verify the address through the <em>Notify me</em> section of that site — also free, and it warns you about
+    future breaches.</p>
 
-    <details style="margin-top:12px">
-      <summary class="small muted" style="cursor:pointer">Optional: automate this inside the app with a paid API key</summary>
-      <p class="small muted" style="margin-top:10px">Only worth it if you own a lot of addresses and want the
-      results listed here instead of on their site. <strong>This is the one request in this app that transmits
-      personal data</strong> — it sends the address being checked to HIBP. The password check below does not;
-      it sends five characters of a hash.</p>
+    <div class="row" style="margin-top:12px">
+      <input id="breach-q" placeholder="Or search the breach list (e.g. linkedin)" style="flex:1;min-width:200px">
+      <button data-action="load-breaches">Load list</button>
+    </div>
+    <div id="breach-result" style="margin-top:12px"></div>
+
+    <details style="margin-top:14px">
+      <summary class="small muted" style="cursor:pointer">Optional: automate this with a paid API key</summary>
+      <p class="small muted" style="margin-top:10px">Only worth it if you own many addresses and want results
+      listed here rather than on their site. <strong>This is the one request in this app that transmits
+      personal data</strong> — it sends the address being checked. Nothing else here does.</p>
       <div class="row">
         <select id="acct-email" style="flex:1;min-width:200px">
           ${state.profile.emails.length
@@ -183,14 +232,14 @@ export function exposure(state) {
   </div>
 
   <div class="card">
-    <h2>Breach browser</h2>
-    <p class="small muted">The full public breach list. Find services you have used — each one is a company
-    that still holds your data unless you make them delete it.</p>
+    <h2>Has a password of yours leaked?</h2>
+    <p class="small muted">Safe to run: the password is hashed on this device and only the first five
+    characters of that hash are sent, so the service cannot tell which password you asked about.</p>
     <div class="row">
-      <input id="breach-q" placeholder="Search by company or domain (e.g. linkedin)" style="flex:1;min-width:200px">
-      <button data-action="load-breaches">Load list</button>
+      <input type="password" id="pw" placeholder="Password to check" autocomplete="off" style="flex:1;min-width:200px">
+      <button data-action="check-pw">Check</button>
     </div>
-    <div id="breach-result" style="margin-top:12px"></div>
+    <div id="pw-result" class="small" style="margin-top:10px"></div>
   </div>`;
 }
 
@@ -210,15 +259,56 @@ export function mountExposure(root, state, rerender) {
       try {
         const n = await pwnedPasswordCount(pw);
         out.innerHTML = n === 0
-          ? `<span class="pill done">Not found</span> This password does not appear in the corpus. That is not
+          ? `<span class="pill done">Not found</span> This password does not appear in any known leak. That is not
              the same as "strong" — a unique passphrase in a password manager still beats it.`
-          : `<span class="pill overdue">Seen ${n.toLocaleString()}×</span> This password is in the breach corpus.
+          : `<span class="pill overdue">Seen ${n.toLocaleString()}×</span> This password has leaked.
              Change it anywhere you used it, and never reuse it.`;
         root.querySelector('#pw').value = '';
       } catch (err) {
         out.innerHTML = `<span class="pill overdue">Could not reach the service</span>
           ${esc(err.message)}. Check your connection — some networks and content blockers block this API.`;
       }
+    }
+
+    if (action === 'copy-query') {
+      try {
+        await navigator.clipboard.writeText(btn.dataset.q);
+        toast('Copied — paste it into your mail search');
+      } catch {
+        toast('Type it into your mail search box');
+      }
+    }
+
+    if (action === 'quick-add') {
+      const nameEl = root.querySelector('#qa-company');
+      const domEl = root.querySelector('#qa-domain');
+      const name = nameEl.value.trim();
+      const site = domEl.value.trim().replace(/^https?:\/\//, '').replace(/\/.*$/, '');
+      if (!name) { toast('Give the company a name first'); return; }
+
+      const id = 'custom:' + name.toLowerCase().replace(/[^a-z0-9]+/g, '-');
+      if (state.custom.some(c => c.id === id)) { toast(`${name} is already on your list`); return; }
+
+      store.update(st => st.custom.push({
+        id, name, category: 'breach', regions: ['EU'], site,
+        optOutUrl: site ? `https://${site}` : '',
+        email: site ? `privacy@${site}` : '',
+        method: 'email', confidence: 'low',
+        notes: 'Added from your mailbox audit. Check their privacy policy for the real contact address before sending.'
+      }));
+
+      // This view suppresses the global re-render (it holds fetched results),
+      // so append the new row by hand.
+      const list = root.querySelector('#qa-added');
+      const row = document.createElement('div');
+      row.className = 'item';
+      row.innerHTML = `<div class="body"><div class="name">${esc(name)}</div></div>
+        <div class="actions"><a class="btn" href="#/letter?b=${encodeURIComponent(id)}">Letter</a></div>`;
+      list.appendChild(row);
+      nameEl.value = '';
+      domEl.value = '';
+      nameEl.focus();
+      toast(`${name} added — letter ready`);
     }
 
     if (action === 'hibp-open') {
@@ -668,9 +758,9 @@ export function profile(state) {
   </div>
 
   <div class="card">
-    <h2>Have I Been Pwned API key <span class="muted small">optional</span></h2>
+    <h2>Breach database API key <span class="muted small">optional</span></h2>
     <p class="small muted">You almost certainly do not need this. Checking your address is free on
-    haveibeenpwned.com — see <a href="#/exposure">Exposure</a>. A key only buys you the same answer listed
+    their website — see <a href="#/exposure">Who has your data</a>. A key only buys you the same answer listed
     inside this app instead of on their site.</p>
     <div class="row">
       <input id="hibpKey" type="password" value="${esc(state.hibpKey)}" placeholder="hibp-api-key" style="flex:1;min-width:200px">

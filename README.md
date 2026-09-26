@@ -60,9 +60,12 @@ personal data. A public URL exposes the code, never your data — what you enter
 ## The pages
 
 - **Overview** — what is in flight, what is past its deadline, what to chase.
-- **Exposure** — check a password against the breach corpus (k-anonymous: only the first five
-  characters of its SHA-1 hash are ever sent), check an address if you have a HIBP API key, and browse
-  the full public breach list. Any breached company can be added to your targets in one click.
+- **Who has your data** — three sources, in order of yield. Your own mailbox first: searching it for
+  `"privacy policy" update`, `"welcome to"`, `unsubscribe` and similar surfaces every company holding
+  your data, costs nothing and involves no third party at all (a policy-update notice is proof they
+  hold you). Anything you find goes in via one box and comes out as a finished letter. Then the data
+  brokers, who need no discovery — assume you are in their files. Then public breach records, free on
+  the breach database's own site; the paid API is optional and tucked away.
 - **Targets** — 37 data brokers, people-search sites, B2B scrapers and Dutch registries, each with its
   opt-out page and status tracking. Add your own.
 - **Letter** — generates the request, in English or Dutch, filled in with your details. Copy it, open

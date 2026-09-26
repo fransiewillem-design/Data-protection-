@@ -57,7 +57,16 @@ store.subscribe(() => {
 
 addEventListener('hashchange', render);
 
+function showBuild() {
+  const el = document.getElementById('build');
+  if (!el) return;
+  const b = el.dataset.build;
+  // The deploy rewrites the placeholder; if it is still there, this is a local copy.
+  el.textContent = b.startsWith('__') ? 'dev' : b;
+}
+
 async function boot() {
+  showBuild();
   try {
     const res = await fetch('data/brokers.json');
     if (!res.ok) throw new Error(`HTTP ${res.status}`);
