@@ -7,6 +7,13 @@
 <meta name="description" content="Local-first workstation for GDPR erasure requests and email alias hygiene.">
 <meta name="color-scheme" content="light dark">
 <!--
+  Every outbound click from this page (an unsubscribe link, a broker opt-out
+  form) would otherwise send this page's URL as the Referer, telling that
+  company you are running a deletion campaign against them. Suppress it
+  globally rather than relying on remembering rel="noreferrer" every time.
+-->
+<meta name="referrer" content="no-referrer">
+<!--
   The local-first promise, enforced by the browser rather than by our own discipline.
   connect-src names the only two hosts this app may ever talk to, so even a bug that
   injected script could not post your identity file to an arbitrary server.

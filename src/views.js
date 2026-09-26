@@ -143,9 +143,12 @@ export function exposure(state) {
 
   <div class="card">
     <h2>1. Scan your mail</h2>
-    <p class="small muted">Drag messages out of your Junk or Inbox folder and drop them here. The file is read
-    on this device by this page — it is not uploaded, and there is no server to upload it to. Works with any
+    <p class="small muted">Drag messages out of your Junk or Inbox folder and drop them here. Works with any
     provider, including iCloud.</p>
+    <p class="small muted"><strong>What happens to the mail:</strong> it is read in memory by this page and
+    never uploaded — there is no server to upload it to. Nothing from the messages is saved either: close
+    this tab and it is gone. Only the companies you explicitly add are kept, as a name and a domain, in this
+    browser. No subject lines, no message text, ever.</p>
 
     <div id="drop" class="drop">
       <p><strong>Drop .eml or .mbox files here</strong></p>
