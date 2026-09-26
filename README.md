@@ -40,11 +40,17 @@ python3 -m http.server 8000
 
 ### Hosting it on GitHub Pages
 
-`.github/workflows/pages.yml` publishes the site on every push. It sets `enablement: true`, so the
-workflow creates the Pages site itself on its first successful run — no repository settings to change.
+`.github/workflows/pages.yml` publishes the site on every push. Two things have to be true first, and
+the second one cannot be automated:
 
-The one requirement is that **the repository must be eligible for Pages**: public, or private on a paid
-plan. Pages is not available for private repositories on the Free plan, and a Pages site built from a
+1. **The repository must be eligible for Pages** — public, or private on a paid plan.
+2. **The Pages site must be created once, by hand**, under *Settings → Pages → Build and deployment →
+   Source: **GitHub Actions***.
+
+The workflow passes `enablement: true`, which asks the API to do step 2 for you. Do not count on it: the
+default `GITHUB_TOKEN` is refused with *"Resource not accessible by integration"* no matter how its
+permissions are declared, because creating a Pages site needs repository-admin rights that the token
+does not carry. Once the site exists, the workflow finds it and deploys on every push. Pages is not available for private repositories on the Free plan, and a Pages site built from a
 private repository is served at a public URL anyway (access-controlled Pages is Enterprise-only), so
 making the repository public is usually the honest choice.
 
