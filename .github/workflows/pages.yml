@@ -28,10 +28,14 @@ jobs:
       - uses: actions/checkout@v4
       - uses: actions/configure-pages@v5
         with:
-          # Creates the Pages site through the API when it does not exist yet,
-          # so enabling Pages needs no trip through repository settings. Needs
-          # the `pages: write` permission granted above, and a repo eligible for
-          # Pages (public, or private on a paid plan).
+          # Asks the API to create the Pages site if it does not exist. Kept
+          # because it makes this workflow portable, but do not rely on it: in
+          # this repository it is refused with "Resource not accessible by
+          # integration", because the default GITHUB_TOKEN cannot create a Pages
+          # site however its permissions are declared. The site has to be
+          # created once by hand, under Settings -> Pages -> Source: GitHub
+          # Actions. After that this step finds the existing site and no
+          # creation is attempted.
           enablement: true
       - uses: actions/upload-pages-artifact@v3
         with:
