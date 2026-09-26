@@ -132,6 +132,13 @@ to clean up after. So there is no server.
 sent to Have I Been Pwned. There is no k-anonymous form of that lookup, so the feature cannot exist
 without it. It is optional, it is off unless you add a key, and the UI says so at the point of use.
 
+Most people should never add a key. Checking your own address is free on haveibeenpwned.com — the paywall
+is on the *automated* lookup, which they closed in 2019 because spammers were bulk-querying it to work out
+which addresses are real. The Exposure page therefore leads with the free route: it copies each address and
+opens their site for you, and the key is tucked away as an optional convenience. Note that breaches they
+class as sensitive are hidden from the public search; to see those, verify the address through the
+*Notify me* section of their site, which is also free.
+
 Nothing else goes anywhere. The letters are generated on your device and sent by your own mail client.
 
 **This is enforced, not just intended.** `index.html` carries a Content Security Policy whose
