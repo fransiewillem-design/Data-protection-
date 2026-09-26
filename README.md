@@ -60,7 +60,14 @@ personal data. A public URL exposes the code, never your data — what you enter
 ## The pages
 
 - **Overview** — what is in flight, what is past its deadline, what to chase.
-- **Who has your data** — three sources, in order of yield. Your own mailbox first: searching it for
+- **Scan your mail** — drag your Junk (or Inbox) messages out of Apple Mail, Outlook or a Gmail Takeout
+  export and drop the `.eml`/`.mbox` files on the page. The browser parses the headers locally, groups
+  senders by company, and sorts them into two piles that need opposite treatment: senders publishing a
+  standards-compliant `List-Unsubscribe` header are real companies, where unsubscribing and an erasure
+  demand both work; senders without one are usually throwaway criminal domains, where clicking anything
+  confirms your address and a letter would bounce. One click turns any sender into a tracked target with
+  a finished letter. Nothing is uploaded — there is no server to upload to.
+- **Who has your data** — three further sources, in order of yield. Your own mailbox first: searching it for
   `"privacy policy" update`, `"welcome to"`, `unsubscribe` and similar surfaces every company holding
   your data, costs nothing and involves no third party at all (a policy-update notice is proof they
   hold you). Anything you find goes in via one box and comes out as a finished letter. Then the data

@@ -176,3 +176,11 @@ th { font-size: .78rem; text-transform: uppercase; letter-spacing: .05em; color:
   .letter { max-height: none; border: 0; padding: 0; font-family: Georgia, serif; font-size: 11pt; }
   .card { border: 0; box-shadow: none; padding: 0; }
 }
+
+.drop {
+  border: 2px dashed var(--line); border-radius: var(--radius);
+  padding: 26px 16px; text-align: center; background: var(--bg);
+  transition: border-color .15s, background .15s;
+}
+.drop.over { border-color: var(--accent); background: var(--accent-soft); }
+.drop p { margin: 0 0 6px; }
