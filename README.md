@@ -162,6 +162,17 @@ profile to an arbitrary host is blocked, while the legitimate hosts still work.
 running code. Verified by test with a deliberately malicious backup: no script executed, no such link
 was rendered, and the payloads appeared as visible text.
 
+**Why there is no "connect your mailbox" button.** Reading the mailbox directly would mean OAuth, and
+OAuth is the less private design, not the more convenient one. The smallest scope either Microsoft or
+Google offers is the *entire mailbox* — neither has a "spam folder only" scope — so the app would hold a
+long-lived token granting full read access to everything, sitting in browser storage on a public origin.
+Dropping files in creates no credential at all: the worst case for a bug in this code is one file the
+user just chose, rather than their whole mail history. That trade is not worth a saved drag.
+
+If this is ever shared with other people, the same property is what matters most: there is no server, no
+account and no database, so whoever runs it never receives anyone's data and never becomes a controller
+of it.
+
 **What this does not protect against:**
 
 - The stored file is **not encrypted**. Anyone with your unlocked machine and this browser profile can
@@ -170,6 +181,10 @@ was rendered, and the payloads appeared as visible text.
 - Hosting on GitHub Pages means GitHub sees ordinary web-server request logs (your IP, your browser).
   That is true of any hosted page, and it is about the visit, not your data. Running it locally avoids
   even that.
+- **Whoever can change this code can change what it does.** The CSP is defence in depth against a bug,
+  not against a compromised repository: an attacker able to push here could lift the restriction in the
+  same commit. Keep two-factor authentication on the GitHub account that owns it. This is the realistic
+  attack on a static, serverless app — not the data, which never leaves the device, but the code.
 
 ## Status
 
