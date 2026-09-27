@@ -184,3 +184,55 @@ th { font-size: .78rem; text-transform: uppercase; letter-spacing: .05em; color:
 }
 .drop.over { border-color: var(--accent); background: var(--accent-soft); }
 .drop p { margin: 0 0 6px; }
+
+/* ---- layout rhythm ------------------------------------------------- */
+main { max-width: 820px; }
+.head { margin-bottom: 26px; }
+.head h1 { font-size: 1.65rem; font-weight: 640; }
+.head p { color: var(--muted); max-width: 60ch; margin: 0; }
+.card { padding: 20px; margin-bottom: 16px; }
+.card h2 { font-size: 1rem; font-weight: 620; display: flex; align-items: center; gap: 8px; }
+
+/* a count that reads as data, not decoration */
+.count {
+  font-size: .78rem; font-weight: 600; color: var(--muted);
+  background: var(--surface-2); border-radius: 20px; padding: 1px 9px;
+}
+
+/* ---- stat bar ------------------------------------------------------ */
+.statbar {
+  display: flex; gap: 28px; flex-wrap: wrap;
+  padding: 16px 20px; margin-bottom: 16px;
+  background: var(--surface); border: 1px solid var(--line);
+  border-radius: var(--radius); box-shadow: var(--shadow);
+}
+.statbar div { display: flex; flex-direction: column; gap: 1px; }
+.statbar b { font-size: 1.45rem; font-weight: 640; letter-spacing: -.02em; line-height: 1.15; }
+.statbar span { font-size: .8rem; color: var(--muted); }
+.statbar .bad b { color: var(--bad); }
+
+/* ---- selectable rows ----------------------------------------------- */
+.list { border-top: 1px solid var(--line); }
+.pick {
+  display: flex; align-items: center; gap: 12px;
+  padding: 9px 2px; border-bottom: 1px solid var(--line);
+  cursor: pointer; margin: 0; font-size: .9rem; font-weight: 400; color: var(--text);
+}
+.pick:hover { background: var(--surface-2); }
+.pick input { width: auto; flex: none; }
+.pick-name { font-weight: 550; }
+.pick-meta { color: var(--muted); font-size: .82rem; margin-left: auto; }
+
+.link-btn {
+  background: none; border: 0; padding: 0; color: var(--accent);
+  font-size: .84rem; cursor: pointer; text-decoration: underline;
+}
+.link-btn:hover { filter: brightness(1.15); }
+
+/* ---- nav ------------------------------------------------------------ */
+#nav a { font-size: .875rem; }
+
+@media (max-width: 620px) {
+  .pick-meta { display: none; }
+  .statbar { gap: 18px; padding: 14px 16px; }
+}
