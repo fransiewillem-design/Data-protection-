@@ -151,8 +151,11 @@ condition of acting. The signature and the subject line are the identifier too, 
 name would hand over exactly what the body withheld. This matters most for the letters that go to
 criminals: a scammer who mails you learns nothing from your reply.
 
-Fail-closed: anything sourced from mail or SMS is minimal even when the recipient address could not be
-determined, rather than falling back to the full profile. Requests to the bundled data brokers, and
+Fail-closed, in two senses. Anything sourced from the user's own evidence — scanned mail, a logged
+number, a breach they appeared in, a company they typed in — is minimal even when the recipient address
+could not be determined, rather than falling back to the full profile. And targets saved before
+provenance was tracked are repaired on load by inferring the source from their id, so data already in
+someone's browser stops leaking without them having to re-add anything. Requests to the bundled data brokers, and
 complaints to a supervisory authority, still carry full details — a broker cannot find you in its files
 without them, and a regulator needs to know who is complaining.
 
