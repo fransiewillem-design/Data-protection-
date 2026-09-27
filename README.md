@@ -81,12 +81,18 @@ was doing.
 - **Targets** — by default, only companies derived from your own evidence: senders found in the mail you
   scanned, and numbers you logged from spam calls or texts. Each row shows where it came from and which
   single identifier its letter will reveal. Splits every sender into what can actually be done to it, so no
-  button is ever dead. Senders advertising RFC 8058 one-click (`List-Unsubscribe-Post`) go in a single
+  button is ever dead. The unsubscribe link is looked for in the message *body* as well as the
+  `List-Unsubscribe` header, because most bulk mail — and nearly all Dutch bulk mail — puts it there and
+  nowhere else, as *Uitschrijven* or *Afmelden*. Bodies are decoded first: quoted-printable, base64,
+  multipart trees and non-UTF-8 charsets. A sender offering no way out anywhere in the message is not
+  treated as a company that forgot but as spam to block, because compliant bulk senders are obliged to
+  offer one. Senders advertising RFC 8058 one-click (`List-Unsubscribe-Post`) go in a single
   batch, four at a time, with no page to visit. Senders that published only a link open one at a time,
   because a browser refuses to let a page open many tabs at once and a loop would silently drop all but
-  the first. Senders that published nothing — everything from the breach list, where there is no message
-  to read a header from — get a search for their unsubscribe or preference page, since a link cannot be
-  guessed from a name. Everything starts selected. The 37 bundled data brokers are one link away but deliberately not in this list — they are not
+  the first. Senders that published nothing are listed separately as spam to block, with
+  per-client instructions and an explicit warning not to reply: any response confirms a person reads the
+  mailbox, and a letter to a throwaway domain bounces. Those are also kept off *Delete data* by default
+  for the same reason. Everything else starts selected. The 37 bundled data brokers are one link away but deliberately not in this list — they are not
   your evidence, they are everyone's.
 - **Letter** — generates the request, in English or Dutch, filled in with your details. Copy it, open
   it in your mail app, or print it. Marking it sent starts the deadline clock.
