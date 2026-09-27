@@ -75,10 +75,11 @@ personal data. A public URL exposes the code, never your data — what you enter
   the breach database's own site; the paid API is optional and tucked away.
 - **Targets** — by default, only companies derived from your own evidence: senders found in the mail you
   scanned, and numbers you logged from spam calls or texts. Each row shows where it came from and which
-  single identifier its letter will reveal. Select any number of them and run the bulk unsubscribe, which
-  steps through their `List-Unsubscribe` links one click at a time (browsers block a page from opening
-  many tabs at once, so a queue is the honest implementation rather than a loop that silently drops most
-  of them). The 37 bundled data brokers are one link away but deliberately not in this list — they are not
+  single identifier its letter will reveal. Select any number and run the bulk unsubscribe. Senders advertising
+  RFC 8058 one-click (`List-Unsubscribe-Post`) are done in a single batch — one button, no pages to
+  visit, four at a time. Senders that published only a link are opened one at a time afterwards, because
+  a browser refuses to let a page open many tabs at once and a loop would silently drop all but the
+  first. The 37 bundled data brokers are one link away but deliberately not in this list — they are not
   your evidence, they are everyone's.
 - **Letter** — generates the request, in English or Dutch, filled in with your details. Copy it, open
   it in your mail app, or print it. Marking it sent starts the deadline clock.
@@ -182,6 +183,21 @@ profile to an arbitrary host is blocked, while the legitimate hosts still work.
 `http(s)` — a `javascript:` URL smuggled in through an imported backup file cannot be clicked into
 running code. Verified by test with a deliberately malicious backup: no script executed, no such link
 was rendered, and the payloads appeared as visible text.
+
+**How one-click unsubscribe keeps the strict policy.** An RFC 8058 unsubscribe is a POST to whatever
+host the sender nominates, so it needs `connect-src https:` — a permission the page holding the identity
+file must not have. That permission lives in `unsubscribe.html`, loaded in a hidden same-origin iframe.
+A framed document served from its own URL gets its own policy instead of inheriting its parent's, so the
+worker can reach any host while `index.html` still cannot reach anything but the two breach endpoints.
+The worker never reads `localStorage`, holds nothing, and acts only on a URL list handed to it by
+postMessage from its own origin. It sends no cookies (`credentials: 'omit'`) and no referrer.
+
+Verified by test: four one-click unsubscribes arrive at the target server with the correct
+`List-Unsubscribe=One-Click` body and no cookie or referer header, while the same test's attempt to POST
+the stored profile to that host **from the main page** is refused by CSP and never arrives.
+
+One honest limit: the response to a cross-site POST is opaque, so the app reports *delivered*, not
+*confirmed*. If mail continues from a sender, the erasure letter is the enforceable follow-up.
 
 **Why there is no "connect your mailbox" button.** Reading the mailbox directly would mean OAuth, and
 OAuth is the less private design, not the more convenient one. The smallest scope either Microsoft or

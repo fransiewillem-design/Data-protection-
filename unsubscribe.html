@@ -1,0 +1,30 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Unsubscribe worker</title>
+<!--
+  This document exists to hold ONE capability the main page must never have:
+  permission to talk to arbitrary servers (connect-src https:), which is what an
+  RFC 8058 one-click unsubscribe POST requires.
+
+  It is loaded in a hidden same-origin iframe. A framed document served from its
+  own URL gets its own policy rather than inheriting the parent's, so index.html
+  — the page that actually holds the user's identity file — keeps its strict
+  connect-src and still cannot reach any host but the two breach endpoints.
+
+  This worker never reads localStorage, never touches the profile, and accepts
+  nothing but a list of URLs handed to it by its own opener over postMessage.
+-->
+<meta http-equiv="Content-Security-Policy" content="
+  default-src 'none';
+  script-src 'self';
+  connect-src https:;
+  form-action 'none';
+  base-uri 'none';
+  object-src 'none'">
+</head>
+<body>
+<script src="src/unsub-worker.js" type="module"></script>
+</body>
+</html>
