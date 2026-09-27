@@ -136,19 +136,15 @@ export function exposure(state) {
 
   return `
   <div class="head">
-    <h1>Who has your data</h1>
-    <p>Three sources, in order of how much they turn up. Everything you find becomes a company you can order
-    to erase you under Article 17 GDPR — that is what the next page does with it.</p>
+    <h1>Scan mail</h1>
+    <p>Everything starts here. Your mailbox is the only honest record of who holds your data, and nothing
+    but this page can read it.</p>
   </div>
 
   <div class="card">
-    <h2>1. Scan your mail</h2>
-    <p class="small muted">Drag messages out of your Junk or Inbox folder and drop them here. Works with any
-    provider, including iCloud.</p>
-    <p class="small muted"><strong>What happens to the mail:</strong> it is read in memory by this page and
-    never uploaded — there is no server to upload it to. Nothing from the messages is saved either: close
-    this tab and it is gone. Only the companies you explicitly add are kept, as a name and a domain, in this
-    browser. No subject lines, no message text, ever.</p>
+    <h2>Drop your mail in</h2>
+    <p class="small muted">Drag messages out of Junk or your Inbox and drop them here. Any provider,
+    including iCloud. Read in memory and never uploaded; nothing from the messages is saved.</p>
 
     <div id="drop" class="drop">
       <p><strong>Drop .eml or .mbox files here</strong></p>
@@ -602,85 +598,46 @@ export function brokers(state, catalog, params) {
   const mine = state.custom;
   const showBrokers = params.get('all') === '1';
   const targets = showBrokers ? allTargets(state, catalog) : mine;
-
-  const cat = params.get('cat') || '';
   const q = (params.get('q') || '').toLowerCase();
-  const shown = targets.filter(b => {
-    if (cat && b.category !== cat) return false;
-    if (q && !(b.name + ' ' + (b.site || '')).toLowerCase().includes(q)) return false;
-    return true;
-  });
+  const shown = targets.filter(b => !q || (b.name + ' ' + (b.site || '')).toLowerCase().includes(q));
 
-  const unsubable = shown.filter(b => b.unsubUrl && safeUrl(b.unsubUrl));
-  const selectedHere = shown.filter(b => selected.has(b.id));
-  const selectedUnsub = selectedHere.filter(b => b.unsubUrl && safeUrl(b.unsubUrl));
-  // Senders advertising RFC 8058 can be unsubscribed with a POST and no visit.
-  const selectedOneClick = selectedUnsub.filter(b => b.oneClick);
-  const selectedVisit = selectedUnsub.filter(b => !b.oneClick);
+  const sent = mine.filter(b => ['sent', 'ack', 'escalated'].includes(store.getRequest(b.id).status)).length;
+  const overdue = targets.filter(b => store.isOverdue(b, store.getRequest(b.id))).length;
 
   return `
   <div class="head">
-    <h1>Targets</h1>
-    <p>Companies found in your own evidence — the mail you scanned and the numbers you logged. Each one
-    demonstrably holds your address, which is what makes the letter enforceable.</p>
+    <h1>Delete data</h1>
+    <p>Order these companies to erase you under Article 17 GDPR. They have one month to comply.
+    Unsubscribing only stops the mail — <a href="#/unsubscribe">that is the other page</a>.</p>
   </div>
 
   ${!mine.length && !showBrokers ? `<div class="notice">
-    <p><strong>Nothing here yet.</strong> This list fills from your own data:
-    <a href="#/exposure">scan your mail</a> to find who has been writing to you, or log a spam caller
-    or texter there.</p>
+    <p>Nothing here yet. <a href="#/scan">Scan your mail</a> to find who holds your data.</p>
+  </div>` : ''}
+
+  ${mine.length ? `<div class="statbar">
+    <div><b>${mine.length}</b><span>from your evidence</span></div>
+    <div><b>${sent}</b><span>requests sent</span></div>
+    <div class="${overdue ? 'bad' : ''}"><b>${overdue}</b><span>past deadline</span></div>
   </div>` : ''}
 
   <div class="card">
     <div class="row">
-      <input id="target-q" placeholder="Search targets" value="${esc(params.get('q') || '')}" style="flex:1;min-width:160px">
+      <input id="target-q" placeholder="Search" value="${esc(params.get('q') || '')}" style="flex:1;min-width:150px">
       <button data-action="add-custom">Add company</button>
     </div>
     <p class="small muted" style="margin:10px 0 0">
       ${showBrokers
-        ? `Showing your ${mine.length} own targets plus the ${catalog.length} bundled data brokers.
-           <a href="#/brokers">Show only mine →</a>`
-        : `Showing only what came from your own evidence.
-           <a href="#/brokers?all=1">Also show the ${catalog.length} bundled data brokers →</a>`}
+        ? `Your ${mine.length} targets plus ${catalog.length} bundled data brokers.
+           <a href="#/delete">Show only mine</a>`
+        : `Only what came from your own evidence.
+           <a href="#/delete?all=1">Add the ${catalog.length} bundled data brokers</a>`}
     </p>
   </div>
 
-  ${shown.length ? `
-  <div class="card">
-    <div class="row between" style="margin-bottom:10px">
-      <label style="margin:0;display:flex;align-items:center;gap:8px;cursor:pointer">
-        <input type="checkbox" id="select-all" style="width:auto"
-          ${selectedHere.length === shown.length && shown.length ? 'checked' : ''}>
-        <span>Select all ${shown.length}</span>
-      </label>
-      <div class="actions">
-        <span class="small muted">${selectedHere.length} selected</span>
-        <button class="primary" data-action="bulk-unsub" ${selectedUnsub.length ? '' : 'disabled'}>
-          ${selectedUnsub.length
-            ? `Unsubscribe from ${selectedUnsub.length} ${selectedUnsub.length === 1 ? 'sender' : 'senders'}`
-            : 'No unsubscribe links in selection'}
-        </button>
-      </div>
-    </div>
-    ${unsubable.length
-      ? `<p class="small muted" style="margin-bottom:12px">${unsubable.length} of these published a working
-         unsubscribe link${selectedOneClick.length ? `, and ${selectedOneClick.length} of your selection
-         support one-click unsubscribe — those go out in a single batch with no page to visit` : ''}${selectedVisit.length
-         ? `. ${selectedVisit.length} only published a link, so those open one at a time` : ''}.
-         The rest can still be sent a letter; they just cannot be unsubscribed from.</p>`
-      : `<div class="notice warn" style="margin-bottom:12px">
-          <p><strong>None of these can be unsubscribed from.</strong> An unsubscribe link is not something
-          that can be guessed from a company name — it is a <code>List-Unsubscribe</code> header that the
-          sender puts in the message itself. Only targets added by
-          <a href="#/exposure">scanning your mail</a> carry one; these came from the breach list, where
-          there is no message to read it from.</p>
-          <p class="small">Scan the mail from these companies and they will gain unsubscribe links. Until
-          then the lever that works on them is the erasure letter, which is stronger anyway: unsubscribing
-          stops the mail, Article 17 makes them delete you.</p>
-        </div>`}
-    <div id="unsub-queue"></div>
-    ${shown.map(b => targetRow(b, state)).join('')}
-  </div>` : '<div class="card"><p class="muted">No targets match.</p></div>'}`;
+  ${shown.length
+    ? `<div class="card">${shown.map(b => targetRow(b, state)).join('')}</div>`
+    : '<div class="card"><p class="muted">No targets match.</p></div>'}`;
 }
 
 function targetRow(b, state) {
@@ -689,22 +646,21 @@ function targetRow(b, state) {
   const pill = overdue ? 'overdue' : (store.STATUSES[r.status]?.pill || 'todo');
   const label = overdue ? `Overdue by ${store.daysSince(r.sentAt) - store.deadlineDays(b)}d` : store.STATUSES[r.status]?.label;
 
-  const canUnsub = !!(b.unsubUrl && safeUrl(b.unsubUrl));
+  const SRC = { mail: 'from your mail', phone: 'from a call or text', breach: 'from a breach', custom: 'added by you' };
   return `
   <div class="item">
-    <input type="checkbox" data-action="sel" data-id="${esc(b.id)}" style="width:auto;margin-top:4px"
-      ${selected.has(b.id) ? 'checked' : ''}>
     <div class="body">
       <div class="name">${esc(b.name)}
         <span class="pill ${pill}">${esc(label)}</span>
-        ${b.source === 'mail' ? '<span class="pill sent">from your mail</span>' : ''}
-        ${b.source === 'phone' ? '<span class="pill sent">from a call/text</span>' : ''}
-        ${canUnsub ? '<span class="pill done">unsubscribe available</span>' : ''}
-        ${b.evidence?.address ? `<span class="pill">letter reveals only ${esc(b.evidence.address)}</span>` : ''}
+        ${SRC[b.source] ? `<span class="pill sent">${SRC[b.source]}</span>` : ''}
       </div>
-      <div class="meta">${esc(CATEGORIES[b.category] || b.category)}
-        ${b.site ? `· ${esc(b.site)}` : ''}
-        ${r.sentAt ? `· sent ${esc(r.sentAt)}` : ''}</div>
+      ${b.evidence?.address
+        ? `<div class="meta">Letter reveals only <span class="mono">${esc(b.evidence.address)}</span></div>`
+        : b.evidence?.phone
+        ? `<div class="meta">Letter reveals only <span class="mono">${esc(b.evidence.phone)}</span></div>`
+        : ''}
+      <div class="meta">${b.site ? `<span class="mono">${esc(b.site)}</span>` : ''}${r.sentAt
+        ? ` · sent ${esc(r.sentAt)}` : ''}${b.source ? '' : ` · ${esc(CATEGORIES[b.category] || b.category)}`}</div>
       ${b.notes ? `<div class="meta">${esc(b.notes)}</div>` : ''}
     </div>
     <div class="actions">
@@ -720,19 +676,6 @@ function targetRow(b, state) {
 
 export function mountBrokers(root, state, rerender) {
   root.addEventListener('change', e => {
-    const box = e.target.closest('[data-action="sel"]');
-    if (box) {
-      if (box.checked) selected.add(box.dataset.id); else selected.delete(box.dataset.id);
-      rerender();
-      return;
-    }
-    if (e.target.id === 'select-all') {
-      const ids = [...root.querySelectorAll('[data-action="sel"]')].map(el => el.dataset.id);
-      if (e.target.checked) ids.forEach(id => selected.add(id));
-      else ids.forEach(id => selected.delete(id));
-      rerender();
-      return;
-    }
     const sel = e.target.closest('[data-action="set-status"]');
     if (sel) { store.setStatus(sel.dataset.id, sel.value); toast('Status updated'); return; }
     if (e.target.id === 'target-cat') {
@@ -753,47 +696,6 @@ export function mountBrokers(root, state, rerender) {
 
   root.addEventListener('click', e => {
     const act = e.target.closest('[data-action]')?.dataset.action;
-
-    if (act === 'bulk-unsub') {
-      const all = allTargets(state, []).concat(state.custom);
-      const list = [...new Map(all.map(t => [t.id, t])).values()]
-        .filter(t => selected.has(t.id) && t.unsubUrl && safeUrl(t.unsubUrl));
-      const oneClick = list.filter(t => t.oneClick);
-      const visit = list.filter(t => !t.oneClick);
-      if (oneClick.length) runOneClickBatch(root, oneClick, visit);
-      else startUnsubQueue(root, visit);
-      return;
-    }
-
-    if (act === 'queue-rest') {
-      const rest = JSON.parse(root.querySelector('#unsub-queue').dataset.rest || '[]');
-      startUnsubQueue(root, rest);
-      return;
-    }
-
-    if (act === 'unsub-next') {
-      const q = root.querySelector('#unsub-queue');
-      const i = Number(q.dataset.i || 0);
-      const urls = JSON.parse(q.dataset.urls || '[]');
-      if (i < urls.length) {
-        // One window.open per click. A loop is silently swallowed by the popup
-        // blocker after the first, so stepping through is the only honest way.
-        window.open(urls[i].url, '_blank', 'noopener,noreferrer');
-        q.dataset.i = String(i + 1);
-        renderQueue(q, urls, i + 1);
-      }
-      return;
-    }
-
-    if (act === 'unsub-copy') {
-      const urls = JSON.parse(root.querySelector('#unsub-queue').dataset.urls || '[]');
-      navigator.clipboard.writeText(urls.map(u => u.url).join('\n'))
-        .then(() => toast(`${urls.length} links copied`))
-        .catch(() => toast('Could not copy — select them by hand'));
-      return;
-    }
-
-    if (act === 'unsub-close') { root.querySelector('#unsub-queue').innerHTML = ''; return; }
 
     if (act !== 'add-custom') return;
     const name = prompt('Company name');
@@ -860,6 +762,41 @@ function runOneClickBatch(root, items, rest) {
   document.body.appendChild(frame);
 }
 
+// The queue renders on whichever page asked for it, so its buttons are wired
+// once here rather than inside a single page's mount.
+function wireQueue(root) {
+  root.addEventListener('click', e => {
+    const act = e.target.closest('[data-action]')?.dataset.action;
+    const q = root.querySelector('#unsub-queue');
+    if (!q) return;
+
+    if (act === 'queue-rest') {
+      startUnsubQueue(root, JSON.parse(q.dataset.rest || '[]'));
+    }
+
+    if (act === 'unsub-next') {
+      const i = Number(q.dataset.i || 0);
+      const urls = JSON.parse(q.dataset.urls || '[]');
+      if (i < urls.length) {
+        // One window.open per click. A loop is silently swallowed by the popup
+        // blocker after the first, so stepping through is the only honest way.
+        window.open(urls[i].url, '_blank', 'noopener,noreferrer');
+        q.dataset.i = String(i + 1);
+        renderQueue(q, urls, i + 1);
+      }
+    }
+
+    if (act === 'unsub-copy') {
+      const urls = JSON.parse(q.dataset.urls || '[]');
+      navigator.clipboard.writeText(urls.map(u => u.url).join('\n'))
+        .then(() => toast(`${urls.length} links copied`))
+        .catch(() => toast('Could not copy — select them by hand'));
+    }
+
+    if (act === 'unsub-close') q.innerHTML = '';
+  });
+}
+
 function startUnsubQueue(root, list) {
   const q = root.querySelector('#unsub-queue');
   if (!q) return;
@@ -891,6 +828,123 @@ function renderQueue(q, urls, i) {
         <button data-action="unsub-close">${done ? 'Close' : 'Stop'}</button>
       </div>
     </div>`;
+}
+
+// ------------------------------------------------------------- unsubscribe
+
+// Sorts a target into what can actually be done to it, so the page never shows
+// a dead button: one-click POST, a link to open, or a search for the page.
+export function unsubTier(b) {
+  if (b.unsubUrl && safeUrl(b.unsubUrl)) return b.oneClick ? 'instant' : 'link';
+  return 'search';
+}
+
+export function searchUrl(b) {
+  const term = (b.name && b.name !== b.site ? b.name : b.site) || b.name || '';
+  return 'https://duckduckgo.com/?q=' +
+    encodeURIComponent(`${term} unsubscribe email preferences`);
+}
+
+let unsubPrimed = false;
+
+export function unsubscribe(state) {
+  const all = state.custom;
+  if (!unsubPrimed && all.length) {
+    all.forEach(b => selected.add(b.id));
+    unsubPrimed = true;
+  }
+  const tiers = { instant: [], link: [], search: [] };
+  for (const b of all) tiers[unsubTier(b)].push(b);
+
+  const sel = k => tiers[k].filter(b => selected.has(b.id));
+  const nSel = sel('instant').length + sel('link').length + sel('search').length;
+
+  const group = (key, title, blurb, cta, cls) => tiers[key].length ? `
+    <section class="card">
+      <div class="row between" style="align-items:flex-start;gap:16px">
+        <div>
+          <h2>${title} <span class="count">${tiers[key].length}</span></h2>
+          <p class="small muted" style="max-width:56ch;margin:0">${blurb}</p>
+        </div>
+        <button class="${cls}" data-action="run-${key}" ${sel(key).length ? '' : 'disabled'}>
+          ${cta.replace('{n}', sel(key).length || '')}
+        </button>
+      </div>
+      <div class="row" style="margin:12px 0 4px">
+        <button class="link-btn" data-action="sel-group" data-group="${key}">
+          ${sel(key).length === tiers[key].length ? 'Deselect' : 'Select'} all ${tiers[key].length}
+        </button>
+      </div>
+      <div class="list">
+        ${tiers[key].map(b => `
+          <label class="pick">
+            <input type="checkbox" data-action="sel" data-id="${esc(b.id)}" ${selected.has(b.id) ? 'checked' : ''}>
+            <span class="pick-name">${esc(b.name)}</span>
+            <span class="pick-meta mono">${esc(b.site || '')}</span>
+          </label>`).join('')}
+      </div>
+    </section>` : '';
+
+  return `
+  <div class="head">
+    <h1>Unsubscribe</h1>
+    <p>Stop the mail arriving. This does not delete anything they hold about you —
+    <a href="#/delete">that is the other page</a>.</p>
+  </div>
+
+  ${!all.length ? `<div class="notice">
+    <p>Nothing to unsubscribe from yet. <a href="#/scan">Scan your mail</a> and the senders land here.</p>
+  </div>` : ''}
+
+  <div id="unsub-queue"></div>
+
+  ${group('instant', 'One click, no page to visit',
+    'These senders support the one-click unsubscribe standard, so a single request completes it. They all go at once.',
+    'Unsubscribe {n} now', 'primary')}
+
+  ${group('link', 'Opens their page',
+    'These published a link but not one-click, so their page has to load. Your browser will not let one page open many tabs, so they open one at a time.',
+    'Open {n}', '')}
+
+  ${group('search', 'No link published',
+    'Nothing in their mail said how to unsubscribe, and a link cannot be guessed from a name. This searches for their unsubscribe or preference page so you can fill it in.',
+    'Find {n}', '')}
+
+  ${all.length ? `<p class="small muted">${nSel} selected. Anything that will not stop mailing you after
+  this is a candidate for an <a href="#/delete">erasure demand</a>, which is enforceable where an
+  unsubscribe is a courtesy.</p>` : ''}`;
+}
+
+export function mountUnsubscribe(root, state, rerender) {
+  wireQueue(root);
+
+  root.addEventListener('change', e => {
+    const box = e.target.closest('[data-action="sel"]');
+    if (!box) return;
+    if (box.checked) selected.add(box.dataset.id); else selected.delete(box.dataset.id);
+    rerender();
+  });
+
+  root.addEventListener('click', e => {
+    const btn = e.target.closest('[data-action]');
+    if (!btn) return;
+    const act = btn.dataset.action;
+
+    if (act === 'sel-group') {
+      const group = btn.dataset.group;
+      const ids = state.custom.filter(b => unsubTier(b) === group).map(b => b.id);
+      const allOn = ids.every(id => selected.has(id));
+      ids.forEach(id => allOn ? selected.delete(id) : selected.add(id));
+      rerender();
+      return;
+    }
+
+    const pick = k => state.custom.filter(b => unsubTier(b) === k && selected.has(b.id));
+
+    if (act === 'run-instant') runOneClickBatch(root, pick('instant'), []);
+    if (act === 'run-link')    startUnsubQueue(root, pick('link').map(b => ({ name: b.name, unsubUrl: b.unsubUrl })));
+    if (act === 'run-search')  startUnsubQueue(root, pick('search').map(b => ({ name: b.name, unsubUrl: searchUrl(b) })));
+  });
 }
 
 // ------------------------------------------------------------------- letter

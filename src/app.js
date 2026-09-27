@@ -2,12 +2,16 @@ import * as store from './store.js';
 import * as views from './views.js';
 
 const ROUTES = [
-  { path: '/',         label: 'Overview',      view: views.dashboard },
-  { path: '/exposure', label: 'Exposure',      view: views.exposure,  mount: views.mountExposure },
-  { path: '/brokers',  label: 'Targets',       view: views.brokers,   mount: views.mountBrokers },
-  { path: '/email',    label: 'Email defence', view: views.email,     mount: views.mountEmail },
-  { path: '/profile',  label: 'Your details',  view: views.profile,   mount: views.mountProfile }
+  { path: '/',            label: 'Overview',    view: views.dashboard },
+  { path: '/scan',        label: 'Scan mail',   view: views.exposure,    mount: views.mountExposure },
+  { path: '/unsubscribe', label: 'Unsubscribe', view: views.unsubscribe, mount: views.mountUnsubscribe },
+  { path: '/delete',      label: 'Delete data', view: views.brokers,     mount: views.mountBrokers },
+  { path: '/aliases',     label: 'Aliases',     view: views.email,       mount: views.mountEmail },
+  { path: '/profile',     label: 'Settings',    view: views.profile,     mount: views.mountProfile }
 ];
+
+// Old hashes people may have bookmarked or that older copy still links to.
+const ALIASES = { '/exposure': '/scan', '/brokers': '/delete', '/email': '/aliases' };
 const LETTER = { path: '/letter', view: views.letter, mount: views.mountLetter };
 
 let catalog = [];
@@ -15,8 +19,9 @@ let current = '/';
 
 function parseHash() {
   const raw = location.hash.replace(/^#/, '') || '/';
-  const [path, query = ''] = raw.split('?');
-  return { path: path || '/', params: new URLSearchParams(query) };
+  const [rawPath, query = ''] = raw.split('?');
+  const path = ALIASES[rawPath] || rawPath || '/';
+  return { path, params: new URLSearchParams(query) };
 }
 
 function renderNav(path) {
@@ -30,7 +35,7 @@ function render() {
   const route = path === '/letter' ? LETTER : (ROUTES.find(r => r.path === path) || ROUTES[0]);
   const state = store.get();
 
-  renderNav(path === '/letter' ? '/brokers' : path);
+  renderNav(path === '/letter' ? '/delete' : path);
 
   // A fresh container per render, so a view's listeners die with its markup
   // instead of stacking up on a long-lived element.
@@ -52,7 +57,7 @@ function render() {
 store.subscribe(() => {
   // Exposure holds fetched results that a full re-render would throw away;
   // it updates its own DOM in place instead.
-  if (current !== '/exposure') render();
+  if (current !== '/scan') render();
 });
 
 addEventListener('hashchange', render);

@@ -59,6 +59,11 @@ personal data. A public URL exposes the code, never your data — what you enter
 
 ## The pages
 
+The two jobs are separate pages because they are separate things: unsubscribing is a courtesy the sender
+may withdraw, erasure is an obligation with a deadline. Mixing them made it unclear which one a button
+was doing.
+
+
 - **Overview** — what is in flight, what is past its deadline, what to chase.
 - **Scan your mail** — drag your Junk (or Inbox) messages out of Apple Mail, Outlook or a Gmail Takeout
   export and drop the `.eml`/`.mbox` files on the page. The browser parses the headers locally, groups
@@ -75,11 +80,13 @@ personal data. A public URL exposes the code, never your data — what you enter
   the breach database's own site; the paid API is optional and tucked away.
 - **Targets** — by default, only companies derived from your own evidence: senders found in the mail you
   scanned, and numbers you logged from spam calls or texts. Each row shows where it came from and which
-  single identifier its letter will reveal. Select any number and run the bulk unsubscribe. Senders advertising
-  RFC 8058 one-click (`List-Unsubscribe-Post`) are done in a single batch — one button, no pages to
-  visit, four at a time. Senders that published only a link are opened one at a time afterwards, because
-  a browser refuses to let a page open many tabs at once and a loop would silently drop all but the
-  first. The 37 bundled data brokers are one link away but deliberately not in this list — they are not
+  single identifier its letter will reveal. Splits every sender into what can actually be done to it, so no
+  button is ever dead. Senders advertising RFC 8058 one-click (`List-Unsubscribe-Post`) go in a single
+  batch, four at a time, with no page to visit. Senders that published only a link open one at a time,
+  because a browser refuses to let a page open many tabs at once and a loop would silently drop all but
+  the first. Senders that published nothing — everything from the breach list, where there is no message
+  to read a header from — get a search for their unsubscribe or preference page, since a link cannot be
+  guessed from a name. Everything starts selected. The 37 bundled data brokers are one link away but deliberately not in this list — they are not
   your evidence, they are everyone's.
 - **Letter** — generates the request, in English or Dutch, filled in with your details. Copy it, open
   it in your mail app, or print it. Marking it sent starts the deadline clock.
