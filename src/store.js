@@ -15,6 +15,32 @@ const EMPTY = {
 
 function clone(o) { return JSON.parse(JSON.stringify(o)); }
 
+// Targets saved before provenance was tracked carry no `source`, which made
+// isEvidenceDerived() fail open and put a full identity file in their letters.
+// Backfill from the id prefix so data already in someone's browser is corrected
+// on load rather than needing to be re-added.
+let migrationApplied = false;
+
+function backfillSources(state) {
+  for (const t of state.custom || []) {
+    if (!t.source) {
+      migrationApplied = true;
+      if (t.id?.startsWith('mail:')) t.source = 'mail';
+      else if (t.id?.startsWith('phone:')) t.source = 'phone';
+      else if (t.id?.startsWith('breach:')) t.source = 'breach';
+      else if (t.id?.startsWith('custom:')) t.source = 'custom';
+    }
+    // Every target the user added came from their own evidence, so default the
+    // disclosure to the one address we know they own.
+    if (!t.evidence && t.source) {
+      migrationApplied = true;
+      const emails = state.profile?.emails || [];
+      t.evidence = { address: emails.length === 1 ? emails[0] : '' };
+    }
+  }
+  return state;
+}
+
 let state = load();
 
 function load() {
@@ -23,7 +49,7 @@ function load() {
     if (!raw) return clone(EMPTY);
     const parsed = JSON.parse(raw);
     // Merge forward so older saves keep working after an update.
-    return { ...clone(EMPTY), ...parsed, profile: { ...EMPTY.profile, ...(parsed.profile || {}) } };
+    return backfillSources({ ...clone(EMPTY), ...parsed, profile: { ...EMPTY.profile, ...(parsed.profile || {}) } });
   } catch {
     return clone(EMPTY);
   }
@@ -42,6 +68,11 @@ function persist() {
   listeners.forEach(fn => fn(state));
 }
 
+// Flush the migration so exports and later reads carry the corrected shape.
+// Deferred to here because persist() touches `listeners`, which is not yet
+// initialised while load() runs at module evaluation.
+if (migrationApplied) persist();
+
 export function get() { return state; }
 
 export function update(fn) { fn(state); persist(); }
@@ -53,7 +84,7 @@ export function importJSON(text) {
   if (typeof parsed !== 'object' || parsed === null || parsed.v !== 1) {
     throw new Error('Not a Data Reclaim backup file.');
   }
-  state = { ...clone(EMPTY), ...parsed, profile: { ...EMPTY.profile, ...(parsed.profile || {}) } };
+  state = backfillSources({ ...clone(EMPTY), ...parsed, profile: { ...EMPTY.profile, ...(parsed.profile || {}) } });
   persist();
 }
 

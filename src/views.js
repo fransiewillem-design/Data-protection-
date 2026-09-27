@@ -441,6 +441,8 @@ export function mountExposure(root, state, rerender) {
         id, name, category: 'breach', regions: ['EU', 'US'],
         site: domain || '', optOutUrl: domain ? `https://${domain}` : '',
         email: domain ? `privacy@${domain}` : '', method: 'email', confidence: 'low',
+        source: 'breach',
+        evidence: { address: (state.profile.emails || [])[0] || '' },
         notes: 'Added from the breach list. Confirm the privacy contact address before sending.'
       }));
       btn.outerHTML = '<span class="pill sent">on your list</span>';
@@ -651,13 +653,25 @@ export function brokers(state, catalog, params) {
       <div class="actions">
         <span class="small muted">${selectedHere.length} selected</span>
         <button class="primary" data-action="bulk-unsub" ${selectedUnsub.length ? '' : 'disabled'}>
-          Unsubscribe from ${selectedUnsub.length || ''} ${selectedUnsub.length === 1 ? 'sender' : 'senders'}
+          ${selectedUnsub.length
+            ? `Unsubscribe from ${selectedUnsub.length} ${selectedUnsub.length === 1 ? 'sender' : 'senders'}`
+            : 'No unsubscribe links in selection'}
         </button>
       </div>
     </div>
-    ${unsubable.length ? `<p class="small muted" style="margin-bottom:12px">${unsubable.length} of these
-      published a working unsubscribe link. Selecting a sender with no link still lets you send it a
-      letter — it just cannot be unsubscribed from.</p>` : ''}
+    ${unsubable.length
+      ? `<p class="small muted" style="margin-bottom:12px">${unsubable.length} of these published a working
+         unsubscribe link. The rest can still be sent a letter; they just cannot be unsubscribed from.</p>`
+      : `<div class="notice warn" style="margin-bottom:12px">
+          <p><strong>None of these can be unsubscribed from.</strong> An unsubscribe link is not something
+          that can be guessed from a company name — it is a <code>List-Unsubscribe</code> header that the
+          sender puts in the message itself. Only targets added by
+          <a href="#/exposure">scanning your mail</a> carry one; these came from the breach list, where
+          there is no message to read it from.</p>
+          <p class="small">Scan the mail from these companies and they will gain unsubscribe links. Until
+          then the lever that works on them is the erasure letter, which is stronger anyway: unsubscribing
+          stops the mail, Article 17 makes them delete you.</p>
+        </div>`}
     <div id="unsub-queue"></div>
     ${shown.map(b => targetRow(b, state)).join('')}
   </div>` : '<div class="card"><p class="muted">No targets match.</p></div>'}`;

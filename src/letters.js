@@ -10,7 +10,11 @@ export function isEvidenceDerived(b) {
   // Anything we learned from the user's own mail or SMS is minimal-disclosure by
   // default, even if we could not pin down which address received it — failing
   // open here would leak a full profile to a scammer.
-  if (b.source === 'mail' || b.source === 'phone') return true;
+  // Every target the user added themselves is evidence-derived: it came from
+  // their mail, their phone, a breach they were in, or their own typing. Only
+  // the bundled broker catalogue gets a full identity block, because a broker
+  // genuinely cannot find one person in a national database from an email alone.
+  if (['mail', 'phone', 'breach', 'custom'].includes(b.source)) return true;
   return !!(b.evidence && (b.evidence.address || b.evidence.phone));
 }
 
