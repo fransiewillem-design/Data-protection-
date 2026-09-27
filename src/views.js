@@ -466,7 +466,11 @@ export function mountExposure(root, state, rerender) {
       evidence: { address },
       unsubUrl: sn.unsubHttp || '',
       unsubMailto: sn.unsubMailto || '',
+      unsubFrom: sn.unsubFrom || '',
       oneClick: !!sn.oneClick,
+      // No unsubscribe anywhere in the message is the clearest spam signal
+      // there is: compliant bulk senders are obliged to offer one.
+      spam: !sn.unsubHttp,
       notes: `Found in your own mail: ${sn.domain} sent to ${address || 'an address of yours'}. The letter deliberately tells them nothing they do not already have.`
     }));
     if (!quiet) toast(`${label} added — letter ready`);
@@ -595,9 +599,13 @@ function breachRow(b, state) {
 const selected = new Set();
 
 export function brokers(state, catalog, params) {
-  const mine = state.custom;
+  // A letter to a throwaway spam domain bounces, and sending one confirms the
+  // address is live. Those stay on the block list unless explicitly asked for.
+  const spam = state.custom.filter(b => senderClass(b) === 'spam');
+  const showSpam = params.get('spam') === '1';
+  const mine = showSpam ? state.custom : state.custom.filter(b => senderClass(b) !== 'spam');
   const showBrokers = params.get('all') === '1';
-  const targets = showBrokers ? allTargets(state, catalog) : mine;
+  const targets = showBrokers ? allTargets({ ...state, custom: mine }, catalog) : mine;
   const q = (params.get('q') || '').toLowerCase();
   const shown = targets.filter(b => !q || (b.name + ' ' + (b.site || '')).toLowerCase().includes(q));
 
@@ -632,6 +640,11 @@ export function brokers(state, catalog, params) {
            <a href="#/delete">Show only mine</a>`
         : `Only what came from your own evidence.
            <a href="#/delete?all=1">Add the ${catalog.length} bundled data brokers</a>`}
+      ${spam.length && !showSpam
+        ? `<br>${spam.length} spam ${spam.length === 1 ? 'sender is' : 'senders are'} hidden — a letter to
+           those bounces and confirms your address is live.
+           <a href="#/delete?spam=1">Show them anyway</a>`
+        : ''}
     </p>
   </div>
 
@@ -832,32 +845,37 @@ function renderQueue(q, urls, i) {
 
 // ------------------------------------------------------------- unsubscribe
 
-// Sorts a target into what can actually be done to it, so the page never shows
-// a dead button: one-click POST, a link to open, or a search for the page.
-export function unsubTier(b) {
-  if (b.unsubUrl && safeUrl(b.unsubUrl)) return b.oneClick ? 'instant' : 'link';
-  return 'search';
+// Three outcomes, and only two of them are unsubscribing. A sender with no
+// unsubscribe anywhere in its message is not a company that forgot — compliant
+// bulk mail must offer one — so it is treated as spam to block, not written to.
+export function senderClass(b) {
+  if (b.source !== 'mail') return 'company';
+  return (b.unsubUrl && safeUrl(b.unsubUrl)) ? 'unsub' : 'spam';
 }
 
-export function searchUrl(b) {
-  const term = (b.name && b.name !== b.site ? b.name : b.site) || b.name || '';
-  return 'https://duckduckgo.com/?q=' +
-    encodeURIComponent(`${term} unsubscribe email preferences`);
+export function unsubTier(b) {
+  if (senderClass(b) !== 'unsub') return null;
+  return b.oneClick && b.unsubFrom === 'header' ? 'instant' : 'link';
 }
 
 let unsubPrimed = false;
 
 export function unsubscribe(state) {
-  const all = state.custom;
-  if (!unsubPrimed && all.length) {
-    all.forEach(b => selected.add(b.id));
+  const mail = state.custom.filter(b => b.source === 'mail');
+  const tiers = { instant: [], link: [] };
+  const spam = [];
+  for (const b of state.custom) {
+    const t = unsubTier(b);
+    if (t) tiers[t].push(b);
+    else if (senderClass(b) === 'spam') spam.push(b);
+  }
+
+  if (!unsubPrimed && (tiers.instant.length || tiers.link.length)) {
+    [...tiers.instant, ...tiers.link].forEach(b => selected.add(b.id));
     unsubPrimed = true;
   }
-  const tiers = { instant: [], link: [], search: [] };
-  for (const b of all) tiers[unsubTier(b)].push(b);
 
   const sel = k => tiers[k].filter(b => selected.has(b.id));
-  const nSel = sel('instant').length + sel('link').length + sel('search').length;
 
   const group = (key, title, blurb, cta, cls) => tiers[key].length ? `
     <section class="card">
@@ -880,6 +898,8 @@ export function unsubscribe(state) {
           <label class="pick">
             <input type="checkbox" data-action="sel" data-id="${esc(b.id)}" ${selected.has(b.id) ? 'checked' : ''}>
             <span class="pick-name">${esc(b.name)}</span>
+            ${b.unsubFrom === 'body-url-only'
+              ? '<span class="pill low" title="Only the link address said unsubscribe, not the visible text">check first</span>' : ''}
             <span class="pick-meta mono">${esc(b.site || '')}</span>
           </label>`).join('')}
       </div>
@@ -888,31 +908,56 @@ export function unsubscribe(state) {
   return `
   <div class="head">
     <h1>Unsubscribe</h1>
-    <p>Stop the mail arriving. This does not delete anything they hold about you —
+    <p>Senders that offered a way out. Stopping the mail is not deletion —
     <a href="#/delete">that is the other page</a>.</p>
   </div>
 
-  ${!all.length ? `<div class="notice">
-    <p>Nothing to unsubscribe from yet. <a href="#/scan">Scan your mail</a> and the senders land here.</p>
+  ${!mail.length ? `<div class="notice">
+    <p>Nothing here yet. <a href="#/scan">Scan your mail</a> and senders land here automatically.</p>
   </div>` : ''}
 
   <div id="unsub-queue"></div>
 
   ${group('instant', 'One click, no page to visit',
-    'These senders support the one-click unsubscribe standard, so a single request completes it. They all go at once.',
+    'These support the one-click unsubscribe standard, so a single request finishes it. They all go at once.',
     'Unsubscribe {n} now', 'primary')}
 
   ${group('link', 'Opens their page',
-    'These published a link but not one-click, so their page has to load. Your browser will not let one page open many tabs, so they open one at a time.',
+    'These published a link — in the message body, usually as Uitschrijven or Afmelden — but not one-click, so the page has to load. Your browser will not open many tabs at once, so they go one at a time.',
     'Open {n}', '')}
 
-  ${group('search', 'No link published',
-    'Nothing in their mail said how to unsubscribe, and a link cannot be guessed from a name. This searches for their unsubscribe or preference page so you can fill it in.',
-    'Find {n}', '')}
+  ${spam.length ? `
+    <section class="card">
+      <h2>Pure spam — block, do not reply <span class="count">${spam.length}</span></h2>
+      <p class="small muted" style="max-width:60ch">Nothing in these messages offered any way to
+      unsubscribe. Compliant bulk senders are obliged to provide one, so its absence is the signal:
+      these are not companies that forgot, they are operations you cannot negotiate with.</p>
+      <p class="small muted" style="max-width:60ch"><strong>Do not click anything in them, and do not
+      send them a letter.</strong> Any response confirms a person reads this mailbox, which raises what
+      your address sells for. An erasure demand to a throwaway domain bounces.</p>
+      <div class="list">
+        ${spam.map(b => `
+          <div class="pick" style="cursor:default">
+            <span class="pick-name">${esc(b.name)}</span>
+            <span class="pick-meta mono">${esc(b.site || '')}</span>
+          </div>`).join('')}
+      </div>
+      <details style="margin-top:14px">
+        <summary class="small muted" style="cursor:pointer">How to block these</summary>
+        <ul class="small muted" style="margin-top:10px">
+          <li><strong>Apple Mail / iCloud:</strong> select the message, then Message → Block Sender.
+          In iCloud settings, set blocked senders to go straight to Bin.</li>
+          <li><strong>Outlook:</strong> right-click → Junk → Block Sender.</li>
+          <li><strong>Gmail:</strong> open the message, the ⋮ menu → Block sender.</li>
+          <li>Blocking one address rarely ends it — they rotate domains. The durable fix is retiring the
+          address they have: <a href="#/aliases">one alias per company</a>.</li>
+        </ul>
+      </details>
+    </section>` : ''}
 
-  ${all.length ? `<p class="small muted">${nSel} selected. Anything that will not stop mailing you after
-  this is a candidate for an <a href="#/delete">erasure demand</a>, which is enforceable where an
-  unsubscribe is a courtesy.</p>` : ''}`;
+  ${tiers.instant.length || tiers.link.length ? `<p class="small muted">Anything that keeps mailing you
+  after this belongs on <a href="#/delete">Delete data</a>, where the demand is enforceable rather than
+  a courtesy.</p>` : ''}`;
 }
 
 export function mountUnsubscribe(root, state, rerender) {
@@ -931,8 +976,7 @@ export function mountUnsubscribe(root, state, rerender) {
     const act = btn.dataset.action;
 
     if (act === 'sel-group') {
-      const group = btn.dataset.group;
-      const ids = state.custom.filter(b => unsubTier(b) === group).map(b => b.id);
+      const ids = state.custom.filter(b => unsubTier(b) === btn.dataset.group).map(b => b.id);
       const allOn = ids.every(id => selected.has(id));
       ids.forEach(id => allOn ? selected.delete(id) : selected.add(id));
       rerender();
@@ -940,10 +984,8 @@ export function mountUnsubscribe(root, state, rerender) {
     }
 
     const pick = k => state.custom.filter(b => unsubTier(b) === k && selected.has(b.id));
-
     if (act === 'run-instant') runOneClickBatch(root, pick('instant'), []);
     if (act === 'run-link')    startUnsubQueue(root, pick('link').map(b => ({ name: b.name, unsubUrl: b.unsubUrl })));
-    if (act === 'run-search')  startUnsubQueue(root, pick('search').map(b => ({ name: b.name, unsubUrl: searchUrl(b) })));
   });
 }
 
