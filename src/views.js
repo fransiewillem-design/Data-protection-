@@ -614,6 +614,9 @@ export function brokers(state, catalog, params) {
   const unsubable = shown.filter(b => b.unsubUrl && safeUrl(b.unsubUrl));
   const selectedHere = shown.filter(b => selected.has(b.id));
   const selectedUnsub = selectedHere.filter(b => b.unsubUrl && safeUrl(b.unsubUrl));
+  // Senders advertising RFC 8058 can be unsubscribed with a POST and no visit.
+  const selectedOneClick = selectedUnsub.filter(b => b.oneClick);
+  const selectedVisit = selectedUnsub.filter(b => !b.oneClick);
 
   return `
   <div class="head">
@@ -661,7 +664,10 @@ export function brokers(state, catalog, params) {
     </div>
     ${unsubable.length
       ? `<p class="small muted" style="margin-bottom:12px">${unsubable.length} of these published a working
-         unsubscribe link. The rest can still be sent a letter; they just cannot be unsubscribed from.</p>`
+         unsubscribe link${selectedOneClick.length ? `, and ${selectedOneClick.length} of your selection
+         support one-click unsubscribe — those go out in a single batch with no page to visit` : ''}${selectedVisit.length
+         ? `. ${selectedVisit.length} only published a link, so those open one at a time` : ''}.
+         The rest can still be sent a letter; they just cannot be unsubscribed from.</p>`
       : `<div class="notice warn" style="margin-bottom:12px">
           <p><strong>None of these can be unsubscribed from.</strong> An unsubscribe link is not something
           that can be guessed from a company name — it is a <code>List-Unsubscribe</code> header that the
@@ -752,7 +758,16 @@ export function mountBrokers(root, state, rerender) {
       const all = allTargets(state, []).concat(state.custom);
       const list = [...new Map(all.map(t => [t.id, t])).values()]
         .filter(t => selected.has(t.id) && t.unsubUrl && safeUrl(t.unsubUrl));
-      startUnsubQueue(root, list);
+      const oneClick = list.filter(t => t.oneClick);
+      const visit = list.filter(t => !t.oneClick);
+      if (oneClick.length) runOneClickBatch(root, oneClick, visit);
+      else startUnsubQueue(root, visit);
+      return;
+    }
+
+    if (act === 'queue-rest') {
+      const rest = JSON.parse(root.querySelector('#unsub-queue').dataset.rest || '[]');
+      startUnsubQueue(root, rest);
       return;
     }
 
@@ -792,6 +807,57 @@ export function mountBrokers(root, state, rerender) {
     }));
     toast(`${name} added`);
   });
+}
+
+// Hands the one-click set to the isolated worker and renders its progress.
+function runOneClickBatch(root, items, rest) {
+  const q = root.querySelector('#unsub-queue');
+  if (!q) return;
+  q.dataset.rest = JSON.stringify(rest.map(t => ({ id: t.id, name: t.name, unsubUrl: t.unsubUrl })));
+
+  const paint = (done, failed, total, finished) => {
+    q.innerHTML = `
+      <div class="notice ${finished ? '' : 'warn'}">
+        <p><strong>${finished ? 'Sent' : 'Unsubscribing…'} ${done} of ${total}</strong>${failed
+          ? ` — ${failed} could not be reached` : ''}</p>
+        ${finished ? `<p class="small">Delivered, not confirmed: a browser hides cross-site responses, so
+          the app cannot read what each sender replied. Compliant senders act on it immediately. If mail
+          from any of them continues, send that one an erasure letter — that one you can enforce.</p>` : ''}
+        ${finished && rest.length ? `<p class="small"><strong>${rest.length} more</strong> published a link
+          but not one-click, so they need opening individually.</p>` : ''}
+        <div class="row" style="margin-top:8px">
+          ${finished && rest.length ? `<button class="primary" data-action="queue-rest">Open the remaining ${rest.length}</button>` : ''}
+          ${finished ? '<button data-action="unsub-close">Close</button>' : ''}
+        </div>
+      </div>`;
+  };
+
+  paint(0, 0, items.length, false);
+
+  const frame = document.createElement('iframe');
+  frame.src = 'unsubscribe.html';
+  frame.hidden = true;
+  frame.setAttribute('aria-hidden', 'true');
+
+  const onMessage = e => {
+    if (e.origin !== location.origin || e.data?.source !== 'dr-unsub') return;
+    const d = e.data;
+    if (d.type === 'ready') {
+      frame.contentWindow.postMessage({
+        type: 'dr-unsub-batch',
+        items: items.map(t => ({ name: t.name, url: safeUrl(t.unsubUrl) }))
+      }, location.origin);
+    }
+    if (d.type === 'progress') paint(d.done, d.failed, d.total, false);
+    if (d.type === 'complete') {
+      paint(d.done, d.failed, d.total, true);
+      removeEventListener('message', onMessage);
+      frame.remove();
+    }
+  };
+
+  addEventListener('message', onMessage);
+  document.body.appendChild(frame);
 }
 
 function startUnsubQueue(root, list) {
