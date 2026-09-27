@@ -1,5 +1,49 @@
 // Request letter templates. Kept as plain functions so they are easy to edit.
 
+// A target found in the user's own mail or SMS has demonstrably got exactly one
+// identifier: the address or number it contacted them on. Handing it a full name,
+// date of birth and postal address would give a scammer more than it started with
+// — the opposite of what this letter is for. So evidence-derived targets get a
+// minimal block, and the letter says why.
+export function isEvidenceDerived(b) {
+  if (!b) return false;
+  // Anything we learned from the user's own mail or SMS is minimal-disclosure by
+  // default, even if we could not pin down which address received it — failing
+  // open here would leak a full profile to a scammer.
+  if (b.source === 'mail' || b.source === 'phone') return true;
+  return !!(b.evidence && (b.evidence.address || b.evidence.phone));
+}
+
+function minimalBlock(b, nl) {
+  const e = b.evidence || {};
+  let id;
+  if (e.address) id = nl ? `E-mailadres: ${e.address}` : `Email address: ${e.address}`;
+  else if (e.phone) id = nl ? `Telefoonnummer: ${e.phone}` : `Phone number: ${e.phone}`;
+  else id = nl
+    ? 'E-mailadres: [vul het adres in waarop u hun bericht ontving]'
+    : 'Email address: [fill in the address their message reached you on]';
+  const why = nl
+    ? 'Dit is het enige identificatiegegeven dat ik verstrek, omdat dit het gegeven is dat u\naantoonbaar al van mij heeft: u heeft mij hierop benaderd. U heeft niets meer nodig om\nmijn gegevens te vinden. Op grond van artikel 12, lid 2, en overweging 64 AVG mag u geen\naanvullende persoonsgegevens verlangen als voorwaarde voor het uitvoeren van dit verzoek.'
+    : 'This is the only identifier I am providing, because it is the one you demonstrably\nalready hold — it is how you contacted me. You need nothing further to locate my\nrecords. Under Article 12(2) and Recital 64 GDPR you may not require additional\npersonal data as a condition of acting on this request, and I will not supply any.';
+  return id + '\n\n' + why;
+}
+
+// Sign as the identifier they already hold, not as a person they cannot yet name.
+function signature(b, p, nl) {
+  if (isEvidenceDerived(b)) {
+    const e = b.evidence || {};
+    return (e.address || e.phone || (nl ? '[adres]' : '[address]')) +
+      (nl ? '\n(de houder van bovengenoemd adres)' : '\n(the holder of the address above)');
+  }
+  return p.fullName || (nl ? '[naam]' : '[your name]');
+}
+
+function subjectId(b, p) {
+  if (!isEvidenceDerived(b)) return p.fullName || '[your name]';
+  const e = b.evidence || {};
+  return e.address || e.phone || 'data subject request';
+}
+
 function identityBlock(p) {
   const lines = [];
   if (p.fullName) lines.push(`Full name: ${p.fullName}`);
@@ -27,7 +71,7 @@ export const TEMPLATES = {
   gdpr_erasure: {
     label: 'GDPR erasure (Art. 17 + 15 + 21)',
     jurisdiction: 'EU',
-    subject: (b, p) => `Request under Articles 15, 17 and 21 GDPR — ${p.fullName || '[your name]'}`,
+    subject: (b, p) => `Request under Articles 15, 17 and 21 GDPR — ${subjectId(b, p)}`,
     body: (b, p) => `To the Data Protection Officer / Privacy Team of ${b.name},
 
 I am a data subject within the meaning of Regulation (EU) 2016/679 (GDPR). I am writing to exercise my rights in respect of all personal data you hold about me.
@@ -35,7 +79,7 @@ I am a data subject within the meaning of Regulation (EU) 2016/679 (GDPR). I am 
 My reference for this request: ${ref()}
 
 IDENTIFYING DETAILS
-${identityBlock(p)}
+${isEvidenceDerived(b) ? minimalBlock(b, false) : identityBlock(p)}
 
 I request that you do the following.
 
@@ -68,14 +112,14 @@ If you do not respond within the statutory period, or refuse without a valid bas
 Please confirm receipt of this request.
 
 Yours faithfully,
-${p.fullName || '[your name]'}
+${signature(b, p, false)}
 ${new Date().toISOString().slice(0, 10)}`
   },
 
   gdpr_erasure_nl: {
     label: 'AVG verwijderingsverzoek (NL)',
     jurisdiction: 'EU',
-    subject: (b, p) => `Verzoek op grond van artikel 15, 17 en 21 AVG — ${p.fullName || '[naam]'}`,
+    subject: (b, p) => `Verzoek op grond van artikel 15, 17 en 21 AVG — ${subjectId(b, p)}`,
     body: (b, p) => `Aan de Functionaris Gegevensbescherming / Privacy Team van ${b.name},
 
 Ik ben betrokkene in de zin van de Algemene verordening gegevensbescherming (AVG / Verordening (EU) 2016/679). Hierbij doe ik een beroep op mijn rechten met betrekking tot alle persoonsgegevens die u over mij verwerkt.
@@ -83,7 +127,7 @@ Ik ben betrokkene in de zin van de Algemene verordening gegevensbescherming (AVG
 Mijn kenmerk: ${ref()}
 
 IDENTIFICATIEGEGEVENS
-${identityBlockNL(p)}
+${isEvidenceDerived(b) ? minimalBlock(b, true) : identityBlockNL(p)}
 
 Ik verzoek u het volgende.
 
@@ -113,7 +157,7 @@ Ontvang ik geen tijdige reactie, of wijst u het verzoek zonder geldige grond af,
 Graag ontvang ik een ontvangstbevestiging.
 
 Met vriendelijke groet,
-${p.fullName || '[naam]'}
+${signature(b, p, true)}
 ${new Date().toISOString().slice(0, 10)}`
   },
 
@@ -121,7 +165,7 @@ ${new Date().toISOString().slice(0, 10)}`
   ccpa_delete: {
     label: 'CCPA/CPRA delete + opt out of sale',
     jurisdiction: 'US',
-    subject: (b, p) => `CCPA/CPRA request to delete and to opt out of sale/sharing — ${p.fullName || '[your name]'}`,
+    subject: (b, p) => `CCPA/CPRA request to delete and to opt out of sale/sharing — ${subjectId(b, p)}`,
     body: (b, p) => `To the Privacy Team of ${b.name},
 
 I am making a consumer rights request under the California Consumer Privacy Act as amended by the CPRA (Cal. Civ. Code § 1798.100 et seq.).
@@ -129,7 +173,7 @@ I am making a consumer rights request under the California Consumer Privacy Act 
 My reference for this request: ${ref()}
 
 IDENTIFYING DETAILS
-${identityBlock(p)}
+${isEvidenceDerived(b) ? minimalBlock(b, false) : identityBlock(p)}
 
 I request that you:
 
@@ -148,7 +192,7 @@ Do not require me to create an account in order to make this request (§ 1798.13
 If I am outside California and you decline on that basis, treat this letter as a request under any equivalent right available to me, and tell me which one applies.
 
 Yours faithfully,
-${p.fullName || '[your name]'}
+${signature(b, p, false)}
 ${new Date().toISOString().slice(0, 10)}`
   },
 
@@ -156,20 +200,20 @@ ${new Date().toISOString().slice(0, 10)}`
   reminder: {
     label: 'Reminder — deadline passed',
     jurisdiction: 'any',
-    subject: (b, p) => `Overdue: request under Articles 15, 17 and 21 GDPR — ${p.fullName || '[your name]'}`,
+    subject: (b, p) => `Overdue: request under Articles 15, 17 and 21 GDPR — ${subjectId(b, p)}`,
     body: (b, p, rec) => `To the Data Protection Officer / Privacy Team of ${b.name},
 
 On ${rec?.sentAt || '[date]'} I sent you a request to erase my personal data and to stop processing it, under Articles 15, 17 and 21 GDPR. The one-month period set by Article 12(3) has now passed without an adequate response.
 
 IDENTIFYING DETAILS
-${identityBlock(p)}
+${isEvidenceDerived(b) ? minimalBlock(b, false) : identityBlock(p)}
 
 This letter is a formal reminder. I ask you to confirm within 14 days that my data has been erased, or to state the specific legal ground on which you refuse.
 
 Failure to respond is itself an infringement of Article 12(3) and (4). If I have not heard from you within 14 days, I will lodge a complaint with the supervisory authority under Article 77 GDPR and will refer to this correspondence.
 
 Yours faithfully,
-${p.fullName || '[your name]'}
+${signature(b, p, false)}
 ${new Date().toISOString().slice(0, 10)}`
   },
 

@@ -73,8 +73,13 @@ personal data. A public URL exposes the code, never your data — what you enter
   hold you). Anything you find goes in via one box and comes out as a finished letter. Then the data
   brokers, who need no discovery — assume you are in their files. Then public breach records, free on
   the breach database's own site; the paid API is optional and tucked away.
-- **Targets** — 37 data brokers, people-search sites, B2B scrapers and Dutch registries, each with its
-  opt-out page and status tracking. Add your own.
+- **Targets** — by default, only companies derived from your own evidence: senders found in the mail you
+  scanned, and numbers you logged from spam calls or texts. Each row shows where it came from and which
+  single identifier its letter will reveal. Select any number of them and run the bulk unsubscribe, which
+  steps through their `List-Unsubscribe` links one click at a time (browsers block a page from opening
+  many tabs at once, so a queue is the honest implementation rather than a loop that silently drops most
+  of them). The 37 bundled data brokers are one link away but deliberately not in this list — they are not
+  your evidence, they are everyone's.
 - **Letter** — generates the request, in English or Dutch, filled in with your details. Copy it, open
   it in your mail app, or print it. Marking it sent starts the deadline clock.
 - **Email defence** — the alias system, guidance on handling what is already arriving, and the tracker
@@ -137,6 +142,19 @@ to clean up after. So there is no server.
 | `data/brokers.json` | Nothing — it is a file in this repo |
 | `haveibeenpwned.com/api/v3/breaches` | Nothing about you — the public breach list |
 | `api.pwnedpasswords.com/range/XXXXX` | Five characters of your password's SHA-1 hash |
+
+**Letters reveal nothing the recipient did not already have.** A target found in your own mail or SMS has
+demonstrably got exactly one identifier: the address or number it contacted you on. Its letter cites that
+and nothing else — no name, no date of birth, no postal address, no other addresses — and says why,
+citing Article 12(2) and Recital 64, which forbid a controller demanding extra personal data as a
+condition of acting. The signature and the subject line are the identifier too, since signing your real
+name would hand over exactly what the body withheld. This matters most for the letters that go to
+criminals: a scammer who mails you learns nothing from your reply.
+
+Fail-closed: anything sourced from mail or SMS is minimal even when the recipient address could not be
+determined, rather than falling back to the full profile. Requests to the bundled data brokers, and
+complaints to a supervisory authority, still carry full details — a broker cannot find you in its files
+without them, and a regulator needs to know who is complaining.
 
 **The one exception, stated plainly:** if you add a HIBP API key and check an address, that address is
 sent to Have I Been Pwned. There is no k-anonymous form of that lookup, so the feature cannot exist

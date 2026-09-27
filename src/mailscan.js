@@ -121,13 +121,26 @@ export function parseMessages(text) {
     const from = parseFrom(h.from);
     if (!from.domain) return null;
 
+    // Which of the user's own addresses this was sent to. This is the ONLY
+    // identifier the sender demonstrably holds, and the letter must not go
+    // beyond it.
+    const recipients = [];
+    for (const key of ['to', 'delivered-to', 'x-original-to', 'envelope-to']) {
+      for (const m of String(h[key] || '').matchAll(/[\w.+-]+@[\w.-]+\.\w+/g)) {
+        if (!recipients.includes(m[0].toLowerCase())) recipients.push(m[0].toLowerCase());
+      }
+    }
+
     return {
       address: from.address,
       name: from.name,
       domain: from.domain,
       subject: decodeWords(h.subject || ''),
       date: h.date || '',
+      recipients,
       unsub: parseUnsubscribe(h['list-unsubscribe']),
+      // RFC 8058: the sender promises a POST alone completes the unsubscribe.
+      oneClick: /one-click/i.test(h['list-unsubscribe-post'] || ''),
       isEsp: ESP_DOMAINS.has(from.domain)
     };
   }).filter(Boolean);
@@ -142,7 +155,8 @@ export function groupBySender(messages) {
     if (!map.has(key)) {
       map.set(key, {
         domain: key, name: m.name || key, count: 0,
-        unsubHttp: '', unsubMailto: '', addresses: new Set(), subjects: [], isEsp: m.isEsp
+        unsubHttp: '', unsubMailto: '', oneClick: false,
+        addresses: new Set(), recipients: new Set(), subjects: [], isEsp: m.isEsp
       });
     }
     const g = map.get(key);
@@ -151,10 +165,12 @@ export function groupBySender(messages) {
     if (g.subjects.length < 3 && m.subject) g.subjects.push(m.subject);
     if (!g.unsubHttp && m.unsub.http) g.unsubHttp = m.unsub.http;
     if (!g.unsubMailto && m.unsub.mailto) g.unsubMailto = m.unsub.mailto;
+    if (m.oneClick) g.oneClick = true;
+    for (const r of m.recipients) g.recipients.add(r);
     // Prefer a human-looking display name over the bare domain.
     if ((g.name === key || !g.name) && m.name) g.name = m.name;
   }
   return [...map.values()]
-    .map(g => ({ ...g, addresses: [...g.addresses] }))
+    .map(g => ({ ...g, addresses: [...g.addresses], recipients: [...g.recipients] }))
     .sort((a, b) => b.count - a.count);
 }
