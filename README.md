@@ -281,7 +281,8 @@ worker of the `connect-src https:` it exists to hold. Cloudflare serves `/unsubs
 
 ### Hosting on GitHub Pages
 
-`.github/workflows/pages.yml` builds and publishes on every push. The Pages site must be created once by
+A fallback only: the live site is on Cloudflare. `.github/workflows/pages.yml` builds and publishes when run by
+hand (*Actions → Deploy to GitHub Pages → Run workflow*), after Pages is switched back on. The Pages site must be created once by
 hand (*Settings → Pages → Source: GitHub Actions*); the workflow's `enablement: true` cannot do it,
 because the default `GITHUB_TOKEN` lacks the admin rights. On the free plan the repository must be
 public. GitHub Pages ignores `_headers`.

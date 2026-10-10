@@ -1,12 +1,11 @@
 name: Deploy to GitHub Pages
 
 on:
-  push:
-    # This repo has no `main` yet: the first branch pushed became the default.
-    # Both are listed so the deploy fires now and keeps working after a rename.
-    branches:
-      - main
-      - claude/data-breach-spam-blocker-7kvnrh
+  # The live site is hoopup.tech on Cloudflare Pages, which builds on every
+  # push by itself. GitHub Pages has been unpublished, so this workflow no
+  # longer runs automatically; it is kept as a manual fallback host
+  # (Actions -> Deploy to GitHub Pages -> Run workflow), after re-enabling
+  # Pages under Settings -> Pages.
   workflow_dispatch:
 
 permissions:
