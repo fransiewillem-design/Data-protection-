@@ -174,6 +174,21 @@ th { font-size: .78rem; text-transform: uppercase; letter-spacing: .05em; color:
 .foot { max-width: 980px; margin: 0 auto; padding: 20px; border-top: 1px solid var(--line); font-size: .84rem; color: var(--muted); }
 .foot a { color: var(--accent); }
 
+/* Delete data: what to send next, and the send queue */
+.work-card hr { border: 0; border-top: 1px solid var(--line); margin: 16px 0; }
+.work-row { display: flex; gap: 16px; justify-content: space-between; align-items: flex-start; flex-wrap: wrap; }
+.work-row > div:first-child { flex: 1 1 340px; }
+.work-row h2 { margin-bottom: 4px; }
+.work-row p { margin: 0 0 8px; max-width: 60ch; }
+.work-row .list { margin-top: 6px; }
+.work-row .pick .btn, .work-row .pick button { margin-left: auto; }
+.work-row .pick .btn + button { margin-left: 0; }
+.count.bad { background: var(--bad-soft); color: var(--bad); }
+.send-card { border-color: var(--accent); }
+.send-card .meter { margin-top: 10px; background: var(--surface-2); }
+.send-card .meter span { background: var(--accent); }
+.print-letter .letter { max-height: none; }
+
 @media (max-width: 560px) {
   .topbar { padding: 10px 14px; }
   main { padding: 18px 14px 48px; }
@@ -185,6 +200,8 @@ th { font-size: .78rem; text-transform: uppercase; letter-spacing: .05em; color:
   .topbar, .foot, .no-print { display: none !important; }
   .letter { max-height: none; border: 0; padding: 0; font-family: Georgia, serif; font-size: 11pt; }
   .card { border: 0; box-shadow: none; padding: 0; }
+  .print-letter { break-after: page; }
+  .print-letter:last-child { break-after: auto; }
 }
 
 .drop {

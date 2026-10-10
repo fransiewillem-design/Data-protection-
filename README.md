@@ -93,6 +93,24 @@ for the scam. A spoof of a real company (say a fake bol.com) is grouped separate
 sender, shown as "(impersonated)", and the real company's domain, link sites and reply hosts are
 excluded from every rule.
 
+**Sending the requests in bulk.** The Delete data page (and the Home card) turns the list into work:
+
+- **Send all requests** — a queue that opens each company's letter as a filled-in draft in your own
+  mail app (`mailto:`). You press Send there; the next one is ready when you come back. Each is marked
+  sent as it opens, which starts its deadline. The letter is also copied to the clipboard, because some
+  mail apps cut off a long `mailto:` body. A guessed `privacy@` address is flagged and can be corrected
+  in the queue; the correction is kept for reminders.
+- **No answer in time** — when the month is up, the same queue sends a reminder giving 14 more days.
+- **Ready for a complaint** — still silent 14 days after the reminder, or refused: the complaint to the
+  regulator is written for you, to submit on its website.
+- **Web form only** — companies that only accept their own form get a checklist with direct links.
+- **Print all / PDF** — every pending letter, one per page, to keep as a record or post.
+
+The app never sends mail itself. A page that could send mail as you is a page that, if compromised,
+could send anything as you; the one click per company is the price of not holding that power. Spam,
+fake-unsubscribe and unverifiable senders are never in the queue — a letter to them only confirms
+your address is live.
+
 **Dutch.** The interface is available in English and Dutch (EN | NL switch in the top bar). It follows
 the browser language on first visit and remembers the choice. The letter language is a separate
 setting in Settings, so a Dutch interface can still produce an English letter to a foreign company;

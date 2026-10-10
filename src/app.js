@@ -10,7 +10,8 @@ const ROUTES = [
   // Detail pages: reached from Home's cards, kept out of the nav.
   { path: '/unsubscribe', view: views.unsubscribe, mount: views.mountUnsubscribe, nav: false },
   { path: '/aliases',     view: views.email,       mount: views.mountEmail,       nav: false },
-  { path: '/find',        view: views.exposure,    mount: views.mountExposure,    nav: false }
+  { path: '/find',        view: views.exposure,    mount: views.mountExposure,    nav: false },
+  { path: '/print',       view: views.printAll,    mount: views.mountPrintAll,    nav: false }
 ];
 
 // Old hashes people may have bookmarked or that older copy still links to.
@@ -29,7 +30,7 @@ function parseHash() {
 
 function renderNav(path) {
   // Detail pages light up the tab they belong to.
-  const owner = { '/unsubscribe': '/', '/aliases': '/profile', '/find': '/' }[path] || path;
+  const owner = { '/unsubscribe': '/', '/aliases': '/profile', '/find': '/', '/print': '/delete' }[path] || path;
   document.getElementById('nav').innerHTML = ROUTES.filter(r => r.nav !== false).map(r =>
     `<a href="#${r.path}" class="${r.path === owner ? 'active' : ''}">${r.label()}</a>`).join('');
 }

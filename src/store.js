@@ -127,6 +127,28 @@ export function setStatus(brokerId, status, extra = {}) {
   });
 }
 
+// A follow-up does not change the status: the request is still open, and the
+// date is what starts the 14-day clock towards a complaint.
+export function markReminder(brokerId, extra = {}) {
+  update(s => {
+    const rec = s.requests[brokerId] || { status: 'todo', sentAt: '', history: [], notes: '' };
+    rec.reminderAt = today();
+    Object.assign(rec, extra);
+    rec.history = rec.history || [];
+    rec.history.push({ ts: new Date().toISOString(), event: 'Reminder sent' });
+    s.requests[brokerId] = rec;
+  });
+}
+
+// The address the user corrected a guessed privacy@ contact to.
+export function setRecipient(brokerId, to) {
+  update(s => {
+    const rec = s.requests[brokerId] || { status: 'todo', sentAt: '', history: [], notes: '' };
+    rec.to = to;
+    s.requests[brokerId] = rec;
+  });
+}
+
 export function setNotes(brokerId, notes) {
   update(s => {
     const rec = s.requests[brokerId] || { status: 'todo', sentAt: '', history: [], notes: '' };

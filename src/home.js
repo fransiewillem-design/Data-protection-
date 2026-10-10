@@ -6,7 +6,7 @@ import { L, plural } from './i18n.js';
 import { parseMessages, groupBySender } from './mailscan.js';
 import {
   esc, toast, senderClass, unsubTier, upsertSender, runOneClickBatch,
-  startUnsubQueue, wireQueue, wireBlock, blockAllCard, hostOf, nameOf
+  startUnsubQueue, wireQueue, wireBlock, blockAllCard, hostOf, nameOf, deleteWork
 } from './views.js';
 
 const ICONS = {
@@ -192,8 +192,9 @@ export function home(state) {
   const exported = new Set(state.blockExport?.ids || []);
   const blockNew = state.blockExport ? blocked.filter(t => !exported.has(t.id)) : blocked;
   const companies = state.custom.filter(t => !['spam', 'bait', 'unclear'].includes(cls(t)));
-  const asked = companies.filter(t => store.getRequest(t.id).status !== 'todo').length;
-  const toAsk = companies.length - asked;
+  const work = deleteWork(companies);
+  const toAsk = work.send.length + work.forms.length;
+  const followUps = work.reminders.length + work.complaints.length;
   const flagged = addressHealth(state).filter(h => h.verdict !== 'ok');
   const worst = flagged[0];
   const mails = mail.reduce((n, t) => n + (t.mailCount || 1), 0);
@@ -261,14 +262,23 @@ export function home(state) {
       action: 'home-block', done: blocked.length ? L('Blocked', 'Geblokkeerd') : L('Nothing to block', 'Niets te blokkeren'),
       more: '#/unsubscribe' })}
 
-    ${card({ icon: 'delete', n: toAsk,
+    ${card({ icon: 'delete', n: toAsk + followUps, tone: followUps ? 'tone-bad' : '',
       title: L('Delete my data', 'Mijn gegevens wissen'),
-      text: toAsk
-        ? L(`${toAsk} ${toAsk === 1 ? 'company holds' : 'companies hold'} your data. A legal request makes them erase it within a month.`,
-            `${toAsk} ${toAsk === 1 ? 'bedrijf heeft' : 'bedrijven hebben'} je gegevens. Een AVG-verzoek verplicht ze die binnen een maand te wissen.`)
-        : companies.length ? L(`All ${companies.length} asked. Deadlines are tracked.`, `Alle ${companies.length} aangeschreven. De termijnen worden bijgehouden.`)
-                           : L('No company to write to yet.', 'Nog geen bedrijf om aan te schrijven.'),
-      cta: L('Write the letters', 'Schrijf de brieven'), href: '#/delete',
+      text: [
+        toAsk ? L(`${toAsk} ${toAsk === 1 ? 'company holds' : 'companies hold'} your data. A legal request makes them erase it within a month.`,
+                  `${toAsk} ${toAsk === 1 ? 'bedrijf heeft' : 'bedrijven hebben'} je gegevens. Een AVG-verzoek verplicht ze die binnen een maand te wissen.`) : '',
+        work.reminders.length ? L(`${work.reminders.length} did not answer in time — a reminder is ready.`,
+                                  `${work.reminders.length} ${work.reminders.length === 1 ? 'reageerde' : 'reageerden'} niet op tijd — een herinnering staat klaar.`) : '',
+        work.complaints.length ? L(`${work.complaints.length} ready for a complaint to the regulator.`,
+                                   `${work.complaints.length} klaar voor een klacht bij de toezichthouder.`) : '',
+        !toAsk && !followUps ? (companies.length
+          ? L(`All ${companies.length} asked. Deadlines are tracked — reminders appear here when one is due.`,
+              `Alle ${companies.length} aangeschreven. De termijnen worden bijgehouden — herinneringen verschijnen hier zodra het tijd is.`)
+          : L('No company to write to yet.', 'Nog geen bedrijf om aan te schrijven.')) : ''
+      ].filter(Boolean).join(' '),
+      cta: work.send.length ? L(`Send ${work.send.length} ${work.send.length === 1 ? 'request' : 'requests'}`, `${work.send.length} ${work.send.length === 1 ? 'verzoek' : 'verzoeken'} versturen`)
+         : work.reminders.length ? L('Send reminders', 'Herinneringen versturen') : L('Open', 'Openen'),
+      href: work.send.length ? '#/delete?send=1' : '#/delete',
       done: companies.length ? L('All asked', 'Alles verstuurd') : L('Nothing yet', 'Nog niets') })}
 
     ${card({ icon: 'addr', n: flagged.length, tone: worst?.verdict === 'burned' ? 'tone-bad' : '',

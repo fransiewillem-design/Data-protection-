@@ -40,6 +40,11 @@ const CATEGORIES = () => ({
 
 const STATUS_NL = { todo: 'Niet gestart', sent: 'Verstuurd', ack: 'Ontvangst bevestigd',
                     done: 'Gewist', refused: 'Geweigerd', escalated: 'Geëscaleerd' };
+const EVENT_NL = { 'Reminder sent': 'Herinnering verstuurd' };
+const eventLabel = ev => {
+  const k = Object.keys(store.STATUSES).find(k => store.STATUSES[k].label === ev);
+  return k ? statusLabel(k) : L(ev, EVENT_NL[ev] || ev);
+};
 export const statusLabel = k => L(store.STATUSES[k]?.label || k, STATUS_NL[k] || k);
 
 export function allTargets(state, catalog) {
@@ -451,6 +456,12 @@ export function brokers(state, catalog, params) {
   const q = (params.get('q') || '').toLowerCase();
   const shown = targets.filter(b => !q || (b.name + ' ' + (b.site || '')).toLowerCase().includes(q));
 
+  lastTargets = new Map(targets.map(b => [b.id, b]));
+  const work = deleteWork(targets);
+  if (params.get('send') === '1' && !sendQueue && work.send.length) {
+    sendQueue = { kind: 'request', ids: work.send.map(b => b.id), i: 0 };
+  }
+
   const sent = mine.filter(b => ['sent', 'ack', 'escalated'].includes(store.getRequest(b.id).status)).length;
   const overdue = targets.filter(b => store.isOverdue(b, store.getRequest(b.id))).length;
 
@@ -471,6 +482,8 @@ export function brokers(state, catalog, params) {
     <div><b>${sent}</b><span>${L('requests sent', 'verzoeken verstuurd')}</span></div>
     <div class="${overdue ? 'bad' : ''}"><b>${overdue}</b><span>${L('past deadline', 'termijn verlopen')}</span></div>
   </div>` : ''}
+
+  ${sendQueue ? sendQueueCard(state) : workCard(work, params)}
 
   <div class="card">
     <div class="row">
@@ -530,6 +543,7 @@ function targetRow(b, state) {
 }
 
 export function mountBrokers(root, state, rerender) {
+  wireSend(root, rerender);
   root.addEventListener('change', e => {
     const sel = e.target.closest('[data-action="set-status"]');
     if (sel) { store.setStatus(sel.dataset.id, sel.value); toast(L('Status updated', 'Status bijgewerkt')); }
@@ -559,6 +573,276 @@ export function mountBrokers(root, state, rerender) {
       notes: L('Added by you. Confirm the privacy contact before sending.', 'Door jou toegevoegd. Controleer het privacy-contactadres voordat je verstuurt.')
     }));
     toast(L(`${name} added`, `${name} toegevoegd`));
+  });
+}
+
+// ------------------------------------------------------------- send all
+//
+// Erasure requests in bulk, without the app ever touching the mailbox: each
+// letter opens as a filled-in draft in the user's own mail app, they press
+// Send, and the next one is ready. One click per company is the floor — a
+// page cannot send mail, and should not be able to.
+
+const isEU = b => ['EU', 'NL', 'UK'].some(r => (b.regions || []).includes(r));
+export const recipient = (b, r = store.getRequest(b.id)) => r.to || b.email || '';
+const REMINDER_GRACE = 14;   // days the reminder letter gives them
+
+// What each company needs next. Spam, bait and unverifiable senders never get
+// here: a letter to them confirms the address is live.
+export function deleteWork(targets) {
+  const w = { send: [], forms: [], reminders: [], complaints: [] };
+  for (const b of targets) {
+    if (['spam', 'bait', 'unclear'].includes(senderClass(b))) continue;
+    const r = store.getRequest(b.id);
+    if (r.status === 'todo') {
+      if (b.method === 'form' && safeUrl(b.optOutUrl)) w.forms.push(b);
+      else if (recipient(b, r)) w.send.push(b);
+    } else if (['sent', 'ack'].includes(r.status)) {
+      if (!r.reminderAt && store.isOverdue(b, r) && recipient(b, r)) w.reminders.push(b);
+      else if (r.reminderAt && store.daysSince(r.reminderAt) > REMINDER_GRACE && isEU(b)) w.complaints.push(b);
+    } else if (r.status === 'refused' && isEU(b)) w.complaints.push(b);
+  }
+  return w;
+}
+
+// Module state, so a store write (marking one sent) re-renders the page
+// without losing the user's place in the queue.
+let sendQueue = null;        // { kind: 'request' | 'reminder', ids, i }
+let lastTargets = new Map(); // id -> target, from the last render of this page
+
+function queueTemplate(kind, b, profile) {
+  if (kind === 'reminder') return profile.language === 'nl' && isEU(b) ? 'reminder_nl' : 'reminder';
+  return suggestedTemplate(b, profile);
+}
+
+function sendQueueCard(state) {
+  const q = sendQueue;
+  const total = q.ids.length;
+  const reminder = q.kind === 'reminder';
+  if (q.i >= total) return `
+    <section class="card send-card" id="send-queue">
+      <h2>${reminder ? L(`All ${total} reminders opened`, `Alle ${total} herinneringen geopend`)
+                     : L(`All ${total} requests opened`, `Alle ${total} verzoeken geopend`)}</h2>
+      <p class="small">${reminder
+        ? L(`They have ${REMINDER_GRACE} days. Anyone still silent after that shows up here with a complaint to the regulator ready.`,
+            `Ze hebben ${REMINDER_GRACE} dagen. Wie daarna nog zwijgt, verschijnt hier met een klacht bij de toezichthouder klaar.`)
+        : L('The one-month deadlines are running. Anyone who has not answered by then shows up here with a reminder ready — you do not need to keep track.',
+            'De termijn van een maand loopt. Wie dan nog niet heeft gereageerd, verschijnt hier met een herinnering klaar — je hoeft niets bij te houden.')}</p>
+      <p class="small muted">${L('Did not send one after all? Set it back to "Not started" in the list below.',
+        'Toch eentje niet verstuurd? Zet hem in de lijst hieronder terug op "Niet gestart".')}</p>
+      <div class="row"><button data-action="send-close">${L('Close', 'Sluiten')}</button></div>
+    </section>`;
+
+  const b = lastTargets.get(q.ids[q.i]);
+  if (!b) { q.i++; return sendQueueCard(state); }
+  const r = store.getRequest(b.id);
+  const to = recipient(b, r);
+  const guessed = !r.to && b.confidence === 'low';
+  const reveals = b.evidence?.address || b.evidence?.phone;
+  const next = q.ids.slice(q.i + 1, q.i + 4).map(id => lastTargets.get(id)?.name).filter(Boolean);
+
+  return `
+  <section class="card send-card" id="send-queue">
+    <div class="row between" style="align-items:flex-start">
+      <div>
+        <p class="small muted" style="margin:0">${reminder ? L('Sending reminders', 'Herinneringen versturen') : L('Sending requests', 'Verzoeken versturen')}
+          · ${q.i + 1} / ${total}</p>
+        <h2 style="margin:2px 0 0">${esc(nameOf(b))}</h2>
+      </div>
+      <button class="link-btn" data-action="send-close">${L('Stop', 'Stoppen')}</button>
+    </div>
+    <div class="meter send-meter"><span style="width:${Math.round(100 * q.i / total)}%"></span></div>
+    <div class="field" style="margin-top:12px">
+      <label for="send-to">${L('To', 'Aan')}${guessed ? ` <span class="pill low">${L('guessed', 'gegokt')}</span>` : ''}</label>
+      <input id="send-to" value="${esc(to)}" data-id="${esc(b.id)}" spellcheck="false">
+      ${guessed ? `<p class="small muted" style="margin:4px 0 0">${L(
+        `A guess from their domain. If it bounces, look for "privacy" or "DPO" in their privacy policy, fix it here, and send again.`,
+        `Een gok op basis van hun domein. Komt hij terug, zoek dan "privacy" of "functionaris gegevensbescherming" in hun privacyverklaring, pas het hier aan en verstuur opnieuw.`)}</p>` : ''}
+    </div>
+    <p class="small">${reveals
+      ? L(`The letter reveals only <span class="mono">${esc(reveals)}</span> — what they already have.`,
+          `De brief noemt alleen <span class="mono">${esc(reveals)}</span> — wat ze al hebben.`)
+      : L('The letter includes your name and address, so this broker can find your record.',
+          'De brief bevat je naam en adres, zodat deze databroker je gegevens kan vinden.')}
+      <a href="#/letter?b=${encodeURIComponent(b.id)}&t=${queueTemplate(q.kind, b, state.profile)}">${L('Read it', 'Lees hem')}</a></p>
+    <div class="row">
+      <button class="primary" data-action="send-open">${L(`Open email to ${esc(nameOf(b))} →`, `Open mail aan ${esc(nameOf(b))} →`)}</button>
+      <button data-action="send-skip">${L('Skip', 'Overslaan')}</button>
+    </div>
+    <p class="small muted" style="margin:10px 0 0">${L(
+      'Your mail app opens with the letter filled in. Press Send there, come back, and the next one is ready. Each is marked as sent when it opens. The letter is also copied, in case your mail app cuts a long one short.',
+      'Je mailapp opent met de brief ingevuld. Druk daar op Verstuur, kom terug, en de volgende staat klaar. Elke brief wordt als verstuurd gemarkeerd zodra hij opent. De brief wordt ook gekopieerd, voor het geval je mailapp een lange brief afkapt.')}
+      ${next.length ? `<br>${L('Up next:', 'Hierna:')} ${next.map(esc).join(', ')}${total - q.i - 1 > next.length ? '…' : ''}` : ''}</p>
+  </section>`;
+}
+
+function workCard(w, params) {
+  const all = params.get('all') === '1' ? '&all=1' : '';
+  const n = w.send.length;
+  const parts = [];
+
+  if (n) parts.push(`
+    <div class="work-row">
+      <div>
+        <h2>${L('Send all requests', 'Alle verzoeken versturen')} <span class="count">${n}</span></h2>
+        <p class="small muted">${L(`One click each: every letter opens in your own mail app, ready to send. Deadlines are tracked from that moment.`,
+          `Eén klik per bedrijf: elke brief opent in je eigen mailapp, klaar om te versturen. De termijnen lopen vanaf dat moment.`)}</p>
+      </div>
+      <div class="row">
+        <button class="primary" data-action="send-start" data-kind="request">${L(`Send ${n} ${n === 1 ? 'request' : 'requests'}`, `${n} ${n === 1 ? 'verzoek' : 'verzoeken'} versturen`)}</button>
+        <a class="btn" href="#/print?set=request${all}">${L('Print all / PDF', 'Alles afdrukken / PDF')}</a>
+      </div>
+    </div>`);
+
+  if (w.reminders.length) parts.push(`
+    <div class="work-row">
+      <div>
+        <h2>${L('No answer in time', 'Niet op tijd gereageerd')} <span class="count bad">${w.reminders.length}</span></h2>
+        <p class="small muted">${L(`Their month is up. A reminder gives them ${REMINDER_GRACE} more days before a complaint to the regulator.`,
+          `Hun maand is om. Een herinnering geeft ze nog ${REMINDER_GRACE} dagen voordat je een klacht indient bij de toezichthouder.`)}
+          <br><strong>${esc(w.reminders.map(b => nameOf(b)).join(', '))}</strong></p>
+      </div>
+      <div class="row">
+        <button class="primary" data-action="send-start" data-kind="reminder">${L(`Send ${w.reminders.length} ${w.reminders.length === 1 ? 'reminder' : 'reminders'}`,
+          `${w.reminders.length} ${w.reminders.length === 1 ? 'herinnering' : 'herinneringen'} versturen`)}</button>
+        <a class="btn" href="#/print?set=reminder${all}">${L('Print', 'Afdrukken')}</a>
+      </div>
+    </div>`);
+
+  if (w.complaints.length) parts.push(`
+    <div class="work-row">
+      <div>
+        <h2>${L('Ready for a complaint', 'Klaar voor een klacht')} <span class="count bad">${w.complaints.length}</span></h2>
+        <p class="small muted">${L(`These ignored the reminder too, or refused. The regulator takes complaints through its own website: write the complaint here, then submit it at
+          <a href="https://autoriteitpersoonsgegevens.nl" target="_blank" rel="noopener noreferrer">autoriteitpersoonsgegevens.nl</a> ("Klacht indienen"), or your own country's authority. Once filed, set the status to Escalated.`,
+          `Deze negeerden ook de herinnering, of weigerden. De toezichthouder neemt klachten aan via de eigen website: schrijf de klacht hier en dien hem in op
+          <a href="https://autoriteitpersoonsgegevens.nl" target="_blank" rel="noopener noreferrer">autoriteitpersoonsgegevens.nl</a> ("Klacht indienen"). Zet daarna de status op Geëscaleerd.`)}</p>
+        <div class="list">${w.complaints.map(b => `
+          <div class="pick" style="cursor:default">
+            <span class="pick-name">${esc(nameOf(b))}</span>
+            <a class="btn" href="#/letter?b=${encodeURIComponent(b.id)}&t=${store.get().profile.language === 'nl' ? 'complaint_nl' : 'complaint'}">${L('Write complaint', 'Klacht schrijven')}</a>
+          </div>`).join('')}</div>
+      </div>
+    </div>`);
+
+  if (w.forms.length) parts.push(`
+    <div class="work-row">
+      <div>
+        <h2>${L('Web form only', 'Alleen via webformulier')} <span class="count">${w.forms.length}</span></h2>
+        <p class="small muted">${L('These only accept their own opt-out form. Open each, fill it in, and mark it done so its deadline is tracked too.',
+          'Deze accepteren alleen hun eigen afmeldformulier. Open het, vul het in en markeer het als gedaan, zodat ook die termijn wordt bijgehouden.')}</p>
+        <div class="list">${w.forms.map(b => `
+          <div class="pick" style="cursor:default">
+            <span class="pick-name">${esc(nameOf(b))}</span>
+            <a class="btn" href="${esc(safeUrl(b.optOutUrl))}" target="_blank" rel="noopener noreferrer">${L('Open form ↗', 'Formulier openen ↗')}</a>
+            <button data-action="form-done" data-id="${esc(b.id)}">${L('Done', 'Gedaan')}</button>
+          </div>`).join('')}</div>
+      </div>
+    </div>`);
+
+  if (!parts.length) return '';
+  return `<section class="card work-card">${parts.join('<hr>')}</section>`;
+}
+
+function wireSend(root, rerender) {
+  root.addEventListener('change', e => {
+    if (e.target.id !== 'send-to') return;
+    const to = e.target.value.trim();
+    if (to && to !== recipient(lastTargets.get(e.target.dataset.id) || {})) store.setRecipient(e.target.dataset.id, to);
+  });
+
+  root.addEventListener('click', e => {
+    const btn = e.target.closest('[data-action]');
+    if (!btn) return;
+    const act = btn.dataset.action;
+
+    if (act === 'send-start') {
+      const w = deleteWork([...lastTargets.values()]);
+      const list = btn.dataset.kind === 'reminder' ? w.reminders : w.send;
+      sendQueue = { kind: btn.dataset.kind, ids: list.map(b => b.id), i: 0 };
+      rerender();
+    }
+
+    if (act === 'send-skip' && sendQueue) { sendQueue.i++; rerender(); }
+
+    if (act === 'send-close') {
+      sendQueue = null;
+      if (/[?&]send=1/.test(location.hash)) location.hash = '#/delete'; else rerender();
+    }
+
+    if (act === 'send-open' && sendQueue) {
+      const b = lastTargets.get(sendQueue.ids[sendQueue.i]);
+      if (!b) return;
+      const r = store.getRequest(b.id);
+      const to = root.querySelector('#send-to')?.value.trim() || recipient(b, r);
+      const { subject, body } = renderLetter(queueTemplate(sendQueue.kind, b, store.get().profile), b, store.get().profile, r);
+
+      // Must happen inside the click, before the re-render below: handing a
+      // mailto: to the mail app needs the user gesture.
+      const link = document.createElement('a');
+      link.href = `mailto:${encodeURIComponent(to)}?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}`;
+      link.click();
+      navigator.clipboard?.writeText(body).catch(() => {});
+
+      const extra = to !== (b.email || '') ? { to } : {};
+      sendQueue.i++;
+      if (sendQueue.kind === 'reminder') store.markReminder(b.id, extra);
+      else store.setStatus(b.id, 'sent', extra);
+    }
+
+    if (act === 'form-done') {
+      store.setStatus(btn.dataset.id, 'sent');
+      toast(L('Marked as done — deadline started', 'Gemarkeerd als gedaan — de termijn loopt'));
+    }
+  });
+}
+
+// ------------------------------------------------------------- print all
+
+export function printAll(state, catalog, params) {
+  const reminder = params.get('set') === 'reminder';
+  const mine = state.custom;
+  const targets = params.get('all') === '1' ? allTargets({ ...state, custom: mine }, catalog) : mine;
+  const w = deleteWork(targets);
+  const list = reminder ? w.reminders : w.send;
+  const back = `#/delete${params.get('all') === '1' ? '?all=1' : ''}`;
+  if (!list.length) return `<div class="card"><p>${L('Nothing to print.', 'Niets om af te drukken.')}
+    <a href="${back}">${L('Back', 'Terug')}</a></p></div>`;
+
+  return `
+  <div class="head no-print">
+    <a class="back" href="${back}">← ${L('Delete data', 'Gegevens verwijderen')}</a>
+    <h1>${reminder ? L(`${list.length} reminders`, `${list.length} herinneringen`) : L(`${list.length} letters`, `${list.length} brieven`)}</h1>
+    <p>${L('One letter per page. Save as PDF to keep a record of exactly what you sent, or print and post them. Mark them as sent once they are on their way.',
+      'Eén brief per pagina. Bewaar als PDF als bewijs van wat je precies verstuurde, of druk af en verstuur per post. Markeer ze als verstuurd zodra ze onderweg zijn.')}</p>
+    <div class="row">
+      <button class="primary" data-action="print">${L('Print / save as PDF', 'Afdrukken / opslaan als PDF')}</button>
+      <button data-action="print-mark" data-set="${reminder ? 'reminder' : 'request'}" data-ids="${esc(JSON.stringify(list.map(b => b.id)))}">${
+        L(`Mark all ${list.length} as sent`, `Alle ${list.length} als verstuurd markeren`)}</button>
+    </div>
+  </div>
+  ${list.map(b => {
+    const r = store.getRequest(b.id);
+    const { subject, body } = renderLetter(queueTemplate(reminder ? 'reminder' : 'request', b, state.profile), b, state.profile, r);
+    return `<article class="card print-letter">
+      <p class="small muted">${L('To', 'Aan')}: ${esc(b.name)}${recipient(b, r) ? ` · <span class="mono">${esc(recipient(b, r))}</span>` : ''}</p>
+      <p class="small"><strong>${L('Subject', 'Onderwerp')}:</strong> ${esc(subject)}</p>
+      <div class="letter">${esc(body)}</div>
+    </article>`;
+  }).join('')}`;
+}
+
+export function mountPrintAll(root) {
+  root.addEventListener('click', e => {
+    const btn = e.target.closest('[data-action]');
+    if (!btn) return;
+    if (btn.dataset.action === 'print') window.print();
+    if (btn.dataset.action === 'print-mark') {
+      const ids = JSON.parse(btn.dataset.ids || '[]');
+      for (const id of ids) btn.dataset.set === 'reminder' ? store.markReminder(id) : store.setStatus(id, 'sent');
+      toast(L(`${ids.length} marked as sent`, `${ids.length} als verstuurd gemarkeerd`));
+      location.hash = '#/delete';
+    }
   });
 }
 
@@ -1023,7 +1307,7 @@ export function letter(state, catalog, params) {
   const rec = store.getRequest(b.id);
   const tid = params.get('t') || suggestedTemplate(b, state.profile);
   const { subject, body } = renderLetter(tid, b, state.profile, rec);
-  const to = b.email || '';
+  const to = recipient(b, rec);
   const mailto = `mailto:${encodeURIComponent(to)}?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}`;
   const tplLabel = (k, t) => L(t.label, TEMPLATE_LABELS_NL[k] || t.label);
 
@@ -1085,7 +1369,7 @@ export function letter(state, catalog, params) {
     ${rec.history?.length ? `<table>
       <thead><tr><th>${L('When', 'Wanneer')}</th><th>${L('Event', 'Gebeurtenis')}</th></tr></thead>
       <tbody>${rec.history.slice().reverse().map(h =>
-        `<tr><td>${esc(h.ts.slice(0, 16).replace('T', ' '))}</td><td>${esc(h.event)}</td></tr>`).join('')}</tbody>
+        `<tr><td>${esc(h.ts.slice(0, 16).replace('T', ' '))}</td><td>${esc(eventLabel(h.event))}</td></tr>`).join('')}</tbody>
     </table>` : `<p class="small muted">${L('Nothing logged yet.', 'Nog niets vastgelegd.')}</p>`}
   </div>`;
 }
