@@ -86,7 +86,17 @@ was doing.
   nowhere else, as *Uitschrijven* or *Afmelden*. Bodies are decoded first: quoted-printable, base64,
   multipart trees and non-UTF-8 charsets. A sender offering no way out anywhere in the message is not
   treated as a company that forgot but as spam to block, because compliant bulk senders are obliged to
-  offer one. Senders advertising RFC 8058 one-click (`List-Unsubscribe-Post`) go in a single
+  offer one.
+
+  **An unsubscribe link is only offered if the sender is authenticated.** The receiving mail server
+  records whether each message really came from the domain it claims (SPF, DKIM, DMARC in
+  `Authentication-Results`); the app reads that verdict rather than guessing. Scam mail routinely carries
+  a convincing "Unsubscribe" link precisely because clicking it confirms a person reads the mailbox. So a
+  sender that failed authentication — or whose domain has no TLD at all, which no real domain lacks — has
+  its link listed as bait with its real destination shown, never as a button. Outlook's SafeLinks
+  wrapper is stripped first, so the destination shown is the actual one. One-click POSTs are reserved for
+  verified senders. Validated against real junk-folder mail: four scams (three with fake unsubscribe
+  links) and one legitimate newsletter, each classified correctly. Senders advertising RFC 8058 one-click (`List-Unsubscribe-Post`) go in a single
   batch, four at a time, with no page to visit. Senders that published only a link open one at a time,
   because a browser refuses to let a page open many tabs at once and a loop would silently drop all but
   the first. Senders that published nothing are listed separately as spam to block, with

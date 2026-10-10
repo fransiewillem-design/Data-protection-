@@ -92,7 +92,7 @@ export function parseFrom(raw) {
 export function parseUnsubscribe(raw) {
   const out = { http: '', mailto: '' };
   for (const m of String(raw || '').matchAll(/<([^>]+)>/g)) {
-    const url = m[1].trim();
+    const url = unwrapSafeLink(m[1].trim());
     if (/^https?:/i.test(url) && !out.http) out.http = url;
     if (/^mailto:/i.test(url) && !out.mailto) out.mailto = url;
   }
@@ -158,7 +158,17 @@ export function extractParts(headers, body, depth = 0) {
 
 // Unsubscribe wording across the languages this is likely to meet.
 const UNSUB_WORDS =
-  /unsubscrib|uitschrijv|afmeld|uitschrijf|opt[\s-]?out|abmeld|austragen|d[eé]sabonn|desinscri|cancelar.{0,12}suscri|annulla.{0,12}iscrizione|stop.{0,10}(mail|email)|e-?mailvoorkeur|mailvoorkeur|email.{0,10}preference|subscription.{0,10}preference/i;
+  /unsubscrib|uitschrijv|afmeld|uitschrijf|opt[\s-]?out|abmeld|austragen|d[eé]sabonn|desinscri|desuscri|darse\s+de\s+baja|cancelar.{0,12}suscri|annulla.{0,12}iscrizione|stop.{0,10}(mail|email)|e-?mailvoorkeur|mailvoorkeur|email.{0,10}preference|subscription.{0,10}preference/i;
+
+export function unwrapSafeLink(url) {
+  try {
+    const u = new URL(url);
+    if (/safelinks\.protection\.outlook\.com$/i.test(u.hostname) && u.searchParams.get('url')) {
+      return u.searchParams.get('url');
+    }
+  } catch { /* not a URL */ }
+  return url;
+}
 
 function stripTags(html) {
   return html.replace(/<[^>]*>/g, ' ').replace(/&nbsp;/gi, ' ').replace(/\s+/g, ' ').trim();
@@ -170,10 +180,15 @@ export function findUnsubInBody(parts) {
 
   for (const part of parts) {
     if (part.type === 'html') {
-      const re = /<a\b[^>]*href\s*=\s*["']([^"']+)["'][^>]*>([\s\S]*?)<\/a>/gi;
+      const re = /<a\b([^>]*)>([\s\S]*?)<\/a>/gi;
       let m;
       while ((m = re.exec(part.text))) {
-        const href = m[1].replace(/&amp;/g, '&').trim();
+        const attrs = m[1];
+        // Outlook keeps the pre-rewrite URL in originalsrc; otherwise unwrap.
+        const orig = /originalsrc\s*=\s*["']([^"']+)["']/i.exec(attrs);
+        const raw = /\bhref\s*=\s*["']([^"']+)["']/i.exec(attrs);
+        if (!orig && !raw) continue;
+        const href = unwrapSafeLink((orig ? orig[1] : raw[1]).replace(/&amp;/g, '&').trim());
         if (!/^https?:\/\//i.test(href)) continue;
         const label = stripTags(m[2]);
         // The visible word is the stronger signal; a tracking URL often hides
@@ -195,6 +210,31 @@ export function findUnsubInBody(parts) {
   // score 2 = the visible link text said "unsubscribe"; score 1 = only the URL
   // did, which is also what a scammer does to bait a click, so it is flagged.
   return { url: candidates[0].url, how: candidates[0].score === 2 ? 'body' : 'body-url-only' };
+}
+
+// --- sender authentication -------------------------------------------------
+
+export function parseAuth(h) {
+  const ar = (h['authentication-results'] || '') + ' ' + (h['received-spf'] || '');
+  const pick = k => (new RegExp(k + '\\s*=\\s*([a-z]+)', 'i').exec(ar) || [])[1]?.toLowerCase() || '';
+  let spf = pick('spf');
+  if (!spf) { const r = /^\s*(pass|fail|softfail|neutral|none)/i.exec(h['received-spf'] || ''); spf = r ? r[1].toLowerCase() : ''; }
+  const scl = parseInt((h['x-ms-exchange-organization-scl'] || '').trim(), 10);
+  return {
+    spf, dkim: pick('dkim'), dmarc: pick('dmarc'),
+    scl: Number.isFinite(scl) ? scl : null,
+    compauthFail: /compauth=fail/i.test(ar)
+  };
+}
+
+// 'verified' only when the receiving server confirmed the sender's domain. A
+// domain without a TLD cannot be real, whatever else the headers say.
+export function senderTrust(domain, auth) {
+  if (!/\.[a-z]{2,}$/i.test(domain || '')) return { trust: 'forged', why: 'the sender domain is not a real domain' };
+  if (auth.dmarc === 'fail' || auth.compauthFail) return { trust: 'forged', why: 'the sender failed authentication' };
+  if (auth.spf === 'pass' || auth.dkim === 'pass') return { trust: 'verified', why: 'the sending server is authorised by the domain' };
+  if (['fail', 'softfail'].includes(auth.spf)) return { trust: 'forged', why: 'the sending server is not authorised by the domain it claims' };
+  return { trust: 'unknown', why: 'the sender could not be verified' };
 }
 
 // --- message splitting -----------------------------------------------------
@@ -245,6 +285,7 @@ export function parseMessages(text) {
       unsubFrom: headerUnsub.http ? 'header' : bodyUnsub.how,
       // RFC 8058: the sender promises a POST alone completes the unsubscribe.
       oneClick: /one-click/i.test(h['list-unsubscribe-post'] || ''),
+      ...senderTrust(from.domain, parseAuth(h)),
       isEsp: ESP_DOMAINS.has(from.domain)
     };
   }).filter(Boolean);
@@ -270,6 +311,8 @@ export function groupBySender(messages) {
     if (!g.unsubHttp && m.unsub.http) { g.unsubHttp = m.unsub.http; g.unsubFrom = m.unsubFrom; }
     if (!g.unsubMailto && m.unsub.mailto) g.unsubMailto = m.unsub.mailto;
     if (m.oneClick) g.oneClick = true;
+    const rank = { forged: 0, unknown: 1, verified: 2 };
+    if (!g.trust || rank[m.trust] < rank[g.trust]) { g.trust = m.trust; g.trustWhy = m.why; }
     for (const r of m.recipients) g.recipients.add(r);
     // Prefer a human-looking display name over the bare domain.
     if ((g.name === key || !g.name) && m.name) g.name = m.name;

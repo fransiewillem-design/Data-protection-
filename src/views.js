@@ -318,7 +318,7 @@ export function mountExposure(root, state, rerender) {
       const list = window.__drSenders || [];
       let n = 0;
       for (const sn of list) if (addSenderAsTarget(sn, true)) n++;
-      toast(`${n} companies added — see Targets`);
+      toast(`${n} companies added — see Unsubscribe and Delete data`);
     }
 
     if (action === 'copy-query') {
@@ -471,6 +471,8 @@ export function mountExposure(root, state, rerender) {
       // No unsubscribe anywhere in the message is the clearest spam signal
       // there is: compliant bulk senders are obliged to offer one.
       spam: !sn.unsubHttp,
+      trust: sn.trust || 'unknown',
+      trustWhy: sn.trustWhy || '',
       notes: `Found in your own mail: ${sn.domain} sent to ${address || 'an address of yours'}. The letter deliberately tells them nothing they do not already have.`
     }));
     if (!quiet) toast(`${label} added — letter ready`);
@@ -502,29 +504,35 @@ export function mountExposure(root, state, rerender) {
   }
 
   function renderScan(out, senders, msgCount, fileCount) {
-    const withUnsub = senders.filter(x => x.unsubHttp || x.unsubMailto);
+    const withUnsub = senders.filter(x => (x.unsubHttp || x.unsubMailto) && x.trust !== 'forged');
+    const forged = senders.filter(x => x.trust === 'forged').length;
     out.innerHTML = `
       <div class="notice">
         <p><strong>${msgCount} messages from ${senders.length} companies</strong>, read from ${fileCount}
-        file(s) on this device. ${withUnsub.length} of them offer a working unsubscribe.</p>
+        file(s) on this device. ${withUnsub.length} can be safely unsubscribed from${forged
+        ? `; <strong>${forged} failed sender authentication</strong> and should be blocked, not answered` : ''}.</p>
       </div>
       <div class="row" style="margin-bottom:10px">
         <button class="primary" data-action="add-all-senders">Add all ${senders.length} as targets</button>
       </div>
       ${senders.map(sn => {
-        const legit = !!(sn.unsubHttp || sn.unsubMailto);
+        const hasLink = !!(sn.unsubHttp || sn.unsubMailto);
+        const [cls, label] = sn.trust === 'forged'
+          ? ['overdue', hasLink ? 'forged — fake unsubscribe' : 'forged sender']
+          : !hasLink ? ['overdue', 'no unsubscribe']
+          : sn.trust === 'verified' ? ['done', 'verified sender'] : ['low', 'unverified'];
         return `
         <div class="item" data-sender="${esc(sn.domain)}">
           <div class="body">
             <div class="name">${esc(sn.name)}
-              <span class="pill ${legit ? 'sent' : 'overdue'}">${legit ? 'real sender' : 'no unsubscribe'}</span>
+              <span class="pill ${cls}">${label}</span>
               <span class="pill">${sn.count} mail${sn.count === 1 ? '' : 's'}</span>
             </div>
             <div class="meta mono">${esc(sn.domain)}</div>
             ${sn.subjects.length ? `<div class="meta">${esc(sn.subjects[0])}</div>` : ''}
           </div>
           <div class="actions">
-            ${sn.unsubHttp && safeUrl(sn.unsubHttp)
+            ${sn.unsubHttp && safeUrl(sn.unsubHttp) && sn.trust !== 'forged'
               ? `<a class="btn" href="${esc(safeUrl(sn.unsubHttp))}" target="_blank" rel="noopener noreferrer">Unsubscribe ↗</a>`
               : ''}
             <button data-action="add-sender" data-name="${esc(sn.name)}" data-domain="${esc(sn.domain)}">Demand deletion</button>
@@ -532,13 +540,12 @@ export function mountExposure(root, state, rerender) {
         </div>`;
       }).join('')}
       <div class="notice warn" style="margin-top:14px">
-        <p><strong>Treat the two groups differently.</strong> A sender marked <em>real sender</em> published a
-        standards-compliant unsubscribe link, which means a real company with a legal department — unsubscribe
-        works, and so does an erasure demand.</p>
-        <p>A sender marked <em>no unsubscribe</em> is usually a criminal operation on a throwaway domain.
-        <strong>Do not click anything in those messages</strong>: it confirms a human reads the mailbox and
-        raises your value on the lists. An erasure letter to them will bounce. Report as junk and move on —
-        the fix for those is a fresh alias, not a letter.</p>
+        <p><strong>Only <em>verified</em> senders get an unsubscribe button.</strong> Your mail provider
+        checks whether each message really came from the domain it claims. Scam mail usually fails that check
+        — and often carries a fake "unsubscribe" link anyway, because clicking it confirms a real person reads
+        this mailbox.</p>
+        <p>Anything marked <em>forged</em>: do not click, do not reply, block it. Its links go to throwaway
+        domains, and a letter to them bounces.</p>
       </div>`;
     window.__drSenders = senders;   // handed to the bulk-add handler
   }
@@ -601,9 +608,9 @@ const selected = new Set();
 export function brokers(state, catalog, params) {
   // A letter to a throwaway spam domain bounces, and sending one confirms the
   // address is live. Those stay on the block list unless explicitly asked for.
-  const spam = state.custom.filter(b => senderClass(b) === 'spam');
+  const spam = state.custom.filter(b => ['spam', 'bait'].includes(senderClass(b)));
   const showSpam = params.get('spam') === '1';
-  const mine = showSpam ? state.custom : state.custom.filter(b => senderClass(b) !== 'spam');
+  const mine = showSpam ? state.custom : state.custom.filter(b => !['spam', 'bait'].includes(senderClass(b)));
   const showBrokers = params.get('all') === '1';
   const targets = showBrokers ? allTargets({ ...state, custom: mine }, catalog) : mine;
   const q = (params.get('q') || '').toLowerCase();
@@ -848,14 +855,23 @@ function renderQueue(q, urls, i) {
 // Three outcomes, and only two of them are unsubscribing. A sender with no
 // unsubscribe anywhere in its message is not a company that forgot — compliant
 // bulk mail must offer one — so it is treated as spam to block, not written to.
+// An unsubscribe link in a mail whose sender failed authentication is not a
+// way out, it is a tracker: clicking it confirms a person reads this mailbox.
+// So a forged sender's link is never offered, however legitimate it looks.
 export function senderClass(b) {
   if (b.source !== 'mail') return 'company';
-  return (b.unsubUrl && safeUrl(b.unsubUrl)) ? 'unsub' : 'spam';
+  const hasLink = !!(b.unsubUrl && safeUrl(b.unsubUrl));
+  if (b.trust === 'forged') return hasLink ? 'bait' : 'spam';
+  return hasLink ? 'unsub' : 'spam';
 }
+
+function hostOf(u) { try { return new URL(u).hostname; } catch { return ''; } }
 
 export function unsubTier(b) {
   if (senderClass(b) !== 'unsub') return null;
-  return b.oneClick && b.unsubFrom === 'header' ? 'instant' : 'link';
+  // One-click POST only for a verified sender's own header: never fire a
+  // request at an endpoint whose owner could not be confirmed.
+  return b.oneClick && b.unsubFrom === 'header' && b.trust === 'verified' ? 'instant' : 'link';
 }
 
 let unsubPrimed = false;
@@ -863,10 +879,11 @@ let unsubPrimed = false;
 export function unsubscribe(state) {
   const mail = state.custom.filter(b => b.source === 'mail');
   const tiers = { instant: [], link: [] };
-  const spam = [];
+  const spam = [], bait = [];
   for (const b of state.custom) {
     const t = unsubTier(b);
     if (t) tiers[t].push(b);
+    else if (senderClass(b) === 'bait') bait.push(b);
     else if (senderClass(b) === 'spam') spam.push(b);
   }
 
@@ -898,8 +915,8 @@ export function unsubscribe(state) {
           <label class="pick">
             <input type="checkbox" data-action="sel" data-id="${esc(b.id)}" ${selected.has(b.id) ? 'checked' : ''}>
             <span class="pick-name">${esc(b.name)}</span>
-            ${b.unsubFrom === 'body-url-only'
-              ? '<span class="pill low" title="Only the link address said unsubscribe, not the visible text">check first</span>' : ''}
+            ${b.trust === 'verified' ? '<span class="pill done">verified sender</span>'
+              : '<span class="pill low" title="Could not confirm who sent this">unverified — check first</span>'}
             <span class="pick-meta mono">${esc(b.site || '')}</span>
           </label>`).join('')}
       </div>
@@ -925,6 +942,24 @@ export function unsubscribe(state) {
   ${group('link', 'Opens their page',
     'These published a link — in the message body, usually as Uitschrijven or Afmelden — but not one-click, so the page has to load. Your browser will not open many tabs at once, so they go one at a time.',
     'Open {n}', '')}
+
+  ${bait.length ? `
+    <section class="card danger-card">
+      <h2>Fake unsubscribe links — do not click <span class="count">${bait.length}</span></h2>
+      <p class="small" style="max-width:62ch">These contain an "unsubscribe" link, but the sender
+      <strong>failed authentication</strong>: your mail provider could not confirm the message came from
+      who it claims. The link is not a way out — it is a tracker. Clicking it tells them a real person
+      reads this mailbox, which makes your address worth more and the spam worse.</p>
+      <div class="list">
+        ${bait.map(b => `
+          <div class="pick" style="cursor:default;flex-wrap:wrap">
+            <span class="pick-name">${esc(b.name)}</span>
+            <span class="pick-meta mono">link goes to ${esc(hostOf(b.unsubUrl))}</span>
+            <span class="small muted" style="flex-basis:100%">${esc(b.trustWhy || 'sender could not be verified')}</span>
+          </div>`).join('')}
+      </div>
+      <p class="small muted" style="margin-top:12px">Block them instead — instructions below.</p>
+    </section>` : ''}
 
   ${spam.length ? `
     <section class="card">
