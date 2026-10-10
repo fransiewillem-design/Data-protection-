@@ -137,39 +137,12 @@ export function exposure(state) {
 
   return `
   <div class="head">
-    <h1>Scan mail</h1>
-    <p>Everything starts here. Your mailbox is the only honest record of who holds your data, and nothing
-    but this page can read it.</p>
+    <h1>More ways to find who has your data</h1>
+    <p>Scanning mail on <a href="#/">Home</a> finds most of them. These catch the rest.</p>
   </div>
 
   <div class="card">
-    <h2>Drop your mail in</h2>
-    <p class="small muted">Drag messages out of Junk or your Inbox and drop them here. Any provider,
-    including iCloud. Read in memory and never uploaded; nothing from the messages is saved.</p>
-
-    <div id="drop" class="drop">
-      <p><strong>Drop .eml or .mbox files here</strong></p>
-      <p class="small muted">or <button data-action="pick">choose files</button></p>
-      <input type="file" id="files" multiple accept=".eml,.mbox,.txt,message/rfc822" style="display:none">
-    </div>
-
-    <details style="margin-top:12px">
-      <summary class="small muted" style="cursor:pointer">How do I get the files out of my mail app?</summary>
-      <ul class="small muted" style="margin-top:10px">
-        <li><strong>Apple Mail (iCloud):</strong> open the Junk mailbox, select all (<code>Cmd+A</code>), then
-        drag the selection onto your Desktop. You get one <code>.eml</code> per message. Drop them here.</li>
-        <li><strong>Outlook (desktop):</strong> same — select in Junk Email and drag to a Finder or Explorer
-        window.</li>
-        <li><strong>Gmail:</strong> Google Takeout → deselect all → select <em>Mail</em> → export. You get an
-        <code>.mbox</code>; drop that in directly.</li>
-      </ul>
-    </details>
-
-    <div id="scan-result" style="margin-top:14px"></div>
-  </div>
-
-  <div class="card">
-    <h2>1b. Or find them by searching your mail</h2>
+    <h2>Search your mailbox</h2>
     <p class="small muted">No export needed — run these searches in your mail app and add what you find by
     hand. Slower, but it reaches mail you would never think to export.</p>
     <details>
@@ -236,7 +209,7 @@ export function exposure(state) {
         </div>`).join('')}
       <p class="small muted" style="margin-top:10px">Copies the address and opens the database — paste it into
       their search box. Add anything it finds using the box in section 1, or the browser below.</p>
-    ` : `<p class="small muted">Add your email addresses on <a href="#/profile">Your details</a> first, then
+    ` : `<p class="small muted">Add your email addresses on <a href="#/profile">Settings</a> first, then
       check each one here.</p>`}
 
     <p class="small muted">Breaches classed as sensitive are hidden from the public search. To see those,
@@ -258,12 +231,12 @@ export function exposure(state) {
         <select id="acct-email" style="flex:1;min-width:200px">
           ${state.profile.emails.length
             ? state.profile.emails.map(e => `<option>${esc(e)}</option>`).join('')
-            : '<option value="">Add an email on "Your details" first</option>'}
+            : '<option value="">Add an email in Settings first</option>'}
         </select>
         <button data-action="check-account" ${state.hibpKey ? '' : 'disabled'}>Check address</button>
       </div>
       ${state.hibpKey ? '' : `<p class="small muted" style="margin-top:8px">No key saved — add one on
-        <a href="#/profile">Your details</a> to enable this.</p>`}
+        <a href="#/profile">Settings</a> to enable this.</p>`}
       <div id="acct-result" style="margin-top:10px"></div>
     </details>
   </div>
@@ -448,41 +421,9 @@ export function mountExposure(root, state, rerender) {
   });
 
   function addSenderAsTarget(sn, quiet) {
-    const label = sn.name && sn.name !== sn.domain ? sn.name : sn.domain;
-    const id = 'mail:' + sn.domain;
-    if (state.custom.some(c => c.id === id)) return false;
-
-    // The address THEY mailed is the only identifier the letter may use. Prefer
-    // one the user owns; otherwise take the recipient header verbatim, which is
-    // how a per-company alias gets picked up correctly.
-    const owned = (state.profile.emails || []).map(e => e.toLowerCase());
-    const hit = (sn.recipients || []).find(r => owned.includes(r));
-    const address = hit || (sn.recipients || [])[0] || (owned.length === 1 ? owned[0] : '');
-
-    store.update(st => st.custom.push({
-      id, name: label, category: 'breach', regions: ['EU'], site: sn.domain,
-      optOutUrl: `https://${sn.domain}`, email: `privacy@${sn.domain}`,
-      method: 'email', confidence: 'low',
-      source: 'mail',
-      evidence: { address },
-      unsubUrl: sn.unsubHttp || '',
-      unsubMailto: sn.unsubMailto || '',
-      unsubFrom: sn.unsubFrom || '',
-      oneClick: !!sn.oneClick,
-      // No unsubscribe anywhere in the message is the clearest spam signal
-      // there is: compliant bulk senders are obliged to offer one.
-      spam: !sn.unsubHttp,
-      trust: sn.trust || 'unknown',
-      trustWhy: sn.trustWhy || '',
-      // What a block rule can hold on to. Kept on the device like everything
-      // else; these are the sender's own addresses and hosts, not the user's.
-      senderAddresses: (sn.addresses || []).slice(0, 5),
-      linkDomains: (sn.linkDomains || []).slice(0, 10),
-      replyToHosts: (sn.replyToHosts || []).slice(0, 3),
-      notes: `Found in your own mail: ${sn.domain} sent to ${address || 'an address of yours'}. The letter deliberately tells them nothing they do not already have.`
-    }));
-    if (!quiet) toast(`${label} added — letter ready`);
-    return true;
+    const added = upsertSender(sn);
+    if (!quiet && added) toast(`${sn.name || sn.domain} added — letter ready`);
+    return added;
   }
 
   // ---- mail scanning ------------------------------------------------------
@@ -606,6 +547,62 @@ function breachRow(b, state) {
 }
 
 // ------------------------------------------------------------------ targets
+
+
+// Adds a scanned sender, or refreshes it if it is already known. Only what a
+// rule or a letter needs is kept: names, domains, the address it reached and
+// how many mails — never subject lines or message text.
+export function upsertSender(sn) {
+  const state = store.get();
+  const label = sn.name && sn.name !== sn.domain ? sn.name : sn.domain;
+  const id = 'mail:' + sn.domain;
+
+  // The address THEY mailed is the only identifier the letter may use. Prefer
+  // one the user owns; otherwise take the recipient header verbatim, which is
+  // how a per-company alias gets picked up correctly.
+  const owned = (state.profile.emails || []).map(e => e.toLowerCase());
+  const hit = (sn.recipients || []).find(r => owned.includes(r));
+  const address = hit || (sn.recipients || [])[0] || (owned.length === 1 ? owned[0] : '');
+
+  const data = {
+    id, name: label, category: 'breach', regions: ['EU'], site: sn.domain,
+    optOutUrl: `https://${sn.domain}`, email: `privacy@${sn.domain}`,
+    method: 'email', confidence: 'low',
+    source: 'mail',
+    evidence: { address },
+    unsubUrl: sn.unsubHttp || '',
+    unsubMailto: sn.unsubMailto || '',
+    unsubFrom: sn.unsubFrom || '',
+    oneClick: !!sn.oneClick,
+    spam: !sn.unsubHttp,
+    trust: sn.trust || 'unknown',
+    trustWhy: sn.trustWhy || '',
+    linkDomains: (sn.linkDomains || []).slice(0, 10),
+    replyToHosts: (sn.replyToHosts || []).slice(0, 3),
+    mailCount: sn.count || 1,
+    notes: `Found in your own mail: ${sn.domain} sent to ${address || 'an address of yours'}. The letter deliberately tells them nothing they do not already have.`
+  };
+
+  let added = false;
+  store.update(st => {
+    const i = st.custom.findIndex(c => c.id === id);
+    if (i === -1) { st.custom.push(data); added = true; return; }
+    const old = st.custom[i];
+    // Keep what the user did (unsubscribed, renamed); take everything else fresh.
+    // Counts take the larger: re-scanning the same files must not inflate them.
+    st.custom[i] = { ...old, ...data, mailCount: Math.max(old.mailCount || 0, data.mailCount),
+                     unsubscribedAt: old.unsubscribedAt };
+  });
+  return added;
+}
+
+export function markUnsubscribed(ids) {
+  if (!ids.length) return;
+  const at = new Date().toISOString().slice(0, 10);
+  store.update(st => {
+    for (const t of st.custom) if (ids.includes(t.id) && !t.unsubscribedAt) t.unsubscribedAt = at;
+  });
+}
 
 // Selection is deliberately not persisted: it is a scratch choice for one bulk
 // action, not something worth keeping in storage.
@@ -738,7 +735,7 @@ export function mountBrokers(root, state, rerender) {
 }
 
 // Hands the one-click set to the isolated worker and renders its progress.
-function runOneClickBatch(root, items, rest) {
+export function runOneClickBatch(root, items, rest) {
   const q = root.querySelector('#unsub-queue');
   if (!q) return;
   q.dataset.rest = JSON.stringify(rest.map(t => ({ id: t.id, name: t.name, unsubUrl: t.unsubUrl })));
@@ -762,6 +759,7 @@ function runOneClickBatch(root, items, rest) {
 
   paint(0, 0, items.length, false);
 
+  const delivered = [];
   const frame = document.createElement('iframe');
   frame.src = 'unsubscribe.html';
   frame.hidden = true;
@@ -773,12 +771,18 @@ function runOneClickBatch(root, items, rest) {
     if (d.type === 'ready') {
       frame.contentWindow.postMessage({
         type: 'dr-unsub-batch',
-        items: items.map(t => ({ name: t.name, url: safeUrl(t.unsubUrl) }))
+        items: items.map(t => ({ id: t.id, name: t.name, url: safeUrl(t.unsubUrl) }))
       }, location.origin);
     }
-    if (d.type === 'progress') paint(d.done, d.failed, d.total, false);
+    if (d.type === 'progress') {
+      // Only a request that actually went out counts; a network failure must
+      // leave the sender pending so the user can try again.
+      if (d.ok && d.id) delivered.push(d.id);
+      paint(d.done, d.failed, d.total, false);
+    }
     if (d.type === 'complete') {
       paint(d.done, d.failed, d.total, true);
+      markUnsubscribed(delivered);
       removeEventListener('message', onMessage);
       frame.remove();
     }
@@ -790,7 +794,7 @@ function runOneClickBatch(root, items, rest) {
 
 // The queue renders on whichever page asked for it, so its buttons are wired
 // once here rather than inside a single page's mount.
-function wireQueue(root) {
+export function wireQueue(root, onClose) {
   root.addEventListener('click', e => {
     const act = e.target.closest('[data-action]')?.dataset.action;
     const q = root.querySelector('#unsub-queue');
@@ -807,6 +811,7 @@ function wireQueue(root) {
         // One window.open per click. A loop is silently swallowed by the popup
         // blocker after the first, so stepping through is the only honest way.
         window.open(urls[i].url, '_blank', 'noopener,noreferrer');
+        if (urls[i].id) markUnsubscribed([urls[i].id]);
         q.dataset.i = String(i + 1);
         renderQueue(q, urls, i + 1);
       }
@@ -819,15 +824,15 @@ function wireQueue(root) {
         .catch(() => toast('Could not copy — select them by hand'));
     }
 
-    if (act === 'unsub-close') q.innerHTML = '';
+    if (act === 'unsub-close') { q.innerHTML = ''; onClose?.(); }
   });
 }
 
-function startUnsubQueue(root, list) {
+export function startUnsubQueue(root, list) {
   const q = root.querySelector('#unsub-queue');
   if (!q) return;
   if (!list.length) { toast('None of the selected senders published an unsubscribe link'); return; }
-  const urls = list.map(t => ({ name: t.name, url: safeUrl(t.unsubUrl) }));
+  const urls = list.map(t => ({ id: t.id, name: t.name, url: safeUrl(t.unsubUrl) }));
   q.dataset.urls = JSON.stringify(urls);
   q.dataset.i = '0';
   renderQueue(q, urls, 0);
@@ -871,7 +876,7 @@ export function senderClass(b) {
   return hasLink ? 'unsub' : 'spam';
 }
 
-function hostOf(u) { try { return new URL(u).hostname; } catch { return ''; } }
+export function hostOf(u) { try { return new URL(u).hostname; } catch { return ''; } }
 
 export function unsubTier(b) {
   if (senderClass(b) !== 'unsub') return null;
@@ -930,7 +935,8 @@ export function unsubscribe(state) {
 
   return `
   <div class="head">
-    <h1>Unsubscribe</h1>
+    <a class="back" href="#/">← Home</a>
+    <h1>Unsubscribe &amp; block</h1>
     <p>Senders that offered a way out. Stopping the mail is not deletion —
     <a href="#/delete">that is the other page</a>.</p>
   </div>
@@ -1004,13 +1010,13 @@ const CLIENTS = {
 };
 let blockClient = null;
 
-function blockAllCard(state) {
+export function blockAllCard(state, { closable = false } = {}) {
   const bl = buildBlockList(state.custom, senderClass);
   if (!blockClient) blockClient = guessClient(state.custom.filter(t => ['spam', 'bait'].includes(senderClass(t))));
   const rules = bl.domains.length + bl.replyTo.length + bl.sharedReplyTo.length;
 
   return `
-  <section class="card block-card">
+  <section class="card block-card ${closable ? 'panel' : ''}">
     <div class="row between" style="align-items:flex-start;gap:16px">
       <div>
         <h2>Block all ${bl.count} at once</h2>
@@ -1018,9 +1024,12 @@ function blockAllCard(state) {
         It blocks the senders <em>and</em> what their campaigns reuse — the sites they link to and the
         address replies go to — because the sender name changes on every message.</p>
       </div>
-      <select id="block-client" style="width:auto">
-        ${Object.entries(CLIENTS).map(([k, v]) => `<option value="${k}" ${k === blockClient ? 'selected' : ''}>${v}</option>`).join('')}
-      </select>
+      <div class="row" style="flex-wrap:nowrap">
+        <select id="block-client" style="width:auto">
+          ${Object.entries(CLIENTS).map(([k, v]) => `<option value="${k}" ${k === blockClient ? 'selected' : ''}>${v}</option>`).join('')}
+        </select>
+        ${closable ? '<button class="link-btn" data-action="panel-close">Close</button>' : ''}
+      </div>
     </div>
 
     <div class="block-facts small">
@@ -1036,7 +1045,7 @@ function blockAllCard(state) {
   </section>`;
 }
 
-function blockPanel(bl, client) {
+export function blockPanel(bl, client) {
   const domainList = bl.domains.map(d => `<code>${esc(d)}</code>`).join(' ');
   const reply = [...bl.replyTo, ...bl.sharedReplyTo];
   const sharedNote = bl.sharedReplyTo.length ? `<p class="small muted">${bl.sharedReplyTo.map(esc).join(', ')}
@@ -1100,14 +1109,14 @@ function blockPanel(bl, client) {
     And if one address is getting nothing but this, it is burned; retiring it beats any filter.</p>`;
 }
 
-function blockText(state, fmt) {
+export function blockText(state, fmt) {
   const bl = buildBlockList(state.custom, senderClass);
   if (fmt === 'gmail') return { text: asGmailXml(bl), name: 'data-reclaim-filters.xml', type: 'application/xml' };
   if (fmt === 'sieve') return { text: asSieve(bl), name: 'data-reclaim.sieve', type: 'text/plain' };
   return { text: asPlainList(bl), name: 'data-reclaim-blocked.txt', type: 'text/plain' };
 }
 
-function downloadText({ text, name, type }) {
+export function downloadText({ text, name, type }) {
   const url = URL.createObjectURL(new Blob([text], { type }));
   const a = document.createElement('a');
   a.href = url; a.download = name;
@@ -1115,16 +1124,37 @@ function downloadText({ text, name, type }) {
   setTimeout(() => URL.revokeObjectURL(url), 1000);
 }
 
+// Block-card controls, shared by every page that shows the card.
+export function wireBlock(root, state) {
+  root.addEventListener('change', e => {
+    if (e.target.id !== 'block-client') return;
+    blockClient = e.target.value;
+    root.querySelector('#block-panel').innerHTML =
+      blockPanel(buildBlockList(store.get().custom, senderClass), blockClient);
+  });
+  root.addEventListener('click', e => {
+    const btn = e.target.closest('[data-action]');
+    if (!btn) return;
+    const act = btn.dataset.action;
+    if (act === 'dl-block') {
+      downloadText(blockText(store.get(), btn.dataset.fmt));
+      // Remember what was exported, so Home can say when new senders arrive.
+      const ids = store.get().custom.filter(t => ['spam', 'bait'].includes(senderClass(t))).map(t => t.id);
+      store.update(st => { st.blockExport = { at: new Date().toISOString().slice(0, 10), ids }; });
+      toast('Downloaded — import it in your mail app');
+    }
+    if (act === 'copy-block') {
+      navigator.clipboard.writeText(blockText(store.get(), btn.dataset.fmt).text)
+        .then(() => toast('Copied')).catch(() => toast('Could not copy'));
+    }
+  });
+}
+
 export function mountUnsubscribe(root, state, rerender) {
+  wireBlock(root, state);
   wireQueue(root);
 
   root.addEventListener('change', e => {
-    if (e.target.id === 'block-client') {
-      blockClient = e.target.value;
-      root.querySelector('#block-panel').innerHTML =
-        blockPanel(buildBlockList(state.custom, senderClass), blockClient);
-      return;
-    }
     const box = e.target.closest('[data-action="sel"]');
     if (!box) return;
     if (box.checked) selected.add(box.dataset.id); else selected.delete(box.dataset.id);
@@ -1144,12 +1174,6 @@ export function mountUnsubscribe(root, state, rerender) {
       return;
     }
 
-    if (act === 'dl-block') { downloadText(blockText(state, btn.dataset.fmt)); toast('Downloaded — import it in your mail app'); return; }
-    if (act === 'copy-block') {
-      navigator.clipboard.writeText(blockText(state, btn.dataset.fmt).text)
-        .then(() => toast('Copied')).catch(() => toast('Could not copy'));
-      return;
-    }
 
     const pick = k => state.custom.filter(b => unsubTier(b) === k && selected.has(b.id));
     if (act === 'run-instant') runOneClickBatch(root, pick('instant'), []);
@@ -1267,7 +1291,8 @@ export function email(state) {
 
   return `
   <div class="head">
-    <h1>Email defence</h1>
+    <a class="back" href="#/profile">← Settings</a>
+    <h1>Aliases</h1>
     <p>You cannot block spam that is already addressed to you. You can make your real address worthless to
     leak, by never giving it out again.</p>
   </div>
@@ -1366,9 +1391,18 @@ export function profile(state) {
   const p = state.profile;
   return `
   <div class="head">
-    <h1>Your details</h1>
+    <h1>Settings</h1>
     <p>These fill in the letters. A request without enough detail to identify you is one a company can
     legitimately refuse, so this is worth filling in properly.</p>
+  </div>
+
+  <div class="card">
+    <h2>Tools</h2>
+    <div class="tool-links">
+      <a href="#/aliases"><b>Aliases</b><span>One address per company, and a log of who leaked which</span></a>
+      <a href="#/unsubscribe"><b>Unsubscribe &amp; block, in detail</b><span>Every sender, grouped, with per-client block files</span></a>
+      <a href="#/find"><b>More ways to find who has your data</b><span>Mailbox searches, breach records, data brokers, password check</span></a>
+    </div>
   </div>
 
   <div class="notice">

@@ -57,6 +57,29 @@ making the repository public is usually the honest choice.
 Publishing is safe here: the app is entirely client-side and the repository holds no keys and no
 personal data. A public URL exposes the code, never your data — what you enter stays in your browser.
 
+## Home: the whole flow on one screen
+
+Drop mail in and Home sorts it into four cards, each with one number and one button:
+
+| Card | What the button does |
+| --- | --- |
+| **Unsubscribe** | One-click unsubscribe for *verified* senders; senders that could not be verified are named, never bulk-clicked |
+| **Block** | One import for your mail app that blocks every scam and its reused link sites and reply addresses |
+| **Delete my data** | Opens the letters for companies that genuinely hold your data |
+| **Your addresses** | Per-address advice from what the scan found (below) |
+
+**Burned addresses.** For every address the scanned mail reached, Home measures how much of it was scam or
+spam and which real senders still depend on it. An address with repeated scams and no real senders is
+**burned**: filters chase new domains indefinitely, while an address that no longer exists cannot be sold
+again, so the advice is to retire it, with provider-specific steps (Microsoft alias or account, iCloud
+Hide My Email, Gmail filter). An address under heavy attack that real senders still use is **under
+attack**: the advice is to move those named senders to a fresh address first, then retire it — or keep it
+for people and stop using it for sign-ups. Thresholds: at least two scams, and none (burned) or at least
+half (under attack) of its mail.
+
+The navigation is three tabs — Home, Delete data, Settings. The detailed unsubscribe-and-block view,
+aliases, and the other ways to find who has your data are linked from Home's cards and from Settings.
+
 ## The pages
 
 The two jobs are separate pages because they are separate things: unsubscribing is a courtesy the sender

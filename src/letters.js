@@ -55,7 +55,7 @@ function identityBlock(p) {
   if (p.emails?.length) lines.push(`Email address(es): ${p.emails.join(', ')}`);
   if (p.phones?.length) lines.push(`Phone number(s): ${p.phones.join(', ')}`);
   if (p.addresses) lines.push(`Postal address: ${p.addresses.replace(/\n/g, ', ')}`);
-  return lines.length ? lines.join('\n') : '[Fill in your details on the "Your details" page]';
+  return lines.length ? lines.join('\n') : '[Fill in your details on the Settings page]';
 }
 
 function identityBlockNL(p) {
@@ -65,7 +65,7 @@ function identityBlockNL(p) {
   if (p.emails?.length) lines.push(`E-mailadres(sen): ${p.emails.join(', ')}`);
   if (p.phones?.length) lines.push(`Telefoonnummer(s): ${p.phones.join(', ')}`);
   if (p.addresses) lines.push(`Postadres: ${p.addresses.replace(/\n/g, ', ')}`);
-  return lines.length ? lines.join('\n') : '[Vul je gegevens in op de pagina "Your details"]';
+  return lines.length ? lines.join('\n') : '[Vul je gegevens in op de pagina Settings]';
 }
 
 const ref = () => 'DR-' + Math.random().toString(36).slice(2, 7).toUpperCase();

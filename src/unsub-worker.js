@@ -40,7 +40,7 @@ async function runBatch(items) {
       const item = queue.shift();
       const res = await unsubscribeOne(item.url);
       if (res.ok) done++; else failed++;
-      send({ type: 'progress', done, failed, total: items.length, name: item.name, ok: res.ok });
+      send({ type: 'progress', done, failed, total: items.length, name: item.name, id: item.id, ok: res.ok });
     }
   }
 

@@ -1,17 +1,19 @@
 import * as store from './store.js';
 import * as views from './views.js';
+import * as home from './home.js';
 
 const ROUTES = [
-  { path: '/',            label: 'Overview',    view: views.dashboard },
-  { path: '/scan',        label: 'Scan mail',   view: views.exposure,    mount: views.mountExposure },
-  { path: '/unsubscribe', label: 'Unsubscribe', view: views.unsubscribe, mount: views.mountUnsubscribe },
-  { path: '/delete',      label: 'Delete data', view: views.brokers,     mount: views.mountBrokers },
-  { path: '/aliases',     label: 'Aliases',     view: views.email,       mount: views.mountEmail },
-  { path: '/profile',     label: 'Settings',    view: views.profile,     mount: views.mountProfile }
+  { path: '/',            label: 'Home',        view: home.home,          mount: home.mountHome },
+  { path: '/delete',      label: 'Delete data', view: views.brokers,      mount: views.mountBrokers },
+  { path: '/profile',     label: 'Settings',    view: views.profile,      mount: views.mountProfile },
+  // Detail pages: reached from Home's cards, kept out of the nav.
+  { path: '/unsubscribe', view: views.unsubscribe, mount: views.mountUnsubscribe, nav: false },
+  { path: '/aliases',     view: views.email,       mount: views.mountEmail,       nav: false },
+  { path: '/find',        view: views.exposure,    mount: views.mountExposure,    nav: false }
 ];
 
 // Old hashes people may have bookmarked or that older copy still links to.
-const ALIASES = { '/exposure': '/scan', '/brokers': '/delete', '/email': '/aliases' };
+const ALIASES = { '/scan': '/', '/exposure': '/find', '/brokers': '/delete', '/email': '/aliases' };
 const LETTER = { path: '/letter', view: views.letter, mount: views.mountLetter };
 
 let catalog = [];
@@ -25,8 +27,10 @@ function parseHash() {
 }
 
 function renderNav(path) {
-  document.getElementById('nav').innerHTML = ROUTES.map(r =>
-    `<a href="#${r.path}" class="${r.path === path ? 'active' : ''}">${r.label}</a>`).join('');
+  // Detail pages light up the tab they belong to.
+  const owner = { '/unsubscribe': '/', '/aliases': '/profile', '/find': '/' }[path] || path;
+  document.getElementById('nav').innerHTML = ROUTES.filter(r => r.nav !== false).map(r =>
+    `<a href="#${r.path}" class="${r.path === owner ? 'active' : ''}">${r.label}</a>`).join('');
 }
 
 function render() {
@@ -47,7 +51,7 @@ function render() {
     el.innerHTML = `<div class="card"><h2>Something broke rendering this page</h2>
       <p class="small">${views.esc(err.message)}</p>
       <p class="small muted">Your saved data is untouched. Try
-      <a href="#/profile">Your details → Export</a> to back it up, then reload.</p></div>`;
+      <a href="#/profile">Settings → Backup</a> to back it up, then reload.</p></div>`;
   }
   document.getElementById('main').replaceChildren(el);
   route.mount?.(el, state, render, params);
@@ -55,9 +59,9 @@ function render() {
 }
 
 store.subscribe(() => {
-  // Exposure holds fetched results that a full re-render would throw away;
-  // it updates its own DOM in place instead.
-  if (current !== '/scan') render();
+  // Home and Find update their own DOM (queues, panels, fetched results) and
+  // re-render explicitly; a store write mid-queue must not wipe the progress.
+  if (!['/', '/find'].includes(current)) render();
 });
 
 addEventListener('hashchange', render);

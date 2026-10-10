@@ -63,7 +63,7 @@ function persist() {
     localStorage.setItem(KEY, JSON.stringify(state));
   } catch (err) {
     console.warn('Could not save state', err);
-    alert('This browser refused to save (private window, or storage is full). Your changes will be lost when you close the tab. Export a backup from "Your details".');
+    alert('This browser refused to save (private window, or storage is full). Your changes will be lost when you close the tab. Export a backup from Settings.');
   }
   listeners.forEach(fn => fn(state));
 }
