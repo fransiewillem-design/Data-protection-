@@ -29,8 +29,8 @@ function minimalBlock(b, nl) {
     ? 'E-mailadres: [vul het adres in waarop u hun bericht ontving]'
     : 'Email address: [fill in the address their message reached you on]';
   const why = nl
-    ? 'Dit is het enige identificatiegegeven dat ik verstrek, omdat dit het gegeven is dat u\naantoonbaar al van mij heeft: u heeft mij hierop benaderd. U heeft niets meer nodig om\nmijn gegevens te vinden. Op grond van artikel 12, lid 2, en overweging 64 AVG mag u geen\naanvullende persoonsgegevens verlangen als voorwaarde voor het uitvoeren van dit verzoek.'
-    : 'This is the only identifier I am providing, because it is the one you demonstrably\nalready hold — it is how you contacted me. You need nothing further to locate my\nrecords. Under Article 12(2) and Recital 64 GDPR you may not require additional\npersonal data as a condition of acting on this request, and I will not supply any.';
+    ? 'Dit is het enige identificatiegegeven dat ik verstrek, omdat u het aantoonbaar al van mij\nheeft — u heeft mij hierop benaderd — en het volstaat om mijn gegevens te vinden. Op grond\nvan artikel 12, lid 2, AVG moet u de uitoefening van mijn rechten faciliteren. Op grond van\nartikel 12, lid 6, mag u alleen om aanvullende gegevens vragen als u redelijke twijfel heeft\nover mijn identiteit, en dan alleen wat nodig is om die twijfel weg te nemen.'
+    : 'This is the only identifier I am providing, because it is the one you demonstrably\nalready hold — it is how you contacted me — and it is enough to locate my records.\nUnder Article 12(2) GDPR you must facilitate the exercise of my rights. Under Article\n12(6) you may ask for additional information only if you have reasonable doubts about\nmy identity, and then only what is necessary to resolve them.';
   return id + '\n\n' + why;
 }
 
@@ -111,7 +111,7 @@ TIME LIMIT
 Article 12(3) GDPR requires a response without undue delay and in any event within one month of receipt. If you extend that period, you must tell me within the first month and give reasons.
 
 IDENTITY VERIFICATION
-If you genuinely cannot identify me from the details above, tell me precisely what further information you need. Please note Article 12(2) and Recital 64: you may not collect additional personal data solely to make it harder to exercise these rights, and a demand for a scan of my passport or ID document is disproportionate for a request of this kind.
+If you genuinely cannot identify me from the details above, tell me precisely what further information you need. Under Article 12(6) GDPR you may ask for additional information only where you have reasonable doubts about my identity, and only what is necessary to confirm it. The European Data Protection Board considers a copy of an identity document generally disproportionate for this purpose (Guidelines 01/2022 on the right of access).
 
 If you do not respond within the statutory period, or refuse without a valid basis, I will lodge a complaint with my supervisory authority under Article 77 GDPR.
 
@@ -156,7 +156,7 @@ TERMIJN
 Op grond van artikel 12, lid 3, AVG dient u zonder onredelijke vertraging en in elk geval binnen één maand na ontvangst te reageren. Verlengt u die termijn, dan dient u mij daarvan binnen de eerste maand gemotiveerd op de hoogte te stellen.
 
 IDENTIFICATIE
-Kunt u mij werkelijk niet identificeren op basis van bovenstaande gegevens, geef dan precies aan welke aanvullende informatie u nodig hebt. Ik wijs u op artikel 12, lid 2, en overweging 64 AVG: u mag niet louter extra persoonsgegevens verzamelen om de uitoefening van deze rechten te bemoeilijken. Het opvragen van een kopie van mijn identiteitsbewijs is voor een verzoek als dit niet proportioneel.
+Kunt u mij werkelijk niet identificeren op basis van bovenstaande gegevens, geef dan precies aan welke aanvullende informatie u nodig hebt. Op grond van artikel 12, lid 6, AVG mag u alleen om aanvullende informatie vragen als u redelijke twijfel heeft over mijn identiteit, en alleen wat nodig is om die te bevestigen. Volgens de Europese toezichthouders (EDPB, richtsnoeren 01/2022 over het recht op inzage) is een kopie van een identiteitsbewijs daarvoor in de regel niet proportioneel.
 
 Ontvang ik geen tijdige reactie, of wijst u het verzoek zonder geldige grond af, dan dien ik een klacht in bij de Autoriteit Persoonsgegevens op grond van artikel 77 AVG.
 

@@ -402,3 +402,7 @@ button, .btn { border-radius: 9px; transition: border-color .12s, color .12s, fi
   .hero h1 { font-size: 1.85rem; }
 }
 .tpl-select { width: auto; max-width: 100%; }
+.legal-title { font-size: 1.25rem; margin: 30px 0 4px; }
+.legal ul { padding-left: 20px; margin: 0; }
+.legal li { margin-bottom: 6px; }
+.legal p:last-child { margin-bottom: 0; }

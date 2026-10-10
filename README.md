@@ -135,9 +135,10 @@ national DPA. Complaints are free.
 
 Two refusals worth knowing:
 
-- **"Send us a copy of your passport."** Art. 12(2) and Recital 64 say a controller may not collect
-  extra personal data just to obstruct a request. For a company that only ever had your email address,
-  demanding ID is disproportionate. The letters say so.
+- **"Send us a copy of your passport."** Under Art. 12(6) a controller may ask for more only when it has
+  reasonable doubts about your identity, and only what is necessary to resolve them. For a company that
+  only ever had your email address, that doubt is hard to justify, and the EDPB considers an ID copy
+  generally disproportionate (Guidelines 01/2022). The letters say so.
 - **"We have a legitimate interest."** For direct marketing this does not survive an objection —
   Art. 21(3) is absolute, with no balancing test. The letters invoke it explicitly.
 
@@ -173,8 +174,8 @@ to clean up after. So there is no server.
 **Letters reveal nothing the recipient did not already have.** A target found in your own mail or SMS has
 demonstrably got exactly one identifier: the address or number it contacted you on. Its letter cites that
 and nothing else — no name, no date of birth, no postal address, no other addresses — and says why,
-citing Article 12(2) and Recital 64, which forbid a controller demanding extra personal data as a
-condition of acting. The signature and the subject line are the identifier too, since signing your real
+citing Article 12(2) (the controller must facilitate the request) and 12(6) (it may ask for more only
+with reasonable doubt about your identity, and only what is necessary). The signature and the subject line are the identifier too, since signing your real
 name would hand over exactly what the body withheld. This matters most for the letters that go to
 criminals: a scammer who mails you learns nothing from your reply.
 

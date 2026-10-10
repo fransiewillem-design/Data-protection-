@@ -1766,9 +1766,19 @@ export function mountProfile(root, state, rerender) {
 // -------------------------------------------------------------------- about
 
 const REPO = 'https://github.com/fransiewillem-design/Data-protection-';
+// The address for privacy questions. Empty until the maintainer sets one; the
+// page then falls back to GitHub, with a warning not to post personal details.
+const CONTACT_EMAIL = '';
+const UPDATED = { en: '10 October 2026', nl: '10 oktober 2026' };
 
 export function about() {
   const ext = (href, text) => `<a href="${href}" target="_blank" rel="noopener noreferrer">${text}</a>`;
+  const contact = CONTACT_EMAIL
+    ? `<a href="mailto:${esc(CONTACT_EMAIL)}">${esc(CONTACT_EMAIL)}</a>`
+    : L(`${ext(REPO + '/issues', 'GitHub')} (public — never post personal details there)`,
+        `${ext(REPO + '/issues', 'GitHub')} (openbaar — zet daar nooit persoonsgegevens neer)`);
+  const sec = (title, body) => `<section class="card legal"><h2>${title}</h2>${body}</section>`;
+
   return `
   <div class="head">
     <h1>${L('About &amp; privacy', 'Over &amp; privacy')}</h1>
@@ -1776,9 +1786,7 @@ export function about() {
       'Unlisted helpt je van de lijsten af te komen waar je gegevens op terecht zijn gekomen — mailinglijsten, oplichterslijsten en databrokers — zonder die gegevens aan nóg een bedrijf te geven.')}</p>
   </div>
 
-  <section class="card">
-    <h2>${L('What it does', 'Wat het doet')}</h2>
-    <ul>${L(`
+  ${sec(L('What it does', 'Wat het doet'), `<ul>${L(`
       <li><b>Unsubscribe</b> from real companies, in one go where they support it.</li>
       <li><b>Block scams</b> — only mail that failed the sender check, never a real company.</li>
       <li><b>Delete your data</b>: letters under the GDPR, sent from your own mail app, with reminders and a complaint to the regulator when a company ignores you.</li>
@@ -1786,35 +1794,69 @@ export function about() {
       <li><b>Uitschrijven</b> bij echte bedrijven, in één keer waar ze dat ondersteunen.</li>
       <li><b>Oplichting blokkeren</b> — alleen mail die zakte voor de afzendercontrole, nooit een echt bedrijf.</li>
       <li><b>Je gegevens laten wissen</b>: brieven op grond van de AVG, verstuurd vanuit je eigen mailapp, met herinneringen en een klacht bij de toezichthouder als een bedrijf je negeert.</li>
-      <li><b>Advies over je adressen</b>: welk adres verbrand is en hoe je het opheft.</li>`)}
-    </ul>
-  </section>
+      <li><b>Advies over je adressen</b>: welk adres verbrand is en hoe je het opheft.</li>`)}</ul>`)}
 
-  <section class="card">
-    <h2>${L('Privacy statement', 'Privacyverklaring')}</h2>
-    <ul>${L(`
-      <li><b>No server, no account, no cookies, no analytics, no trackers.</b> There is no database to breach, because nothing you enter is ever sent to us.</li>
-      <li>Mail you drop in is read <b>on your device</b>. Only the sender's name, domain, links and unsubscribe address are kept — not subjects, not message text.</li>
-      <li>Your details and progress are stored in <b>this browser only</b> (localStorage). They are not encrypted, so use a device and browser profile only you use. <a href="#/profile">Settings</a> → Erase everything removes it all.</li>
-      <li>The app itself contacts only: the breach database ${ext('https://haveibeenpwned.com', 'Have I Been Pwned')} when you use the breach or password check (a password check sends only the first 5 characters of a scrambled hash, never the password), and a sender's own unsubscribe address when you choose one-click unsubscribe. Letters go out through your own mail app.</li>
-      <li>The site is hosted on GitHub Pages. Like any web host, GitHub sees your IP address and which files your browser loads; see the ${ext('https://docs.github.com/en/site-policy/privacy-policies/github-general-privacy-statement', 'GitHub privacy statement')}.</li>`, `
-      <li><b>Geen server, geen account, geen cookies, geen analytics, geen trackers.</b> Er is geen database die gelekt kan worden, want niets wat je invult wordt ooit naar ons gestuurd.</li>
-      <li>Mail die je erin sleept wordt <b>op je eigen apparaat</b> gelezen. Alleen de naam, het domein, de links en het uitschrijfadres van de afzender worden bewaard — geen onderwerpregels, geen berichttekst.</li>
-      <li>Je gegevens en voortgang staan <b>alleen in deze browser</b> (localStorage). Ze zijn niet versleuteld, dus gebruik een apparaat en browserprofiel dat alleen jij gebruikt. <a href="#/profile">Instellingen</a> → Alles wissen haalt alles weg.</li>
-      <li>De app maakt zelf alleen contact met: de datalekdatabase ${ext('https://haveibeenpwned.com', 'Have I Been Pwned')} als je de datalek- of wachtwoordcheck gebruikt (een wachtwoordcheck stuurt alleen de eerste 5 tekens van een versleutelde hash, nooit het wachtwoord), en het uitschrijfadres van een afzender als je kiest voor uitschrijven met één klik. Brieven gaan via je eigen mailapp.</li>
-      <li>De site draait op GitHub Pages. Zoals elke webhost ziet GitHub je IP-adres en welke bestanden je browser laadt; zie de ${ext('https://docs.github.com/en/site-policy/privacy-policies/github-general-privacy-statement', 'privacyverklaring van GitHub')}.</li>`)}
-    </ul>
-  </section>
+  <h2 class="legal-title" id="privacy">${L('Privacy statement', 'Privacyverklaring')}</h2>
+  <p class="small muted">${L(`Last updated ${UPDATED.en}.`, `Laatst bijgewerkt op ${UPDATED.nl}.`)}</p>
 
-  <section class="card">
-    <h2>${L('Good to know', 'Goed om te weten')}</h2>
+  ${sec(L('Who we are', 'Wie we zijn'), `<p>${L(
+    `Unlisted is a free, non-commercial project by <b>fransiewillem</b>. Questions about privacy, or a request under the GDPR: ${contact}.`,
+    `Unlisted is een gratis, niet-commercieel project van <b>fransiewillem</b>. Vragen over privacy, of een verzoek op grond van de AVG: ${contact}.`)}</p>`)}
+
+  ${sec(L('In short', 'In het kort'), `<p>${L(
+    'We have no server, no accounts, no analytics, no tracking cookies and no third-party scripts. Nothing you enter in Unlisted, and no mail you drop into it, is ever sent to us. We cannot see it, so we cannot lose it, sell it or hand it over.',
+    'We hebben geen server, geen accounts, geen statistieken, geen trackingcookies en geen scripts van derden. Niets wat je in Unlisted invult, en geen mail die je erin sleept, wordt ooit naar ons gestuurd. We kunnen het niet zien, dus we kunnen het ook niet kwijtraken, verkopen of afgeven.')}</p>`)}
+
+  ${sec(L('What stays on your own device', 'Wat op je eigen apparaat blijft'), `
+    <p>${L('Everything below is processed in your browser and stored there only (localStorage). It never leaves your device unless you choose to send a letter or export a backup.',
+      'Alles hieronder wordt in je browser verwerkt en alleen daar opgeslagen (localStorage). Het verlaat je apparaat niet, tenzij je zelf een brief verstuurt of een back-up exporteert.')}</p>
     <ul>${L(`
-      <li>This is practical guidance, not legal advice. A company may ask you to prove who you are before it acts.</li>
-      <li>The app cannot see whether a company really deleted your data; it tracks the deadlines so you can hold them to it.</li>
-      <li>Unlisted is free and open source (MIT). Found a problem or have an idea? ${ext(REPO + '/issues', 'Open an issue')}.</li>`, `
-      <li>Dit is praktische uitleg, geen juridisch advies. Een bedrijf mag je vragen te bewijzen wie je bent voordat het iets doet.</li>
-      <li>De app kan niet zien of een bedrijf je gegevens echt heeft gewist; hij houdt de termijnen bij zodat je ze eraan kunt houden.</li>
-      <li>Unlisted is gratis en open source (MIT). Een probleem gevonden of een idee? ${ext(REPO + '/issues', 'Meld het hier')}.</li>`)}
-    </ul>
-  </section>`;
+      <li>The details you fill in under Settings: name, date of birth, email addresses, phone numbers and postal address. They are only used to fill in your letters.</li>
+      <li>From mail you drop in: per sender only the name, domain, link domains, unsubscribe address and whether it passed the sender check. Subjects and message text are read to find unsubscribe links, and are not kept.</li>
+      <li>Your progress: which companies you wrote to and when, notes, aliases, your language choice, and a breach-database API key if you add one.</li>`, `
+      <li>De gegevens die je bij Instellingen invult: naam, geboortedatum, e-mailadressen, telefoonnummers en postadres. Ze worden alleen gebruikt om je brieven in te vullen.</li>
+      <li>Uit mail die je erin sleept: per afzender alleen de naam, het domein, de linkdomeinen, het uitschrijfadres en of de afzendercontrole slaagde. Onderwerpen en berichttekst worden gelezen om uitschrijflinks te vinden, en niet bewaard.</li>
+      <li>Je voortgang: welke bedrijven je wanneer aanschreef, notities, aliassen, je taalkeuze en een API-sleutel voor de datalekdatabase als je die toevoegt.</li>`)}</ul>
+    <p>${L('This storage is not encrypted: use a device and browser profile only you use. You remove it all with <a href="#/profile">Settings</a> → Erase everything, or by clearing this site\'s data in your browser. Because it is strictly necessary for the service you ask for, and contains nothing used to track you, no cookie consent is needed for it.',
+      'Deze opslag is niet versleuteld: gebruik een apparaat en browserprofiel dat alleen jij gebruikt. Je wist alles via <a href="#/profile">Instellingen</a> → Alles wissen, of door de websitegegevens van deze site in je browser te wissen. Omdat de opslag strikt noodzakelijk is voor de dienst die je vraagt, en niets bevat waarmee je gevolgd wordt, is er geen cookietoestemming voor nodig.')}</p>`)}
+
+  ${sec(L('When something does leave your device', 'Wanneer er wél iets je apparaat verlaat'), `
+    <p>${L('Only in these cases, and only when you choose to. The data then goes straight from your browser to the party named; it does not pass through us.',
+      'Alleen in deze gevallen, en alleen als jij dat kiest. De gegevens gaan dan rechtstreeks van je browser naar de genoemde partij; ze komen niet langs ons.')}</p>
+    <ul>${L(`
+      <li><b>Visiting the site.</b> The site is hosted on GitHub Pages (GitHub Inc., USA). Like every web host, GitHub receives your IP address and the files your browser loads, and may log these for security. See the ${ext('https://docs.github.com/en/site-policy/privacy-policies/github-general-privacy-statement', 'GitHub privacy statement')}; GitHub participates in the EU–US Data Privacy Framework.</li>
+      <li><b>Breach and password check.</b> When you use it, your browser contacts ${ext('https://haveibeenpwned.com/Privacy', 'Have I Been Pwned')} (Australia). The breach list carries nothing about you. A password check sends only the first 5 characters of a scrambled hash of the password, never the password itself. Only if you add your own API key and check an address is that email address sent to Have I Been Pwned.</li>
+      <li><b>One-click unsubscribe.</b> Your browser sends the unsubscribe request to the address the sender published. That sender already has your email address; it also sees your IP address. No cookies or other details are sent.</li>
+      <li><b>Opening a link</b> (an unsubscribe page, an opt-out form, the regulator's website) works like any link: that website sees your visit. This site never sends it where you came from.</li>
+      <li><b>Letters</b> open in your own mail app and are sent by you, through your own mail provider.</li>`, `
+      <li><b>Het bezoeken van de site.</b> De site draait op GitHub Pages (GitHub Inc., VS). Zoals elke webhost ontvangt GitHub je IP-adres en de bestanden die je browser laadt, en kan die voor beveiliging vastleggen. Zie de ${ext('https://docs.github.com/en/site-policy/privacy-policies/github-general-privacy-statement', 'privacyverklaring van GitHub')}; GitHub neemt deel aan het EU-VS Data Privacy Framework.</li>
+      <li><b>Datalek- en wachtwoordcheck.</b> Als je die gebruikt, maakt je browser contact met ${ext('https://haveibeenpwned.com/Privacy', 'Have I Been Pwned')} (Australië). De lijst met datalekken bevat niets over jou. Een wachtwoordcheck stuurt alleen de eerste 5 tekens van een versleutelde hash van het wachtwoord, nooit het wachtwoord zelf. Alleen als je een eigen API-sleutel toevoegt en een adres controleert, wordt dat e-mailadres naar Have I Been Pwned gestuurd.</li>
+      <li><b>Uitschrijven met één klik.</b> Je browser stuurt het uitschrijfverzoek naar het adres dat de afzender opgaf. Die afzender heeft je e-mailadres al; hij ziet ook je IP-adres. Er worden geen cookies of andere gegevens meegestuurd.</li>
+      <li><b>Een link openen</b> (een uitschrijfpagina, een afmeldformulier, de website van de toezichthouder) werkt zoals elke link: die website ziet je bezoek. Deze site stuurt niet mee waar je vandaan kwam.</li>
+      <li><b>Brieven</b> openen in je eigen mailapp en worden door jou verstuurd, via je eigen mailprovider.</li>`)}</ul>`)}
+
+  ${sec(L('Sharing, sale and legal requests', 'Delen, verkoop en vorderingen'), `<p>${L(
+    'We do not share or sell anything, because we receive nothing. For the same reason there is nothing we could hand over if asked to.',
+    'We delen of verkopen niets, omdat we niets ontvangen. Om dezelfde reden is er niets dat we kunnen afgeven als iemand daarom vraagt.')}</p>`)}
+
+  ${sec(L('Your rights', 'Je rechten'), `<p>${L(
+    `Under the GDPR you have the right to access, correct and erase your personal data, among others. Everything Unlisted stores is already in your own hands: you can view, change and erase it yourself in the app. For anything else, contact us at ${contact}. You can also lodge a complaint with the ${ext('https://autoriteitpersoonsgegevens.nl', 'Autoriteit Persoonsgegevens')}, the Dutch data protection authority.`,
+    `Op grond van de AVG heb je onder meer recht op inzage, correctie en verwijdering van je persoonsgegevens. Alles wat Unlisted opslaat, heb je al zelf in handen: je kunt het in de app bekijken, aanpassen en wissen. Voor al het andere kun je contact opnemen via ${contact}. Je kunt ook een klacht indienen bij de ${ext('https://autoriteitpersoonsgegevens.nl', 'Autoriteit Persoonsgegevens')}.`)}</p>`)}
+
+  ${sec(L('Changes', 'Wijzigingen'), `<p>${L(
+    'If this statement changes, the date at the top changes with it. Any change that sends more data anywhere will be announced on this page first, and you can always check the source code.',
+    'Als deze verklaring verandert, verandert de datum bovenaan mee. Een wijziging waardoor er meer gegevens ergens heen gaan, kondigen we eerst op deze pagina aan, en je kunt altijd de broncode nakijken.')}</p>`)}
+
+  <h2 class="legal-title" id="terms">${L('Terms of use', 'Gebruiksvoorwaarden')}</h2>
+  ${sec(L('Using Unlisted', 'Unlisted gebruiken'), `<ul>${L(`
+    <li>Unlisted is free and provided as is, without any guarantee. It is practical guidance, not legal advice.</li>
+    <li>You send every letter and unsubscribe yourself, and you are responsible for what you send. Read each letter before you send it.</li>
+    <li>Use it for your own data. Writing on behalf of someone else needs their permission.</li>
+    <li>Company contact details may be outdated or guessed; the app marks guessed ones. We cannot see whether a company really erased your data — the app tracks deadlines so you can hold them to it.</li>
+    <li>Unlisted is open source under the MIT licence: ${ext(REPO, 'source code')}.</li>`, `
+    <li>Unlisted is gratis en wordt geleverd zoals het is, zonder enige garantie. Het is praktische uitleg, geen juridisch advies.</li>
+    <li>Je verstuurt elke brief en elke uitschrijving zelf, en je bent verantwoordelijk voor wat je verstuurt. Lees elke brief voordat je hem verstuurt.</li>
+    <li>Gebruik het voor je eigen gegevens. Namens iemand anders schrijven mag alleen met diens toestemming.</li>
+    <li>Contactgegevens van bedrijven kunnen verouderd of gegokt zijn; de app markeert gegokte adressen. We kunnen niet zien of een bedrijf je gegevens echt heeft gewist — de app houdt de termijnen bij zodat je ze eraan kunt houden.</li>
+    <li>Unlisted is open source onder de MIT-licentie: ${ext(REPO, 'broncode')}.</li>`)}</ul>`)}`;
 }
