@@ -407,3 +407,18 @@ button, .btn { border-radius: 9px; transition: border-color .12s, color .12s, fi
 .legal li { margin-bottom: 6px; }
 .legal p:last-child { margin-bottom: 0; }
 .hero-eyebrow { margin: -4px auto 14px !important; font-size: .9rem; color: var(--muted); }
+.steps {
+  list-style: none; counter-reset: step; padding: 0; margin: 0 auto 22px; max-width: 560px;
+  display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px;
+}
+.steps li {
+  counter-increment: step; display: flex; flex-direction: column; gap: 2px; align-items: center;
+  background: var(--surface); border: 1px solid var(--line); border-radius: var(--radius); padding: 12px 8px;
+  font-size: .86rem; color: var(--muted);
+}
+.steps li::before {
+  content: counter(step); width: 22px; height: 22px; border-radius: 50%; display: grid; place-items: center;
+  background: var(--accent-soft); color: var(--accent); font-weight: 700; font-size: .78rem; margin-bottom: 4px;
+}
+.steps b { color: var(--text); font-size: .95rem; }
+@media (max-width: 560px) { .steps { grid-template-columns: 1fr; } .steps li { flex-direction: row; gap: 6px; justify-content: flex-start; } .steps li::before { margin: 0 4px 0 0; } }

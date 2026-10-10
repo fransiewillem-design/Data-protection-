@@ -166,17 +166,19 @@ export function home(state) {
   if (!mail.length) return `
   <section class="hero">
     <img class="hero-mark" src="assets/img/icon.svg" alt="" width="56" height="56">
-    <h1>${L('Tell them to hoop up.', 'Laat ze ophoepelen.')}</h1>
-    ${L('<p class="hero-eyebrow">From the Dutch <i>hoepel op!</i> — get lost.</p>', '')}
-    <p>${L(`Drop in the mail from your Junk folder. Real companies get an unsubscribe, scams get blocked,
-    and you see which companies to make delete your data — on this device. Nothing is uploaded.`,
-    `Sleep de mail uit je map Ongewenst hierheen. Echte bedrijven krijgen een uitschrijving, oplichters worden
-    geblokkeerd, en je ziet welke bedrijven je gegevens moeten wissen — op dit apparaat. Er wordt niets geüpload.`)}</p>
+    <h1>${L('Stop spam. Get your data deleted.', 'Stop spam. Laat je gegevens wissen.')}</h1>
+    <p>${L('Drop in the mail from your junk folder. HoopUp tells you what to do with each sender.',
+           'Sleep de mail uit je map Ongewenst hierheen. HoopUp vertelt je wat je met elke afzender doet.')}</p>
+    <ol class="steps">
+      <li><b>${L('Unsubscribe', 'Uitschrijven')}</b><span>${L('from real companies', 'bij echte bedrijven')}</span></li>
+      <li><b>${L('Block', 'Blokkeren')}</b><span>${L('scams and fake senders', 'oplichting en nepafzenders')}</span></li>
+      <li><b>${L('Delete', 'Wissen')}</b><span>${L('your data at companies', 'je gegevens bij bedrijven')}</span></li>
+    </ol>
     ${dropZone(false)}
     <ul class="trust">
       <li>${L('Nothing is uploaded', 'Er wordt niets geüpload')}</li>
       <li>${L('No account', 'Geen account')}</li>
-      <li>${L('Free &amp; open source', 'Gratis &amp; open source')}</li>
+      <li>${L('Free', 'Gratis')}</li>
     </ul>
     ${HOWTO()}
     <p class="small muted" style="margin-top:22px">${L(`Already know a company that holds your data?

@@ -2,7 +2,7 @@
 
 # HoopUp
 
-**Tell them to hoop up.** *Hoepel op!* is Dutch for "get lost". Unsubscribe from real companies, block scams, and make companies delete your
+**Stop spam. Get your data deleted.** Unsubscribe from real companies, block scams, and make companies delete your
 data under the GDPR — all in your browser. No account, no server, no analytics: nothing you enter or
 drop in is ever uploaded. Available in English and Dutch.
 
