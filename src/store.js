@@ -98,7 +98,7 @@ export function reset() { state = clone(EMPTY); persist(); }
 export function importJSON(text) {
   const parsed = JSON.parse(text);
   if (typeof parsed !== 'object' || parsed === null || parsed.v !== 1) {
-    throw new Error(L('Not an Unlisted backup file.', 'Dit is geen Unlisted-back-up.'));
+    throw new Error(L('Not a HoopUp backup file.', 'Dit is geen HoopUp-back-up.'));
   }
   state = backfillSources({ ...clone(EMPTY), ...parsed, profile: { ...EMPTY.profile, ...(parsed.profile || {}) } });
   persist();

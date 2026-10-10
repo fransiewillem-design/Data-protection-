@@ -1222,9 +1222,9 @@ export function blockPanel(bl, client) {
   const steps = {
     outlookcom: `
       <ol class="small">
-        ${bl.links.length ? `<li>${L('<b>Settings</b> (gear) → <b>Mail</b> → <b>Rules</b> → <b>Add new rule</b>. Name it <i>Unlisted – links</i>. Condition <b>Subject or body includes</b> — add each of:',
-          '<b>Instellingen</b> (tandwiel) → <b>E-mail</b> → <b>Regels</b> → <b>Nieuwe regel toevoegen</b>. Noem hem <i>Unlisted – links</i>. Voorwaarde <b>Onderwerp of hoofdtekst bevat</b> — voeg elk toe van:')} ${sites}. ${L('Action <b>Delete</b>. Save.', 'Actie <b>Verwijderen</b>. Opslaan.')}</li>` : ''}
-        ${reply.length ? `<li>${L('Add a second rule, <i>Unlisted – replies</i>. Condition <b>Message header includes</b> —', 'Voeg een tweede regel toe, <i>Unlisted – antwoorden</i>. Voorwaarde <b>Berichtkop bevat</b> —')} ${replies}. ${L('Action <b>Delete</b>. Save.', 'Actie <b>Verwijderen</b>. Opslaan.')}</li>` : ''}
+        ${bl.links.length ? `<li>${L('<b>Settings</b> (gear) → <b>Mail</b> → <b>Rules</b> → <b>Add new rule</b>. Name it <i>HoopUp – links</i>. Condition <b>Subject or body includes</b> — add each of:',
+          '<b>Instellingen</b> (tandwiel) → <b>E-mail</b> → <b>Regels</b> → <b>Nieuwe regel toevoegen</b>. Noem hem <i>HoopUp – links</i>. Voorwaarde <b>Onderwerp of hoofdtekst bevat</b> — voeg elk toe van:')} ${sites}. ${L('Action <b>Delete</b>. Save.', 'Actie <b>Verwijderen</b>. Opslaan.')}</li>` : ''}
+        ${reply.length ? `<li>${L('Add a second rule, <i>HoopUp – replies</i>. Condition <b>Message header includes</b> —', 'Voeg een tweede regel toe, <i>HoopUp – antwoorden</i>. Voorwaarde <b>Berichtkop bevat</b> —')} ${replies}. ${L('Action <b>Delete</b>. Save.', 'Actie <b>Verwijderen</b>. Opslaan.')}</li>` : ''}
       </ol>
       ${bl.links.length && reply.length ? twoRules : ''}
       <p class="small muted">${L('Menu names shift slightly between Outlook versions; the conditions are the same.', 'Menunamen verschillen soms per Outlook-versie; de voorwaarden zijn hetzelfde.')}</p>
@@ -1245,15 +1245,15 @@ export function blockPanel(bl, client) {
         <li>${L('Download the filter file below.', 'Download hieronder het filterbestand.')}</li>
         <li>${L('<b>Settings</b> (gear) → <b>See all settings</b> → <b>Filters and Blocked Addresses</b>.',
                '<b>Instellingen</b> (tandwiel) → <b>Alle instellingen bekijken</b> → <b>Filters en geblokkeerde adressen</b>.')}</li>
-        <li>${L('<b>Import filters</b> → choose <code>unlisted-filters.xml</code> → <b>Open file</b> → <b>Create filters</b>. Tick <i>Also apply to matching conversations</i> to clear what is already there.',
-               '<b>Filters importeren</b> → kies <code>unlisted-filters.xml</code> → <b>Bestand openen</b> → <b>Filters maken</b>. Vink <i>Filter ook toepassen op overeenkomende gesprekken</i> aan om wat er al staat op te ruimen.')}</li>
+        <li>${L('<b>Import filters</b> → choose <code>hoopup-filters.xml</code> → <b>Open file</b> → <b>Create filters</b>. Tick <i>Also apply to matching conversations</i> to clear what is already there.',
+               '<b>Filters importeren</b> → kies <code>hoopup-filters.xml</code> → <b>Bestand openen</b> → <b>Filters maken</b>. Vink <i>Filter ook toepassen op overeenkomende gesprekken</i> aan om wat er al staat op te ruimen.')}</li>
       </ol>
       ${reply.length ? `<p class="small muted">${L('Gmail filters cannot look at the reply address, so the file uses the link sites.', 'Gmail-filters kunnen niet naar het antwoordadres kijken, dus het bestand gebruikt de linksites.')}</p>` : ''}
       <div class="row"><button class="primary" data-action="dl-block" data-fmt="gmail" ${bl.links.length ? '' : 'disabled'}>${L('Download Gmail filters', 'Download Gmail-filters')}</button></div>`,
     apple: `
       <ol class="small">
-        <li>${L('Mail on your Mac → <b>Settings</b> → <b>Rules</b> → <b>Add Rule</b>. Name it <i>Unlisted</i>, and set <b>If any of the following conditions are met</b>.',
-               'Mail op je Mac → <b>Instellingen</b> → <b>Regels</b> → <b>Voeg regel toe</b>. Noem hem <i>Unlisted</i> en kies <b>Als aan een van de volgende voorwaarden is voldaan</b>.')}</li>
+        <li>${L('Mail on your Mac → <b>Settings</b> → <b>Rules</b> → <b>Add Rule</b>. Name it <i>HoopUp</i>, and set <b>If any of the following conditions are met</b>.',
+               'Mail op je Mac → <b>Instellingen</b> → <b>Regels</b> → <b>Voeg regel toe</b>. Noem hem <i>HoopUp</i> en kies <b>Als aan een van de volgende voorwaarden is voldaan</b>.')}</li>
         ${bl.links.length ? `<li>${L('For each of', 'Voor elk van')} ${sites} ${L('add <b>Message Content</b> · <b>Contains</b> · <i>the site</i>.', 'voeg toe: <b>Berichtinhoud</b> · <b>Bevat</b> · <i>de site</i>.')}</li>` : ''}
         ${reply.length ? `<li>${L('Add <b>Reply-To</b> · <b>Contains</b> ·', 'Voeg toe: <b>Reply-To</b> · <b>Bevat</b> ·')} ${replies} ${L('(choose <i>Edit Header List…</i> in the first menu if Reply-To is not offered).', '(kies <i>Wijzig kopregellijst…</i> in het eerste menu als Reply-To er niet tussen staat).')}</li>` : ''}
         <li>${L('Action <b>Move Message</b> → <b>Trash</b>. Click <b>Apply</b> when asked, to clear existing mail.', 'Actie <b>Verplaats bericht</b> → <b>Prullenmand</b>. Klik op <b>Pas toe</b> als daarom wordt gevraagd, om bestaande mail op te ruimen.')}</li>
@@ -1277,10 +1277,10 @@ export function blockPanel(bl, client) {
 
 export function blockText(state, fmt) {
   const bl = buildBlockList(state.custom, senderClass);
-  if (fmt === 'gmail') return { text: asGmailXml(bl), name: 'unlisted-filters.xml', type: 'application/xml' };
-  if (fmt === 'sieve') return { text: asSieve(bl), name: 'unlisted.sieve', type: 'text/plain' };
-  if (fmt === 'reply') return { text: asReplyList(bl), name: 'unlisted-reply-addresses.txt', type: 'text/plain' };
-  return { text: asLinkList(bl), name: 'unlisted-link-sites.txt', type: 'text/plain' };
+  if (fmt === 'gmail') return { text: asGmailXml(bl), name: 'hoopup-filters.xml', type: 'application/xml' };
+  if (fmt === 'sieve') return { text: asSieve(bl), name: 'hoopup.sieve', type: 'text/plain' };
+  if (fmt === 'reply') return { text: asReplyList(bl), name: 'hoopup-reply-addresses.txt', type: 'text/plain' };
+  return { text: asLinkList(bl), name: 'hoopup-link-sites.txt', type: 'text/plain' };
 }
 
 export function downloadText({ text, name, type }) {
@@ -1728,7 +1728,7 @@ export function mountProfile(root, state, rerender) {
       const url = URL.createObjectURL(blob);
       const link = document.createElement('a');
       link.href = url;
-      link.download = `unlisted-backup-${store.today()}.json`;
+      link.download = `hoopup-backup-${store.today()}.json`;
       link.click();
       URL.revokeObjectURL(url);
     }
@@ -1771,7 +1771,18 @@ const REPO = 'https://github.com/fransiewillem-design/Data-protection-';
 const CONTACT_EMAIL = '';
 const UPDATED = { en: '10 October 2026', nl: '10 oktober 2026' };
 
+// The statement names whichever host is actually serving this copy, so it
+// stays true before and after the move to the own domain.
+const HOSTS = {
+  github: { name: 'GitHub Pages (GitHub Inc.)', short: 'GitHub', where: 'USA', whereNL: 'VS',
+            policy: 'https://docs.github.com/en/site-policy/privacy-policies/github-general-privacy-statement' },
+  cloudflare: { name: 'Cloudflare Pages (Cloudflare Inc.)', short: 'Cloudflare', where: 'USA, served from data centres near you', whereNL: 'VS, geleverd vanuit datacenters bij jou in de buurt',
+                policy: 'https://www.cloudflare.com/privacypolicy/' }
+};
+const currentHost = () => HOSTS[location.hostname.endsWith('github.io') ? 'github' : 'cloudflare'];
+
 export function about() {
+  const host = currentHost();
   const ext = (href, text) => `<a href="${href}" target="_blank" rel="noopener noreferrer">${text}</a>`;
   const contact = CONTACT_EMAIL
     ? `<a href="mailto:${esc(CONTACT_EMAIL)}">${esc(CONTACT_EMAIL)}</a>`
@@ -1782,8 +1793,8 @@ export function about() {
   return `
   <div class="head">
     <h1>${L('About &amp; privacy', 'Over &amp; privacy')}</h1>
-    <p>${L('Unlisted helps you get off the lists your data ended up on — mailing lists, scam lists and data brokers — without handing that data to yet another company.',
-      'Unlisted helpt je van de lijsten af te komen waar je gegevens op terecht zijn gekomen — mailinglijsten, oplichterslijsten en databrokers — zonder die gegevens aan nóg een bedrijf te geven.')}</p>
+    <p>${L('HoopUp — from the Dutch <i>hoepel op!</i>, "get lost" — tells spammers, scammers and data brokers to leave you alone: off their mailing lists, out of their files, and without handing your data to yet another company.',
+      'HoopUp — van <i>hoepel op!</i> — zegt spammers, oplichters en databrokers dat ze je met rust moeten laten: van hun mailinglijsten af, uit hun bestanden, en zonder je gegevens aan nóg een bedrijf te geven.')}</p>
   </div>
 
   ${sec(L('What it does', 'Wat het doet'), `<ul>${L(`
@@ -1800,12 +1811,12 @@ export function about() {
   <p class="small muted">${L(`Last updated ${UPDATED.en}.`, `Laatst bijgewerkt op ${UPDATED.nl}.`)}</p>
 
   ${sec(L('Who we are', 'Wie we zijn'), `<p>${L(
-    `Unlisted is a free, non-commercial project by <b>fransiewillem</b>. Questions about privacy, or a request under the GDPR: ${contact}.`,
-    `Unlisted is een gratis, niet-commercieel project van <b>fransiewillem</b>. Vragen over privacy, of een verzoek op grond van de AVG: ${contact}.`)}</p>`)}
+    `HoopUp is a free, non-commercial project by <b>fransiewillem</b>. Questions about privacy, or a request under the GDPR: ${contact}.`,
+    `HoopUp is een gratis, niet-commercieel project van <b>fransiewillem</b>. Vragen over privacy, of een verzoek op grond van de AVG: ${contact}.`)}</p>`)}
 
   ${sec(L('In short', 'In het kort'), `<p>${L(
-    'We have no server, no accounts, no analytics, no tracking cookies and no third-party scripts. Nothing you enter in Unlisted, and no mail you drop into it, is ever sent to us. We cannot see it, so we cannot lose it, sell it or hand it over.',
-    'We hebben geen server, geen accounts, geen statistieken, geen trackingcookies en geen scripts van derden. Niets wat je in Unlisted invult, en geen mail die je erin sleept, wordt ooit naar ons gestuurd. We kunnen het niet zien, dus we kunnen het ook niet kwijtraken, verkopen of afgeven.')}</p>`)}
+    'We have no server, no accounts, no analytics, no tracking cookies and no third-party scripts. Nothing you enter in HoopUp, and no mail you drop into it, is ever sent to us. We cannot see it, so we cannot lose it, sell it or hand it over.',
+    'We hebben geen server, geen accounts, geen statistieken, geen trackingcookies en geen scripts van derden. Niets wat je in HoopUp invult, en geen mail die je erin sleept, wordt ooit naar ons gestuurd. We kunnen het niet zien, dus we kunnen het ook niet kwijtraken, verkopen of afgeven.')}</p>`)}
 
   ${sec(L('What stays on your own device', 'Wat op je eigen apparaat blijft'), `
     <p>${L('Everything below is processed in your browser and stored there only (localStorage). It never leaves your device unless you choose to send a letter or export a backup.',
@@ -1824,12 +1835,12 @@ export function about() {
     <p>${L('Only in these cases, and only when you choose to. The data then goes straight from your browser to the party named; it does not pass through us.',
       'Alleen in deze gevallen, en alleen als jij dat kiest. De gegevens gaan dan rechtstreeks van je browser naar de genoemde partij; ze komen niet langs ons.')}</p>
     <ul>${L(`
-      <li><b>Visiting the site.</b> The site is hosted on GitHub Pages (GitHub Inc., USA). Like every web host, GitHub receives your IP address and the files your browser loads, and may log these for security. See the ${ext('https://docs.github.com/en/site-policy/privacy-policies/github-general-privacy-statement', 'GitHub privacy statement')}; GitHub participates in the EU–US Data Privacy Framework.</li>
+      <li><b>Visiting the site.</b> The site is hosted by ${host.name} (${host.where}). Like every web host, ${host.short} receives your IP address and the files your browser loads, and may log these for security. See the ${ext(host.policy, `${host.short} privacy policy`)}; ${host.short} participates in the EU–US Data Privacy Framework.</li>
       <li><b>Breach and password check.</b> When you use it, your browser contacts ${ext('https://haveibeenpwned.com/Privacy', 'Have I Been Pwned')} (Australia). The breach list carries nothing about you. A password check sends only the first 5 characters of a scrambled hash of the password, never the password itself. Only if you add your own API key and check an address is that email address sent to Have I Been Pwned.</li>
       <li><b>One-click unsubscribe.</b> Your browser sends the unsubscribe request to the address the sender published. That sender already has your email address; it also sees your IP address. No cookies or other details are sent.</li>
       <li><b>Opening a link</b> (an unsubscribe page, an opt-out form, the regulator's website) works like any link: that website sees your visit. This site never sends it where you came from.</li>
       <li><b>Letters</b> open in your own mail app and are sent by you, through your own mail provider.</li>`, `
-      <li><b>Het bezoeken van de site.</b> De site draait op GitHub Pages (GitHub Inc., VS). Zoals elke webhost ontvangt GitHub je IP-adres en de bestanden die je browser laadt, en kan die voor beveiliging vastleggen. Zie de ${ext('https://docs.github.com/en/site-policy/privacy-policies/github-general-privacy-statement', 'privacyverklaring van GitHub')}; GitHub neemt deel aan het EU-VS Data Privacy Framework.</li>
+      <li><b>Het bezoeken van de site.</b> De site wordt gehost door ${host.name} (${host.whereNL}). Zoals elke webhost ontvangt ${host.short} je IP-adres en de bestanden die je browser laadt, en kan die voor beveiliging vastleggen. Zie de ${ext(host.policy, `privacyverklaring van ${host.short}`)}; ${host.short} neemt deel aan het EU-VS Data Privacy Framework.</li>
       <li><b>Datalek- en wachtwoordcheck.</b> Als je die gebruikt, maakt je browser contact met ${ext('https://haveibeenpwned.com/Privacy', 'Have I Been Pwned')} (Australië). De lijst met datalekken bevat niets over jou. Een wachtwoordcheck stuurt alleen de eerste 5 tekens van een versleutelde hash van het wachtwoord, nooit het wachtwoord zelf. Alleen als je een eigen API-sleutel toevoegt en een adres controleert, wordt dat e-mailadres naar Have I Been Pwned gestuurd.</li>
       <li><b>Uitschrijven met één klik.</b> Je browser stuurt het uitschrijfverzoek naar het adres dat de afzender opgaf. Die afzender heeft je e-mailadres al; hij ziet ook je IP-adres. Er worden geen cookies of andere gegevens meegestuurd.</li>
       <li><b>Een link openen</b> (een uitschrijfpagina, een afmeldformulier, de website van de toezichthouder) werkt zoals elke link: die website ziet je bezoek. Deze site stuurt niet mee waar je vandaan kwam.</li>
@@ -1840,23 +1851,23 @@ export function about() {
     'We delen of verkopen niets, omdat we niets ontvangen. Om dezelfde reden is er niets dat we kunnen afgeven als iemand daarom vraagt.')}</p>`)}
 
   ${sec(L('Your rights', 'Je rechten'), `<p>${L(
-    `Under the GDPR you have the right to access, correct and erase your personal data, among others. Everything Unlisted stores is already in your own hands: you can view, change and erase it yourself in the app. For anything else, contact us at ${contact}. You can also lodge a complaint with the ${ext('https://autoriteitpersoonsgegevens.nl', 'Autoriteit Persoonsgegevens')}, the Dutch data protection authority.`,
-    `Op grond van de AVG heb je onder meer recht op inzage, correctie en verwijdering van je persoonsgegevens. Alles wat Unlisted opslaat, heb je al zelf in handen: je kunt het in de app bekijken, aanpassen en wissen. Voor al het andere kun je contact opnemen via ${contact}. Je kunt ook een klacht indienen bij de ${ext('https://autoriteitpersoonsgegevens.nl', 'Autoriteit Persoonsgegevens')}.`)}</p>`)}
+    `Under the GDPR you have the right to access, correct and erase your personal data, among others. Everything HoopUp stores is already in your own hands: you can view, change and erase it yourself in the app. For anything else, contact us at ${contact}. You can also lodge a complaint with the ${ext('https://autoriteitpersoonsgegevens.nl', 'Autoriteit Persoonsgegevens')}, the Dutch data protection authority.`,
+    `Op grond van de AVG heb je onder meer recht op inzage, correctie en verwijdering van je persoonsgegevens. Alles wat HoopUp opslaat, heb je al zelf in handen: je kunt het in de app bekijken, aanpassen en wissen. Voor al het andere kun je contact opnemen via ${contact}. Je kunt ook een klacht indienen bij de ${ext('https://autoriteitpersoonsgegevens.nl', 'Autoriteit Persoonsgegevens')}.`)}</p>`)}
 
   ${sec(L('Changes', 'Wijzigingen'), `<p>${L(
     'If this statement changes, the date at the top changes with it. Any change that sends more data anywhere will be announced on this page first, and you can always check the source code.',
     'Als deze verklaring verandert, verandert de datum bovenaan mee. Een wijziging waardoor er meer gegevens ergens heen gaan, kondigen we eerst op deze pagina aan, en je kunt altijd de broncode nakijken.')}</p>`)}
 
   <h2 class="legal-title" id="terms">${L('Terms of use', 'Gebruiksvoorwaarden')}</h2>
-  ${sec(L('Using Unlisted', 'Unlisted gebruiken'), `<ul>${L(`
-    <li>Unlisted is free and provided as is, without any guarantee. It is practical guidance, not legal advice.</li>
+  ${sec(L('Using HoopUp', 'HoopUp gebruiken'), `<ul>${L(`
+    <li>HoopUp is free and provided as is, without any guarantee. It is practical guidance, not legal advice.</li>
     <li>You send every letter and unsubscribe yourself, and you are responsible for what you send. Read each letter before you send it.</li>
     <li>Use it for your own data. Writing on behalf of someone else needs their permission.</li>
     <li>Company contact details may be outdated or guessed; the app marks guessed ones. We cannot see whether a company really erased your data — the app tracks deadlines so you can hold them to it.</li>
-    <li>Unlisted is open source under the MIT licence: ${ext(REPO, 'source code')}.</li>`, `
-    <li>Unlisted is gratis en wordt geleverd zoals het is, zonder enige garantie. Het is praktische uitleg, geen juridisch advies.</li>
+    <li>HoopUp is open source under the MIT licence: ${ext(REPO, 'source code')}.</li>`, `
+    <li>HoopUp is gratis en wordt geleverd zoals het is, zonder enige garantie. Het is praktische uitleg, geen juridisch advies.</li>
     <li>Je verstuurt elke brief en elke uitschrijving zelf, en je bent verantwoordelijk voor wat je verstuurt. Lees elke brief voordat je hem verstuurt.</li>
     <li>Gebruik het voor je eigen gegevens. Namens iemand anders schrijven mag alleen met diens toestemming.</li>
     <li>Contactgegevens van bedrijven kunnen verouderd of gegokt zijn; de app markeert gegokte adressen. We kunnen niet zien of een bedrijf je gegevens echt heeft gewist — de app houdt de termijnen bij zodat je ze eraan kunt houden.</li>
-    <li>Unlisted is open source onder de MIT-licentie: ${ext(REPO, 'broncode')}.</li>`)}</ul>`)}`;
+    <li>HoopUp is open source onder de MIT-licentie: ${ext(REPO, 'broncode')}.</li>`)}</ul>`)}`;
 }

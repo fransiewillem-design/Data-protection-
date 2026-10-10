@@ -1,7 +1,7 @@
 {
-  "name": "Unlisted",
-  "short_name": "Unlisted",
-  "description": "Get off their lists: unsubscribe, block scams and make companies delete your data — all in your browser.",
+  "name": "HoopUp",
+  "short_name": "HoopUp",
+  "description": "Tell them to hoop up: unsubscribe, block scams and make companies delete your data — all in your browser.",
   "start_url": "./",
   "scope": "./",
   "display": "standalone",

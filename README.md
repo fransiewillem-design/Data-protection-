@@ -1,12 +1,12 @@
 <p align="center"><img src="assets/img/icon.svg" width="72" height="72" alt=""></p>
 
-# Unlisted
+# HoopUp
 
-**Get off their lists.** Unsubscribe from real companies, block scams, and make companies delete your
+**Tell them to hoop up.** *Hoepel op!* is Dutch for "get lost". Unsubscribe from real companies, block scams, and make companies delete your
 data under the GDPR — all in your browser. No account, no server, no analytics: nothing you enter or
 drop in is ever uploaded. Available in English and Dutch.
 
-**Use it:** https://fransiewillem-design.github.io/Data-protection-/
+**Use it:** https://hoopup.tech
 
 ## What this actually does, and what it cannot
 
@@ -24,7 +24,7 @@ between operators you cannot reach. Filtering is an arms race you slowly lose. W
 compartmentalisation: give every company a different address, so a leak burns one alias instead of
 your identity — and tells you precisely who leaked it.
 
-So Unlisted does the parts that work, and is honest about the rest:
+So HoopUp does the parts that work, and is honest about the rest:
 
 | Stop the mail | Get the data deleted |
 | --- | --- |
@@ -252,7 +252,7 @@ of it.
 
 ## Running it
 
-No build step, no dependencies. It does need to be served over HTTP rather than opened from disk,
+No bundler, no dependencies. It does need to be served over HTTP rather than opened from disk,
 because browsers block `file://` pages from reading local files.
 
 ```bash
@@ -260,24 +260,34 @@ python3 -m http.server 8000
 # open http://localhost:8000
 ```
 
-### Hosting it on GitHub Pages
+### Building
 
-`.github/workflows/pages.yml` publishes the site on every push. Two things have to be true first, and
-the second one cannot be automated:
+`sh scripts/build.sh` copies only what the site serves into `dist/` and stamps the commit into every
+asset URL, so a browser never mixes a fresh page with stale cached modules. Both hosts below run it.
 
-1. **The repository must be eligible for Pages** — public, or private on a paid plan.
-2. **The Pages site must be created once, by hand**, under *Settings → Pages → Build and deployment →
-   Source: **GitHub Actions***.
+### Hosting on Cloudflare Pages (hoopup.tech)
 
-The workflow passes `enablement: true`, which asks the API to do step 2 for you. Do not count on it: the
-default `GITHUB_TOKEN` is refused with *"Resource not accessible by integration"* no matter how its
-permissions are declared, because creating a Pages site needs repository-admin rights that the token
-does not carry. Once the site exists, the workflow finds it and deploys on every push. Pages is not available for private repositories on the Free plan, and a Pages site built from a
-private repository is served at a public URL anyway (access-controlled Pages is Enterprise-only), so
-making the repository public is usually the honest choice.
+1. Cloudflare → **Workers & Pages** → **Create** → **Pages** → **Connect to Git**, and give Cloudflare
+   access to this repository only.
+2. Branch: the default branch. Framework preset: **None**. Build command: `sh scripts/build.sh`.
+   Build output directory: `dist`.
+3. **Custom domains** → add `hoopup.tech` (and `www.hoopup.tech`).
 
-Publishing is safe here: the app is entirely client-side and the repository holds no keys and no
-personal data. A public URL exposes the code, never your data — what you enter stays in your browser.
+`_headers` adds what a `<meta>` tag cannot: `frame-ancestors` (no framing by other sites), HSTS,
+`nosniff`, and a locked-down `Permissions-Policy`. The Content-Security-Policy is set per page, never on
+`/*`: two policies on one response are both enforced, and a site-wide one would strip the unsubscribe
+worker of the `connect-src https:` it exists to hold. Cloudflare serves `/unsubscribe.html` at
+`/unsubscribe`, so that rule is listed under both paths.
+
+### Hosting on GitHub Pages
+
+`.github/workflows/pages.yml` builds and publishes on every push. The Pages site must be created once by
+hand (*Settings → Pages → Source: GitHub Actions*); the workflow's `enablement: true` cannot do it,
+because the default `GITHUB_TOKEN` lacks the admin rights. On the free plan the repository must be
+public. GitHub Pages ignores `_headers`.
+
+Publishing is safe either way: the app is entirely client-side and the repository holds no keys and no
+personal data.
 
 ## Status
 

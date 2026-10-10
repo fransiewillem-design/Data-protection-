@@ -166,7 +166,8 @@ export function home(state) {
   if (!mail.length) return `
   <section class="hero">
     <img class="hero-mark" src="assets/img/icon.svg" alt="" width="56" height="56">
-    <h1>${L('Get off their lists.', 'Haal jezelf van hun lijsten.')}</h1>
+    <h1>${L('Tell them to hoop up.', 'Laat ze ophoepelen.')}</h1>
+    ${L('<p class="hero-eyebrow">From the Dutch <i>hoepel op!</i> — get lost.</p>', '')}
     <p>${L(`Drop in the mail from your Junk folder. Real companies get an unsubscribe, scams get blocked,
     and you see which companies to make delete your data — on this device. Nothing is uploaded.`,
     `Sleep de mail uit je map Ongewenst hierheen. Echte bedrijven krijgen een uitschrijving, oplichters worden

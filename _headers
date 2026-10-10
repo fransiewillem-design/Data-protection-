@@ -1,0 +1,32 @@
+# Response headers for Cloudflare Pages (GitHub Pages ignores this file).
+#
+# These add what a <meta> tag cannot: protection against the page being framed
+# by another site, forced HTTPS, and no MIME sniffing. The Content-Security-
+# Policy is set per page, never on /*, because two policies on one response are
+# both enforced — a site-wide one would strip the unsubscribe worker of the
+# connect-src https: it exists to hold.
+
+/*
+  X-Content-Type-Options: nosniff
+  Referrer-Policy: no-referrer
+  Strict-Transport-Security: max-age=31536000
+  Permissions-Policy: camera=(), microphone=(), geolocation=(), payment=(), usb=(), interest-cohort=()
+  Cross-Origin-Opener-Policy: same-origin
+
+/
+  Content-Security-Policy: default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data:; connect-src 'self' https://haveibeenpwned.com https://api.pwnedpasswords.com; form-action 'none'; base-uri 'none'; object-src 'none'; frame-ancestors 'none'
+  X-Frame-Options: DENY
+
+/index.html
+  Content-Security-Policy: default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data:; connect-src 'self' https://haveibeenpwned.com https://api.pwnedpasswords.com; form-action 'none'; base-uri 'none'; object-src 'none'; frame-ancestors 'none'
+  X-Frame-Options: DENY
+
+# Loaded by the app in a hidden same-origin frame, so it may be framed by itself only.
+# Listed twice because Cloudflare serves /unsubscribe.html at /unsubscribe.
+/unsubscribe
+  Content-Security-Policy: default-src 'none'; script-src 'self'; connect-src https:; form-action 'none'; base-uri 'none'; object-src 'none'; frame-ancestors 'self'
+  X-Frame-Options: SAMEORIGIN
+
+/unsubscribe.html
+  Content-Security-Policy: default-src 'none'; script-src 'self'; connect-src https:; form-action 'none'; base-uri 'none'; object-src 'none'; frame-ancestors 'self'
+  X-Frame-Options: SAMEORIGIN

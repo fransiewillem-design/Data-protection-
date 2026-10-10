@@ -57,7 +57,7 @@ function renderChrome() {
   set('foot-build', L('Build', 'Versie'));
   set('foot-about', L('About &amp; privacy', 'Over &amp; privacy'));
   set('foot-source', L('Source code', 'Broncode'));
-  document.querySelector('.brand')?.setAttribute('aria-label', L('Unlisted — home', 'Unlisted — home'));
+  document.querySelector('.brand')?.setAttribute('aria-label', 'HoopUp — home');
   set('foot-legal', L(
     'Guidance here is practical, not legal advice. Deadlines and rights cited are GDPR (EU/NL) and CCPA/CPRA (California).',
     'De uitleg hier is praktisch, geen juridisch advies. Genoemde termijnen en rechten komen uit de AVG (EU/NL) en de CCPA/CPRA (Californië).'));
