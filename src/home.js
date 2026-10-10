@@ -3,6 +3,7 @@
 
 import * as store from './store.js';
 import { L, plural } from './i18n.js';
+import { relationOf } from './letters.js';
 import { parseMessages, groupBySender } from './mailscan.js';
 import {
   esc, toast, senderClass, unsubTier, upsertSender, runOneClickBatch,
@@ -195,6 +196,7 @@ export function home(state) {
   const work = deleteWork(companies);
   const toAsk = work.send.length + work.forms.length;
   const followUps = work.reminders.length + work.complaints.length;
+  const suspect = [...work.send, ...work.forms].filter(t => relationOf(t, store.getRequest(t.id)) === 'none').length;
   const flagged = addressHealth(state).filter(h => h.verdict !== 'ok');
   const worst = flagged[0];
   const mails = mail.reduce((n, t) => n + (t.mailCount || 1), 0);
@@ -267,6 +269,8 @@ export function home(state) {
       text: [
         toAsk ? L(`${toAsk} ${toAsk === 1 ? 'company holds' : 'companies hold'} your data. A legal request makes them erase it within a month.`,
                   `${toAsk} ${toAsk === 1 ? 'bedrijf heeft' : 'bedrijven hebben'} je gegevens. Een AVG-verzoek verplicht ze die binnen een maand te wissen.`) : '',
+        suspect ? L(`${suspect} with no reason to have it ${suspect === 1 ? 'goes' : 'go'} first.`,
+                    `${suspect} zonder reden om ze te hebben ${suspect === 1 ? 'gaat' : 'gaan'} voor.`) : '',
         work.reminders.length ? L(`${work.reminders.length} did not answer in time — a reminder is ready.`,
                                   `${work.reminders.length} ${work.reminders.length === 1 ? 'reageerde' : 'reageerden'} niet op tijd — een herinnering staat klaar.`) : '',
         work.complaints.length ? L(`${work.complaints.length} ready for a complaint to the regulator.`,

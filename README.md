@@ -111,11 +111,25 @@ could send anything as you; the one click per company is the price of not holdin
 fake-unsubscribe and unverifiable senders are never in the queue — a letter to them only confirms
 your address is live.
 
+**Who goes first.** Delete data groups every company by how you relate to it, guessed from the
+evidence and correctable per row:
+
+| Group | Guessed from | Letter |
+| --- | --- | --- |
+| No reason to have your data | bundled data brokers, cold calls and texts, mail from senders that could not be verified | full erasure request |
+| You may have signed up once | verified senders of newsletters | full erasure request |
+| Your own providers | breach notices, verified mail with no unsubscribe link (orders, invoices, account notices) | stop marketing, erase what the service does not need, stop sharing, say what is kept — the account stays |
+
+The send queue follows the same order, so the companies with no business holding your data are written
+to first. A full erasure request to your own phone company would be refused for everything the contract
+needs, or acted on by closing the account; the customer letter asks for what is enforceable without that.
+
 **Dutch.** The interface is available in English and Dutch (EN | NL switch in the top bar). It follows
-the browser language on first visit and remembers the choice. The letter language is a separate
-setting in Settings, so a Dutch interface can still produce an English letter to a foreign company;
-Dutch letter templates exist for the erasure request, the reminder and the complaint to the Autoriteit
-Persoonsgegevens.
+the browser language on first visit and remembers the choice. Letters follow the interface by default
+(Settings → Letter language: same as the app, always English, always Dutch). In Dutch, every company found
+in your own mail, calls or breaches, and every broker operating in the Netherlands or Belgium, gets a Dutch
+letter; international brokers stay in English, with a note saying why. Dutch templates exist for the
+erasure request, the customer letter, the reminder and the complaint to the Autoriteit Persoonsgegevens.
 
 The navigation is three tabs — Home, Delete data, Settings. The detailed unsubscribe-and-block view,
 aliases, and the other ways to find who has your data are linked from Home's cards and from Settings.

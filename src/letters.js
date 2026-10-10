@@ -1,5 +1,7 @@
 // Request letter templates. Kept as plain functions so they are easy to edit.
 
+import { lang } from './i18n.js';
+
 // A target found in the user's own mail or SMS has demonstrably got exactly one
 // identifier: the address or number it contacted them on. Handing it a full name,
 // date of birth and postal address would give a scammer more than it started with
@@ -65,7 +67,7 @@ function identityBlockNL(p) {
   if (p.emails?.length) lines.push(`E-mailadres(sen): ${p.emails.join(', ')}`);
   if (p.phones?.length) lines.push(`Telefoonnummer(s): ${p.phones.join(', ')}`);
   if (p.addresses) lines.push(`Postadres: ${p.addresses.replace(/\n/g, ', ')}`);
-  return lines.length ? lines.join('\n') : '[Vul je gegevens in op de pagina Settings]';
+  return lines.length ? lines.join('\n') : '[Vul je gegevens in op de pagina Instellingen]';
 }
 
 const ref = () => 'DR-' + Math.random().toString(36).slice(2, 7).toUpperCase();
@@ -316,6 +318,116 @@ ${p.fullName || '[naam]'}
 ${new Date().toISOString().slice(0, 10)}`
 };
 
+// --- Existing customers ---------------------------------------------------------
+//
+// Telling your own phone company to erase you is a request it must refuse for
+// everything the contract needs, and one it may act on by closing the account.
+// What a customer actually wants is narrower: no marketing, nothing kept that
+// the service does not need, nothing passed on. That is enforceable as it stands.
+
+const breachNote = (b, nl) => b.source !== 'breach' ? '' : nl
+  ? `\nUw organisatie is getroffen door een datalek waarbij klantgegevens zijn buitgemaakt. Dat maakt het des te belangrijker dat u niet meer bewaart dan strikt noodzakelijk (artikel 5, lid 1, onder c en e, AVG).\n`
+  : `\nYour organisation has suffered a data breach involving customer data. That makes it all the more important that you keep no more than is strictly necessary (Article 5(1)(c) and (e) GDPR).\n`;
+
+TEMPLATES.customer_minimise = {
+  label: 'Existing customer — stop marketing, keep only what is needed',
+  jurisdiction: 'EU',
+  subject: (b, p) => `Request under Articles 15, 17 and 21 GDPR (existing customer) — ${subjectId(b, p)}`,
+  body: (b, p) => `To the Data Protection Officer / Privacy Team of ${b.name},
+
+I am a customer of yours and I intend to remain one. This is not a request to close my account or end any contract.
+
+IDENTIFYING DETAILS
+${isEvidenceDerived(b) ? minimalBlock(b, false) : identityBlock(p)}
+${breachNote(b, false)}
+I ask you to:
+
+1. Stop processing my personal data for direct marketing, including profiling for that purpose, by email, phone, text, post or online advertising (Article 21(2) and (3) GDPR). This objection is unconditional.
+
+2. Erase all personal data you no longer need to provide your service to me or to meet a legal obligation — for example data from past contracts or orders beyond their retention period, usage and browsing profiles, and data obtained from third parties (Article 17(1)(a) and (c) GDPR).
+
+3. Stop passing my personal data to third parties for their own purposes, and tell me which recipients you have disclosed it to so far (Articles 15(1)(c) and 19 GDPR).
+
+4. Tell me which personal data you keep about me, for what purpose, and for how long (Article 15(1) GDPR).
+
+Please respond within one month, as Article 12(3) GDPR requires.
+
+Yours faithfully,
+${signature(b, p, false)}
+${new Date().toISOString().slice(0, 10)}`
+};
+
+TEMPLATES.customer_minimise_nl = {
+  label: 'Bestaande klant — geen marketing, alleen bewaren wat nodig is',
+  jurisdiction: 'EU',
+  subject: (b, p) => `Verzoek op grond van artikel 15, 17 en 21 AVG (bestaande klant) — ${subjectId(b, p)}`,
+  body: (b, p) => `Aan de Functionaris Gegevensbescherming / het privacyteam van ${b.name},
+
+Ik ben klant bij u en wil dat blijven. Dit is geen verzoek om mijn account op te heffen of een overeenkomst te beëindigen.
+
+IDENTIFICATIEGEGEVENS
+${isEvidenceDerived(b) ? minimalBlock(b, true) : identityBlockNL(p)}
+${breachNote(b, true)}
+Ik verzoek u:
+
+1. Mijn persoonsgegevens niet langer te verwerken voor direct marketing, inclusief profilering voor dat doel, per e-mail, telefoon, sms, post of online advertenties (artikel 21, lid 2 en 3, AVG). Dit bezwaar is onvoorwaardelijk.
+
+2. Alle persoonsgegevens te wissen die u niet meer nodig heeft om uw dienst aan mij te leveren of om aan een wettelijke plicht te voldoen — bijvoorbeeld gegevens van eerdere contracten of bestellingen waarvan de bewaartermijn is verstreken, gebruiks- en surfprofielen, en gegevens die u van derden heeft verkregen (artikel 17, lid 1, onder a en c, AVG).
+
+3. Mijn persoonsgegevens niet langer aan derden te verstrekken voor hun eigen doeleinden, en mij te laten weten aan welke ontvangers u ze tot nu toe heeft verstrekt (artikel 15, lid 1, onder c, en artikel 19 AVG).
+
+4. Mij te laten weten welke persoonsgegevens u van mij bewaart, voor welk doel en hoe lang (artikel 15, lid 1, AVG).
+
+Ik verzoek u binnen één maand te reageren, zoals artikel 12, lid 3, AVG voorschrijft.
+
+Met vriendelijke groet,
+${signature(b, p, true)}
+${new Date().toISOString().slice(0, 10)}`
+};
+
+// --- Which letter, in which language ---------------------------------------------
+
+// 'auto' follows the interface: someone using the app in Dutch gets Dutch letters.
+export function letterLang(profile) {
+  const l = profile?.letterLanguage;
+  return l === 'en' || l === 'nl' ? l : lang();
+}
+
+const isEU = b => ['EU', 'NL', 'UK', 'BE'].some(r => (b.regions || []).includes(r));
+
+// A Dutch letter to Acxiom's US privacy desk is a letter nobody there reads.
+// Dutch goes to companies found in the user's own evidence (they mailed, called
+// or leaked a Dutch user) and to brokers operating in the Netherlands or Belgium.
+export function writesDutch(b, profile) {
+  if (letterLang(profile) !== 'nl') return false;
+  return !!b.source || (b.regions || []).some(r => r === 'NL' || r === 'BE');
+}
+
+// How the user relates to a company, guessed from where it came from; the user
+// can correct it. 'none' = no reason to hold their data, 'maybe' = may have
+// signed up once, 'customer' = a provider they actually use.
+export function guessRelation(b) {
+  if (!b.source) return 'none';                 // bundled data broker
+  if (b.source === 'phone') return 'none';      // cold call or text
+  if (b.source === 'breach') return 'customer'; // breach notices come from services you had an account with
+  if (b.source === 'mail') {
+    if (b.trust !== 'verified') return 'none';  // marketing from a sender that could not be checked
+    // Verified mail with no unsubscribe at all is transactional — an order,
+    // an invoice, an account notice — which only goes to customers.
+    return b.unsubUrl ? 'maybe' : 'customer';
+  }
+  return 'maybe';
+}
+export const relationOf = (b, rec) => rec?.relation || guessRelation(b);
+export const RELATION_ORDER = { none: 0, maybe: 1, customer: 2 };
+
+export function templateFor(kind, b, profile, rec) {
+  const nl = writesDutch(b, profile);
+  if (kind === 'reminder') return nl && isEU(b) ? 'reminder_nl' : 'reminder';
+  if (kind === 'complaint') return letterLang(profile) === 'nl' ? 'complaint_nl' : 'complaint';
+  return suggestedTemplate(b, profile, rec);
+}
+
 // Template labels as shown in the picker, per interface language.
 export const TEMPLATE_LABELS_NL = {
   gdpr_erasure: 'AVG-verwijderverzoek (Engels)',
@@ -324,7 +436,9 @@ export const TEMPLATE_LABELS_NL = {
   reminder: 'Herinnering (Engels)',
   reminder_nl: 'Herinnering (Nederlands)',
   complaint: 'Klacht bij de toezichthouder (Engels)',
-  complaint_nl: 'Klacht bij de Autoriteit Persoonsgegevens (Nederlands)'
+  complaint_nl: 'Klacht bij de Autoriteit Persoonsgegevens (Nederlands)',
+  customer_minimise: 'Bestaande klant: geen marketing, alleen het nodige bewaren (Engels)',
+  customer_minimise_nl: 'Bestaande klant: geen marketing, alleen het nodige bewaren (Nederlands)'
 };
 
 function addDays(dateStr, n) {
@@ -333,9 +447,10 @@ function addDays(dateStr, n) {
   return d.toISOString().slice(0, 10);
 }
 
-export function suggestedTemplate(broker, profile) {
-  const eu = broker.regions.includes('EU') || broker.regions.includes('NL') || broker.regions.includes('UK');
-  if (eu) return profile.language === 'nl' ? 'gdpr_erasure_nl' : 'gdpr_erasure';
+export function suggestedTemplate(broker, profile, rec) {
+  const nl = writesDutch(broker, profile);
+  if (isEU(broker) && relationOf(broker, rec) === 'customer') return nl ? 'customer_minimise_nl' : 'customer_minimise';
+  if (isEU(broker)) return nl ? 'gdpr_erasure_nl' : 'gdpr_erasure';
   // A US-only broker still has to handle a GDPR request if it targets EU residents,
   // but a CCPA request is the one it has a process for, so lead with that.
   return 'ccpa_delete';

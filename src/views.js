@@ -1,5 +1,8 @@
 import * as store from './store.js';
-import { TEMPLATES, TEMPLATE_LABELS_NL, render as renderLetter, suggestedTemplate } from './letters.js';
+import {
+  TEMPLATES, TEMPLATE_LABELS_NL, render as renderLetter, suggestedTemplate,
+  templateFor, relationOf, RELATION_ORDER, writesDutch, letterLang
+} from './letters.js';
 import { allBreaches, breachesForAccount, pwnedPasswordCount } from './hibp.js';
 import { L, plural, lang } from './i18n.js';
 import { buildBlockList, asLinkList, asReplyList, asGmailXml, asSieve, guessClient } from './blocklist.js';
@@ -504,9 +507,43 @@ export function brokers(state, catalog, params) {
     </p>
   </div>
 
-  ${shown.length
-    ? `<div class="card">${shown.map(b => targetRow(b, state)).join('')}</div>`
+  ${shown.length ? relationGroups(shown, state)
     : `<div class="card"><p class="muted">${L('Nothing matches.', 'Niets gevonden.')}</p></div>`}`;
+}
+
+const RELATIONS = () => ({
+  none: {
+    title: L('No reason to have your data', 'Geen reden om je gegevens te hebben'),
+    blurb: L('Data brokers, cold callers, and senders that could not be verified. These come first: you never chose to give them anything, and erasing you there costs you nothing.',
+      'Databrokers, ongevraagde bellers en afzenders die niet te controleren waren. Deze komen eerst: je hebt ze nooit iets gegeven, en daar gewist worden kost je niets.'),
+    pick: L('Never gave them my data', 'Nooit mijn gegevens gegeven')
+  },
+  maybe: {
+    title: L('You may have signed up once', 'Misschien ooit aangemeld'),
+    blurb: L('Real companies whose newsletters reach you. If you do not recognise one, move it up to "Never gave them my data".',
+      'Echte bedrijven waarvan je nieuwsbrieven krijgt. Herken je er een niet, zet hem dan op "Nooit mijn gegevens gegeven".'),
+    pick: L('Not sure', 'Weet ik niet')
+  },
+  customer: {
+    title: L('Your own providers', 'Je eigen leveranciers'),
+    blurb: L('Companies you are a customer of. Erasing you there would be refused for the contract, or close your account. So they get a different letter: stop all marketing, delete what the service does not need, stop passing it on. Your account stays.',
+      'Bedrijven waar je klant bent. Een volledig verwijderverzoek zouden ze voor je contract weigeren, of je account opheffen. Daarom krijgen ze een andere brief: geen marketing meer, wis wat de dienst niet nodig heeft, deel het met niemand. Je account blijft.'),
+    pick: L("I'm a customer", 'Ik ben klant')
+  }
+});
+
+function relationGroups(list, state) {
+  const R = RELATIONS();
+  const groups = { none: [], maybe: [], customer: [] };
+  for (const b of list) groups[relationOf(b, store.getRequest(b.id))].push(b);
+  // Within a group, what came from the user's own evidence before bundled brokers.
+  for (const g of Object.values(groups)) g.sort((a, b) => (a.source ? 0 : 1) - (b.source ? 0 : 1));
+  return Object.entries(groups).filter(([, g]) => g.length).map(([k, g]) => `
+    <section class="card rel-group rel-${k}">
+      <h2>${R[k].title} <span class="count">${g.length}</span></h2>
+      <p class="small muted" style="max-width:66ch;margin-top:-2px">${R[k].blurb}</p>
+      ${g.map(b => targetRow(b, state)).join('')}
+    </section>`).join('');
 }
 
 function targetRow(b, state) {
@@ -530,6 +567,12 @@ function targetRow(b, state) {
       <div class="meta">${b.site ? `<span class="mono">${esc(b.site)}</span>` : ''}${r.sentAt
         ? ` · ${L('sent', 'verstuurd')} ${esc(r.sentAt)}` : ''}${b.source ? '' : ` · ${esc(CATEGORIES()[b.category] || b.category)}`}</div>
       ${b.notes && lang() === 'en' ? `<div class="meta">${esc(b.notes)}</div>` : ''}
+      <div class="meta rel-pick">${L('You and them:', 'Jij en zij:')}
+        <select data-action="set-relation" data-id="${esc(b.id)}">
+          ${Object.entries(RELATIONS()).map(([k, v]) =>
+            `<option value="${k}" ${relationOf(b, r) === k ? 'selected' : ''}>${esc(v.pick)}</option>`).join('')}
+        </select>
+        ${r.relation ? '' : `<span class="muted">${L('(our guess)', '(onze inschatting)')}</span>`}</div>
     </div>
     <div class="actions">
       ${safeUrl(b.optOutUrl) ? `<a class="btn" href="${esc(safeUrl(b.optOutUrl))}" target="_blank" rel="noopener noreferrer">${L('Opt-out page ↗', 'Afmeldpagina ↗')}</a>` : ''}
@@ -547,6 +590,13 @@ export function mountBrokers(root, state, rerender) {
   root.addEventListener('change', e => {
     const sel = e.target.closest('[data-action="set-status"]');
     if (sel) { store.setStatus(sel.dataset.id, sel.value); toast(L('Status updated', 'Status bijgewerkt')); }
+    const rel = e.target.closest('[data-action="set-relation"]');
+    if (rel) {
+      store.setRelation(rel.dataset.id, rel.value);
+      toast(rel.value === 'customer'
+        ? L('Moved to your providers — they get the customer letter', 'Verplaatst naar je leveranciers — zij krijgen de klantenbrief')
+        : L('Moved', 'Verplaatst'));
+    }
   });
 
   let timer;
@@ -602,6 +652,10 @@ export function deleteWork(targets) {
       else if (r.reminderAt && store.daysSince(r.reminderAt) > REMINDER_GRACE && isEU(b)) w.complaints.push(b);
     } else if (r.status === 'refused' && isEU(b)) w.complaints.push(b);
   }
+  // The companies with no business holding the data go first; the user's own
+  // providers, who get the narrower letter, go last.
+  const rank = b => RELATION_ORDER[relationOf(b, store.getRequest(b.id))] * 2 + (b.source ? 0 : 1);
+  for (const k of ['send', 'forms', 'reminders']) w[k].sort((a, b) => rank(a) - rank(b));
   return w;
 }
 
@@ -610,10 +664,7 @@ export function deleteWork(targets) {
 let sendQueue = null;        // { kind: 'request' | 'reminder', ids, i }
 let lastTargets = new Map(); // id -> target, from the last render of this page
 
-function queueTemplate(kind, b, profile) {
-  if (kind === 'reminder') return profile.language === 'nl' && isEU(b) ? 'reminder_nl' : 'reminder';
-  return suggestedTemplate(b, profile);
-}
+const queueTemplate = (kind, b, profile) => templateFor(kind, b, profile, store.getRequest(b.id));
 
 function sendQueueCard(state) {
   const q = sendQueue;
@@ -665,6 +716,9 @@ function sendQueueCard(state) {
       : L('The letter includes your name and address, so this broker can find your record.',
           'De brief bevat je naam en adres, zodat deze databroker je gegevens kan vinden.')}
       <a href="#/letter?b=${encodeURIComponent(b.id)}&t=${queueTemplate(q.kind, b, state.profile)}">${L('Read it', 'Lees hem')}</a></p>
+    ${!reminder && relationOf(b, r) === 'customer' ? `<p class="small"><span class="pill done">${L('customer letter', 'klantenbrief')}</span>
+      ${L('You are a customer here, so this asks them to stop marketing and delete what they do not need — your account stays.',
+          'Je bent hier klant, dus deze brief vraagt om te stoppen met marketing en te wissen wat ze niet nodig hebben — je account blijft.')}</p>` : ''}
     <div class="row">
       <button class="primary" data-action="send-open">${L(`Open email to ${esc(nameOf(b))} →`, `Open mail aan ${esc(nameOf(b))} →`)}</button>
       <button data-action="send-skip">${L('Skip', 'Overslaan')}</button>
@@ -720,7 +774,7 @@ function workCard(w, params) {
         <div class="list">${w.complaints.map(b => `
           <div class="pick" style="cursor:default">
             <span class="pick-name">${esc(nameOf(b))}</span>
-            <a class="btn" href="#/letter?b=${encodeURIComponent(b.id)}&t=${store.get().profile.language === 'nl' ? 'complaint_nl' : 'complaint'}">${L('Write complaint', 'Klacht schrijven')}</a>
+            <a class="btn" href="#/letter?b=${encodeURIComponent(b.id)}&t=${templateFor('complaint', b, store.get().profile)}">${L('Write complaint', 'Klacht schrijven')}</a>
           </div>`).join('')}</div>
       </div>
     </div>`);
@@ -1305,7 +1359,7 @@ export function letter(state, catalog, params) {
     <a href="#/delete">${L('Back to the list', 'Terug naar de lijst')}</a></p></div>`;
 
   const rec = store.getRequest(b.id);
-  const tid = params.get('t') || suggestedTemplate(b, state.profile);
+  const tid = params.get('t') || suggestedTemplate(b, state.profile, rec);
   const { subject, body } = renderLetter(tid, b, state.profile, rec);
   const to = recipient(b, rec);
   const mailto = `mailto:${encodeURIComponent(to)}?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}`;
@@ -1328,6 +1382,11 @@ export function letter(state, catalog, params) {
     `<strong>Dit bedrijf heeft een eigen formulier.</strong> Probeer eerst
     <a href="${esc(safeUrl(b.optOutUrl))}" target="_blank" rel="noopener noreferrer">hun afmeldpagina</a> —
     dat gaat meestal sneller. Stuur deze brief als het formulier niet werkt, om een ID vraagt of er niets gebeurt.`)}</p>
+  </div>` : ''}
+
+  ${letterLang(state.profile) === 'nl' && !writesDutch(b, state.profile) && !params.get('t') ? `<div class="notice no-print">
+    <p>${L('This company works outside the Netherlands, so the letter is in English — a Dutch one would likely go unread. Pick a Dutch template below if you prefer.',
+      'Dit bedrijf werkt buiten Nederland, dus de brief is in het Engels — een Nederlandse brief wordt daar waarschijnlijk niet gelezen. Kies hieronder een Nederlands sjabloon als je dat liever hebt.')}</p>
   </div>` : ''}
 
   ${b.confidence === 'low' ? `<div class="notice warn no-print">
@@ -1592,8 +1651,9 @@ export function profile(state) {
         </select></div>
       <div class="field"><label for="language">${L('Letter language', 'Taal van de brieven')}</label>
         <select id="language">
-          <option value="en" ${p.language === 'en' ? 'selected' : ''}>English</option>
-          <option value="nl" ${p.language === 'nl' ? 'selected' : ''}>Nederlands</option>
+          <option value="auto" ${!['en', 'nl'].includes(p.letterLanguage) ? 'selected' : ''}>${L('Same as the app (English)', 'Zelfde als de app (Nederlands)')}</option>
+          <option value="en" ${p.letterLanguage === 'en' ? 'selected' : ''}>${L('Always English', 'Altijd Engels')}</option>
+          <option value="nl" ${p.letterLanguage === 'nl' ? 'selected' : ''}>${L('Always Dutch', 'Altijd Nederlands')}</option>
         </select></div>
     </div>
     <div class="field"><label for="emails">${L('Email addresses (one per line)', 'E-mailadressen (één per regel)')}</label>
@@ -1649,7 +1709,7 @@ export function mountProfile(root, state, rerender) {
           fullName: val('fullName').trim(),
           birthDate: val('birthDate'),
           country: val('country'),
-          language: val('language'),
+          letterLanguage: val('language'),
           emails: lines('emails'),
           phones: lines('phones'),
           addresses: val('addresses').trim()

@@ -5,7 +5,7 @@ const KEY = 'data-reclaim/v1';
 const EMPTY = {
   v: 1,
   profile: {
-    fullName: '', birthDate: '', country: 'NL', language: 'en',
+    fullName: '', birthDate: '', country: 'NL', letterLanguage: 'auto',
     emails: [], phones: [], addresses: ''
   },
   requests: {},   // brokerId -> record
@@ -24,6 +24,17 @@ function clone(o) { return JSON.parse(JSON.stringify(o)); }
 let migrationApplied = false;
 
 function backfillSources(state) {
+  // `language` (default 'en') became `letterLanguage` (default: follow the
+  // interface). Only an explicit Dutch choice is carried over; the old English
+  // default was never a choice, and kept Dutch users getting English letters.
+  const p = state.profile || {};
+  if ('language' in p) {
+    if (p.language === 'nl' && (!p.letterLanguage || p.letterLanguage === 'auto')) p.letterLanguage = 'nl';
+    p.letterLanguage ||= 'auto';
+    delete p.language;
+    migrationApplied = true;
+  }
+
   for (const t of state.custom || []) {
     if (!t.source) {
       migrationApplied = true;
@@ -136,6 +147,15 @@ export function markReminder(brokerId, extra = {}) {
     Object.assign(rec, extra);
     rec.history = rec.history || [];
     rec.history.push({ ts: new Date().toISOString(), event: 'Reminder sent' });
+    s.requests[brokerId] = rec;
+  });
+}
+
+// The user's own answer to "do you actually deal with this company?".
+export function setRelation(brokerId, relation) {
+  update(s => {
+    const rec = s.requests[brokerId] || { status: 'todo', sentAt: '', history: [], notes: '' };
+    rec.relation = relation;
     s.requests[brokerId] = rec;
   });
 }
