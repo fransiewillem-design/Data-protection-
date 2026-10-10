@@ -2,6 +2,7 @@ import * as store from './store.js';
 import { TEMPLATES, render as renderLetter, suggestedTemplate } from './letters.js';
 import { allBreaches, breachesForAccount, pwnedPasswordCount } from './hibp.js';
 import { parseMessages, groupBySender } from './mailscan.js';
+import { buildBlockList, asPlainList, asGmailXml, asSieve, guessClient } from './blocklist.js';
 
 export const esc = s => String(s ?? '').replace(/[&<>"']/g,
   c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
@@ -473,6 +474,11 @@ export function mountExposure(root, state, rerender) {
       spam: !sn.unsubHttp,
       trust: sn.trust || 'unknown',
       trustWhy: sn.trustWhy || '',
+      // What a block rule can hold on to. Kept on the device like everything
+      // else; these are the sender's own addresses and hosts, not the user's.
+      senderAddresses: (sn.addresses || []).slice(0, 5),
+      linkDomains: (sn.linkDomains || []).slice(0, 10),
+      replyToHosts: (sn.replyToHosts || []).slice(0, 3),
       notes: `Found in your own mail: ${sn.domain} sent to ${address || 'an address of yours'}. The letter deliberately tells them nothing they do not already have.`
     }));
     if (!quiet) toast(`${label} added — letter ready`);
@@ -943,6 +949,8 @@ export function unsubscribe(state) {
     'These published a link — in the message body, usually as Uitschrijven or Afmelden — but not one-click, so the page has to load. Your browser will not open many tabs at once, so they go one at a time.',
     'Open {n}', '')}
 
+  ${bait.length + spam.length ? blockAllCard(state) : ''}
+
   ${bait.length ? `
     <section class="card danger-card">
       <h2>Fake unsubscribe links — do not click <span class="count">${bait.length}</span></h2>
@@ -958,7 +966,7 @@ export function unsubscribe(state) {
             <span class="small muted" style="flex-basis:100%">${esc(b.trustWhy || 'sender could not be verified')}</span>
           </div>`).join('')}
       </div>
-      <p class="small muted" style="margin-top:12px">Block them instead — instructions below.</p>
+      <p class="small muted" style="margin-top:12px">Block them instead — the card above does all of them at once.</p>
     </section>` : ''}
 
   ${spam.length ? `
@@ -977,17 +985,6 @@ export function unsubscribe(state) {
             <span class="pick-meta mono">${esc(b.site || '')}</span>
           </div>`).join('')}
       </div>
-      <details style="margin-top:14px">
-        <summary class="small muted" style="cursor:pointer">How to block these</summary>
-        <ul class="small muted" style="margin-top:10px">
-          <li><strong>Apple Mail / iCloud:</strong> select the message, then Message → Block Sender.
-          In iCloud settings, set blocked senders to go straight to Bin.</li>
-          <li><strong>Outlook:</strong> right-click → Junk → Block Sender.</li>
-          <li><strong>Gmail:</strong> open the message, the ⋮ menu → Block sender.</li>
-          <li>Blocking one address rarely ends it — they rotate domains. The durable fix is retiring the
-          address they have: <a href="#/aliases">one alias per company</a>.</li>
-        </ul>
-      </details>
     </section>` : ''}
 
   ${tiers.instant.length || tiers.link.length ? `<p class="small muted">Anything that keeps mailing you
@@ -995,10 +992,139 @@ export function unsubscribe(state) {
   a courtesy.</p>` : ''}`;
 }
 
+
+// ---------------------------------------------------------------- block all
+
+const CLIENTS = {
+  outlookcom: 'Outlook.com / Hotmail',
+  outlookwin: 'Outlook for Windows',
+  gmail:      'Gmail',
+  apple:      'Apple Mail / iCloud',
+  sieve:      'Fastmail, Proton & others'
+};
+let blockClient = null;
+
+function blockAllCard(state) {
+  const bl = buildBlockList(state.custom, senderClass);
+  if (!blockClient) blockClient = guessClient(state.custom.filter(t => ['spam', 'bait'].includes(senderClass(t))));
+  const rules = bl.domains.length + bl.replyTo.length + bl.sharedReplyTo.length;
+
+  return `
+  <section class="card block-card">
+    <div class="row between" style="align-items:flex-start;gap:16px">
+      <div>
+        <h2>Block all ${bl.count} at once</h2>
+        <p class="small muted" style="max-width:58ch;margin:0">One file, imported once into your mail app.
+        It blocks the senders <em>and</em> what their campaigns reuse — the sites they link to and the
+        address replies go to — because the sender name changes on every message.</p>
+      </div>
+      <select id="block-client" style="width:auto">
+        ${Object.entries(CLIENTS).map(([k, v]) => `<option value="${k}" ${k === blockClient ? 'selected' : ''}>${v}</option>`).join('')}
+      </select>
+    </div>
+
+    <div class="block-facts small">
+      <span><b>${bl.senders.length}</b> sender domains</span>
+      <span><b>${bl.links.length}</b> link sites</span>
+      <span><b>${bl.replyTo.length + bl.sharedReplyTo.length}</b> reply addresses</span>
+      ${bl.unblockableSenders ? `<span class="muted">${bl.unblockableSenders} used a fake domain no rule can match again</span>` : ''}
+    </div>
+
+    <div id="block-panel">${rules ? blockPanel(bl, blockClient) : `<p class="small muted">Nothing
+      blockable yet: these senders left no reusable trace. Re-scan the messages so their links and
+      reply addresses are recorded.</p>`}</div>
+  </section>`;
+}
+
+function blockPanel(bl, client) {
+  const domainList = bl.domains.map(d => `<code>${esc(d)}</code>`).join(' ');
+  const reply = [...bl.replyTo, ...bl.sharedReplyTo];
+  const sharedNote = bl.sharedReplyTo.length ? `<p class="small muted">${bl.sharedReplyTo.map(esc).join(', ')}
+    ${bl.sharedReplyTo.length === 1 ? 'is a mailing service' : 'are mailing services'} that legitimate
+    senders use too, so ${bl.sharedReplyTo.length === 1 ? 'it is' : 'they are'} only ever matched as a reply
+    address, never blocked outright.</p>` : '';
+
+  const steps = {
+    outlookcom: `
+      <p class="small">Outlook.com has no import for blocked senders, so this is one rule that does the job:</p>
+      <ol class="small">
+        <li><b>Settings</b> (gear) → <b>Mail</b> → <b>Rules</b> → <b>Add new rule</b>. Name it <i>Data Reclaim</i>.</li>
+        <li>Condition <b>Sender address includes</b> — add each of: ${domainList || '—'}</li>
+        ${reply.length ? `<li>Add a condition <b>Message header includes</b> — add: ${reply.map(r => `<code>${esc(r)}</code>`).join(' ')}</li>` : ''}
+        <li>Action: <b>Delete</b>. Tick <b>Stop processing more rules</b>. Save.</li>
+      </ol>
+      <p class="small muted">Menu names shift slightly between Outlook versions; the conditions are the same.</p>
+      <div class="row"><button data-action="copy-block" data-fmt="plain">Copy the list</button></div>`,
+    outlookwin: `
+      <ol class="small">
+        <li>Download the list below.</li>
+        <li><b>Home</b> → <b>Junk</b> → <b>Junk E-mail Options</b> → <b>Blocked Senders</b> tab.</li>
+        <li><b>Import from File</b> → choose <code>data-reclaim-blocked.txt</code> → <b>OK</b>.</li>
+      </ol>
+      <div class="row"><button class="primary" data-action="dl-block" data-fmt="plain">Download block list</button>
+      <button data-action="copy-block" data-fmt="plain">Copy</button></div>`,
+    gmail: `
+      <ol class="small">
+        <li>Download the filter file below.</li>
+        <li><b>Settings</b> (gear) → <b>See all settings</b> → <b>Filters and Blocked Addresses</b>.</li>
+        <li><b>Import filters</b> → choose <code>data-reclaim-filters.xml</code> → <b>Open file</b> →
+        <b>Create filters</b>. Tick <i>Also apply to matching conversations</i> to clear what is already there.</li>
+      </ol>
+      <div class="row"><button class="primary" data-action="dl-block" data-fmt="gmail">Download Gmail filters</button></div>`,
+    apple: `
+      <p class="small">Apple offers no import, so this is one rule with a line per domain — a few minutes, once:</p>
+      <ol class="small">
+        <li>Mail on your Mac → <b>Settings</b> → <b>Rules</b> → <b>Add Rule</b>. Name it <i>Data Reclaim</i>.</li>
+        <li>Set <b>If any of the following conditions are met</b>.</li>
+        <li>For each of ${domainList || '—'} add <b>From</b> · <b>Contains</b> · <i>the domain</i>.</li>
+        ${reply.length ? `<li>Add <b>Reply-To</b> · <b>Contains</b> · ${reply.map(r => `<code>${esc(r)}</code>`).join(' ')}
+        (choose <i>Edit Header List…</i> in the first menu if Reply-To is not offered).</li>` : ''}
+        <li>Action <b>Move Message</b> → <b>Trash</b>. Click <b>Apply</b> when asked, to clear existing mail.</li>
+      </ol>
+      <p class="small muted">Mac rules run while Mail is open. For a spam address on iCloud, retiring it is
+      often less work — see <a href="#/aliases">Aliases</a>.</p>
+      <div class="row"><button data-action="copy-block" data-fmt="plain">Copy the list</button></div>`,
+    sieve: `
+      <ol class="small">
+        <li>Download the Sieve script below.</li>
+        <li><b>Fastmail:</b> Settings → Filters &amp; Rules → <b>Edit custom Sieve code</b> → paste.
+        <b>Proton:</b> Settings → Filters → <b>Add sieve filter</b> → paste, and change <code>"Junk"</code> to <code>"Spam"</code>.</li>
+      </ol>
+      <div class="row"><button class="primary" data-action="dl-block" data-fmt="sieve">Download Sieve script</button>
+      <button data-action="copy-block" data-fmt="sieve">Copy</button></div>`
+  };
+
+  return steps[client] + sharedNote + `
+    <p class="small muted" style="margin-top:10px">New variants will keep coming: these operations change
+    domains constantly. Scan your junk again in a few weeks and re-export — the list grows each time.
+    And if one address is getting nothing but this, it is burned; retiring it beats any filter.</p>`;
+}
+
+function blockText(state, fmt) {
+  const bl = buildBlockList(state.custom, senderClass);
+  if (fmt === 'gmail') return { text: asGmailXml(bl), name: 'data-reclaim-filters.xml', type: 'application/xml' };
+  if (fmt === 'sieve') return { text: asSieve(bl), name: 'data-reclaim.sieve', type: 'text/plain' };
+  return { text: asPlainList(bl), name: 'data-reclaim-blocked.txt', type: 'text/plain' };
+}
+
+function downloadText({ text, name, type }) {
+  const url = URL.createObjectURL(new Blob([text], { type }));
+  const a = document.createElement('a');
+  a.href = url; a.download = name;
+  document.body.appendChild(a); a.click(); a.remove();
+  setTimeout(() => URL.revokeObjectURL(url), 1000);
+}
+
 export function mountUnsubscribe(root, state, rerender) {
   wireQueue(root);
 
   root.addEventListener('change', e => {
+    if (e.target.id === 'block-client') {
+      blockClient = e.target.value;
+      root.querySelector('#block-panel').innerHTML =
+        blockPanel(buildBlockList(state.custom, senderClass), blockClient);
+      return;
+    }
     const box = e.target.closest('[data-action="sel"]');
     if (!box) return;
     if (box.checked) selected.add(box.dataset.id); else selected.delete(box.dataset.id);
@@ -1015,6 +1141,13 @@ export function mountUnsubscribe(root, state, rerender) {
       const allOn = ids.every(id => selected.has(id));
       ids.forEach(id => allOn ? selected.delete(id) : selected.add(id));
       rerender();
+      return;
+    }
+
+    if (act === 'dl-block') { downloadText(blockText(state, btn.dataset.fmt)); toast('Downloaded — import it in your mail app'); return; }
+    if (act === 'copy-block') {
+      navigator.clipboard.writeText(blockText(state, btn.dataset.fmt).text)
+        .then(() => toast('Copied')).catch(() => toast('Could not copy'));
       return;
     }
 

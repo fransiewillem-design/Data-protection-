@@ -95,7 +95,17 @@ was doing.
   sender that failed authentication — or whose domain has no TLD at all, which no real domain lacks — has
   its link listed as bait with its real destination shown, never as a button. Outlook's SafeLinks
   wrapper is stripped first, so the destination shown is the actual one. One-click POSTs are reserved for
-  verified senders. Validated against real junk-folder mail: four scams (three with fake unsubscribe
+  verified senders.
+
+  **Block all at once.** Everything marked as spam or bait becomes one import for the user's mail app —
+  Outlook for Windows (blocked-senders list), Gmail (filter XML, its own export format), Sieve for
+  Fastmail, Proton and others — or, where no import exists (Outlook.com, Apple Mail), a single rule with
+  exact steps. Sender domains alone are nearly useless here: scam campaigns generate a fresh domain per
+  message. What they reuse are the sites their links point to and the address replies go to, so those
+  are blocked too. Two safeguards: nothing a verified sender uses is ever included, so a wanted
+  newsletter cannot be caught; and shared mailing services such as `in2.getdrip.com`, which legitimate
+  senders also use, are only ever matched as a reply address, never blocked outright. The app still never
+  touches the mailbox — the user imports the file — which is the price of not holding a mailbox token. Validated against real junk-folder mail: four scams (three with fake unsubscribe
   links) and one legitimate newsletter, each classified correctly. Senders advertising RFC 8058 one-click (`List-Unsubscribe-Post`) go in a single
   batch, four at a time, with no page to visit. Senders that published only a link open one at a time,
   because a browser refuses to let a page open many tabs at once and a loop would silently drop all but

@@ -239,3 +239,11 @@ main { max-width: 820px; }
 
 .danger-card { border-color: var(--bad); box-shadow: 0 0 0 1px var(--bad-soft), var(--shadow); }
 .danger-card h2 { color: var(--bad); }
+
+.block-card { border-color: var(--accent); }
+.block-facts { display: flex; gap: 18px; flex-wrap: wrap; margin: 14px 0 6px; color: var(--muted); }
+.block-facts b { color: var(--text); font-size: 1.05rem; }
+.block-card ol { padding-left: 20px; margin: 8px 0 12px; }
+.block-card ol li { margin-bottom: 6px; }
+.block-card code { background: var(--surface-2); padding: 1px 6px; border-radius: 4px; }
+#block-panel .row { margin: 4px 0 12px; }

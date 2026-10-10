@@ -156,6 +156,29 @@ export function extractParts(headers, body, depth = 0) {
   }];
 }
 
+// Every site the message links to, as registrable domains. Scam campaigns
+// rotate the sender domain on every message but reuse their link hosts, so
+// these are what a block rule can actually hold on to.
+export function collectLinkDomains(parts) {
+  const out = new Set();
+  for (const part of parts) {
+    if (part.type !== 'html') continue;
+    const re = /<a\b([^>]*)>/gi;
+    let m;
+    while ((m = re.exec(part.text))) {
+      const orig = /originalsrc\s*=\s*["']([^"']+)["']/i.exec(m[1]);
+      const raw = /\bhref\s*=\s*["']([^"']+)["']/i.exec(m[1]);
+      const url = unwrapSafeLink(((orig || raw) || [])[1]?.replace(/&amp;/g, '&') || '');
+      try {
+        const host = new URL(url).hostname;
+        if (host) out.add(registrableDomain(host));
+      } catch { /* mailto:, anchors, junk */ }
+      if (out.size >= 15) return [...out];
+    }
+  }
+  return [...out];
+}
+
 // Unsubscribe wording across the languages this is likely to meet.
 const UNSUB_WORDS =
   /unsubscrib|uitschrijv|afmeld|uitschrijf|opt[\s-]?out|abmeld|austragen|d[eé]sabonn|desinscri|desuscri|darse\s+de\s+baja|cancelar.{0,12}suscri|annulla.{0,12}iscrizione|stop.{0,10}(mail|email)|e-?mailvoorkeur|mailvoorkeur|email.{0,10}preference|subscription.{0,10}preference/i;
@@ -286,6 +309,8 @@ export function parseMessages(text) {
       // RFC 8058: the sender promises a POST alone completes the unsubscribe.
       oneClick: /one-click/i.test(h['list-unsubscribe-post'] || ''),
       ...senderTrust(from.domain, parseAuth(h)),
+      replyToHost: (parseFrom(h['reply-to'] || '').address.split('@')[1] || '').toLowerCase(),
+      linkDomains: collectLinkDomains(parts),
       isEsp: ESP_DOMAINS.has(from.domain)
     };
   }).filter(Boolean);
@@ -301,7 +326,8 @@ export function groupBySender(messages) {
       map.set(key, {
         domain: key, name: m.name || key, count: 0,
         unsubHttp: '', unsubMailto: '', unsubFrom: '', oneClick: false,
-        addresses: new Set(), recipients: new Set(), subjects: [], isEsp: m.isEsp
+        addresses: new Set(), recipients: new Set(), subjects: [], isEsp: m.isEsp,
+        linkDomains: new Set(), replyToHosts: new Set()
       });
     }
     const g = map.get(key);
@@ -314,10 +340,13 @@ export function groupBySender(messages) {
     const rank = { forged: 0, unknown: 1, verified: 2 };
     if (!g.trust || rank[m.trust] < rank[g.trust]) { g.trust = m.trust; g.trustWhy = m.why; }
     for (const r of m.recipients) g.recipients.add(r);
+    for (const d of m.linkDomains || []) g.linkDomains.add(d);
+    if (m.replyToHost) g.replyToHosts.add(m.replyToHost);
     // Prefer a human-looking display name over the bare domain.
     if ((g.name === key || !g.name) && m.name) g.name = m.name;
   }
   return [...map.values()]
-    .map(g => ({ ...g, addresses: [...g.addresses], recipients: [...g.recipients] }))
+    .map(g => ({ ...g, addresses: [...g.addresses], recipients: [...g.recipients],
+                 linkDomains: [...g.linkDomains], replyToHosts: [...g.replyToHosts] }))
     .sort((a, b) => b.count - a.count);
 }
