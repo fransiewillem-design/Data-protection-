@@ -1,3 +1,4 @@
+import { L } from './i18n.js';
 // Local-first state. Nothing here ever leaves the browser.
 const KEY = 'data-reclaim/v1';
 
@@ -10,7 +11,8 @@ const EMPTY = {
   requests: {},   // brokerId -> record
   aliases: [],    // { id, alias, service, createdAt, status, spamSeen }
   custom: [],     // user-added brokers, same shape as data/brokers.json entries
-  hibpKey: ''
+  hibpKey: '',
+  uiLang: ''      // '' = follow the browser; 'en' | 'nl' once chosen
 };
 
 function clone(o) { return JSON.parse(JSON.stringify(o)); }
@@ -63,7 +65,8 @@ function persist() {
     localStorage.setItem(KEY, JSON.stringify(state));
   } catch (err) {
     console.warn('Could not save state', err);
-    alert('This browser refused to save (private window, or storage is full). Your changes will be lost when you close the tab. Export a backup from Settings.');
+    alert(L('This browser refused to save (private window, or storage is full). Your changes will be lost when you close the tab. Export a backup from Settings.',
+      'Deze browser weigert op te slaan (privévenster of opslag vol). Je wijzigingen gaan verloren als je het tabblad sluit. Maak een back-up via Instellingen.'));
   }
   listeners.forEach(fn => fn(state));
 }
@@ -82,7 +85,7 @@ export function reset() { state = clone(EMPTY); persist(); }
 export function importJSON(text) {
   const parsed = JSON.parse(text);
   if (typeof parsed !== 'object' || parsed === null || parsed.v !== 1) {
-    throw new Error('Not a Data Reclaim backup file.');
+    throw new Error(L('Not a Data Reclaim backup file.', 'Dit is geen Data Reclaim-back-up.'));
   }
   state = backfillSources({ ...clone(EMPTY), ...parsed, profile: { ...EMPTY.profile, ...(parsed.profile || {}) } });
   persist();

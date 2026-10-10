@@ -1,3 +1,4 @@
+import { L } from './i18n.js';
 // Have I Been Pwned lookups, done from the browser.
 //
 // Two very different endpoints:
@@ -23,8 +24,8 @@ export async function breachesForAccount(email, apiKey) {
     { headers: { 'hibp-api-key': apiKey } }   // browsers forbid setting user-agent here
   );
   if (res.status === 404) return [];              // clean, as far as HIBP knows
-  if (res.status === 401) throw new Error('That API key was rejected.');
-  if (res.status === 429) throw new Error('Rate limited by HIBP — wait a moment and retry.');
+  if (res.status === 401) throw new Error(L('That API key was rejected.', 'Die API-sleutel werd geweigerd.'));
+  if (res.status === 429) throw new Error(L('Rate limited by HIBP — wait a moment and retry.', 'Te veel verzoeken bij HIBP — wacht even en probeer opnieuw.'));
   if (!res.ok) throw new Error(`HIBP returned ${res.status}`);
   return res.json();
 }

@@ -75,6 +75,14 @@ p { margin: 0 0 .7rem; }
   color: var(--ok); background: var(--ok-soft); padding: 3px 8px; border-radius: 20px; font-weight: 600;
 }
 
+.lang { display: flex; border: 1px solid var(--line); border-radius: 8px; overflow: hidden; }
+.lang button {
+  border: 0; border-radius: 0; background: transparent; padding: 4px 9px; min-height: 0;
+  font-size: .76rem; font-weight: 600; letter-spacing: .04em; color: var(--muted); box-shadow: none;
+}
+.lang button + button { border-left: 1px solid var(--line); }
+.lang button[aria-pressed="true"] { background: var(--accent-soft); color: var(--accent); }
+
 main { max-width: 980px; margin: 0 auto; padding: 24px 20px 60px; }
 .head { margin-bottom: 20px; }
 .head p { color: var(--muted); max-width: 66ch; }
@@ -170,6 +178,8 @@ th { font-size: .78rem; text-transform: uppercase; letter-spacing: .05em; color:
   .topbar { padding: 10px 14px; }
   main { padding: 18px 14px 48px; }
   .local-badge { display: none; }
+  .lang { order: 1; margin-left: auto; }
+  #nav { order: 2; width: 100%; }
 }
 @media print {
   .topbar, .foot, .no-print { display: none !important; }

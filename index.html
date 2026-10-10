@@ -34,7 +34,7 @@
 <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🛡️</text></svg>">
 </head>
 <body>
-<a class="skip" href="#main">Skip to content</a>
+<a class="skip" id="skip" href="#main">Skip to content</a>
 
 <header class="topbar">
   <div class="brand">
@@ -42,16 +42,20 @@
     <span>Data Reclaim</span>
   </div>
   <nav id="nav" aria-label="Sections"></nav>
-  <span class="local-badge" title="No server, no account. Everything is stored in this browser only.">local only</span>
+  <span class="local-badge" id="local-badge" title="No server, no account. Everything is stored in this browser only.">local only</span>
+  <div class="lang" role="group" aria-label="Language">
+    <button type="button" data-lang="en" aria-pressed="true">EN</button>
+    <button type="button" data-lang="nl" aria-pressed="false">NL</button>
+  </div>
 </header>
 
 <main id="main"></main>
 
 <footer class="foot">
-  <p>Everything you type stays in this browser (<code>localStorage</code>). No account, no server, no analytics.
+  <p id="foot-local">Everything you type stays in this browser (<code>localStorage</code>). No account, no server, no analytics.
   Back it up from <a href="#/profile">Settings</a>.</p>
-  <p class="muted">Build <span id="build" data-build="__BUILD__">dev</span> ·
-  Guidance here is practical, not legal advice. Deadlines and rights cited are GDPR (EU/NL) and CCPA/CPRA (California).</p>
+  <p class="muted"><span id="foot-build">Build</span> <span id="build" data-build="__BUILD__">dev</span> ·
+  <span id="foot-legal">Guidance here is practical, not legal advice. Deadlines and rights cited are GDPR (EU/NL) and CCPA/CPRA (California).</span></p>
 </footer>
 
 <script type="module" src="src/app.js"></script>

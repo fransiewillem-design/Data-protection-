@@ -258,6 +258,75 @@ ${new Date().toISOString().slice(0, 10)}`
   }
 };
 
+// Dutch escalation letters, so a Dutch user can go request → herinnering →
+// klacht without switching language halfway.
+TEMPLATES.reminder_nl = {
+  label: 'Herinnering — termijn verstreken',
+  jurisdiction: 'EU',
+  subject: (b, p) => `Termijn verstreken: verzoek op grond van artikel 15, 17 en 21 AVG — ${subjectId(b, p)}`,
+  body: (b, p, rec) => `Aan de Functionaris Gegevensbescherming / het privacyteam van ${b.name},
+
+Op ${rec?.sentAt || '[datum]'} heb ik u verzocht mijn persoonsgegevens te wissen en de verwerking ervan te staken, op grond van artikel 15, 17 en 21 AVG. De termijn van één maand uit artikel 12, lid 3, is inmiddels verstreken zonder toereikende reactie.
+
+IDENTIFICATIEGEGEVENS
+${isEvidenceDerived(b) ? minimalBlock(b, true) : identityBlockNL(p)}
+
+Dit is een formele herinnering. Ik verzoek u binnen 14 dagen te bevestigen dat mijn gegevens zijn gewist, of de specifieke wettelijke grond te noemen waarop u weigert.
+
+Het uitblijven van een reactie is op zichzelf een schending van artikel 12, lid 3 en 4, AVG. Heb ik binnen 14 dagen niets van u vernomen, dan dien ik een klacht in bij de Autoriteit Persoonsgegevens op grond van artikel 77 AVG en verwijs ik naar deze correspondentie.
+
+Met vriendelijke groet,
+${signature(b, p, true)}
+${new Date().toISOString().slice(0, 10)}`
+};
+
+TEMPLATES.complaint_nl = {
+  label: 'Klacht bij de Autoriteit Persoonsgegevens',
+  jurisdiction: 'EU',
+  subject: (b, p) => `Klacht op grond van artikel 77 AVG over ${b.name}`,
+  body: (b, p, rec) => `Aan de Autoriteit Persoonsgegevens,
+
+Hierbij dien ik een klacht in op grond van artikel 77 AVG tegen ${b.name} (${b.site || ''}).
+
+KLAGER
+${identityBlockNL(p)}
+
+WAT ER GEBEURDE
+Op ${rec?.sentAt || '[datum]'} heb ik ${b.name} verzocht op grond van artikel 15, 17 en 21 AVG mijn persoonsgegevens te wissen, de verwerking voor direct marketing te staken en de bron te noemen van gegevens die zij bewaren.
+
+De wettelijke termijn uit artikel 12, lid 3, is verstreken op ${rec?.sentAt ? addDays(rec.sentAt, 30) : '[datum]'}. ${rec?.status === 'refused'
+  ? 'De verwerkingsverantwoordelijke heeft het verzoek geweigerd zonder toereikende rechtsgrond.'
+  : 'De verwerkingsverantwoordelijke heeft niet, of niet toereikend, gereageerd.'}
+
+WAAROM IK KLAAG
+De verwerkingsverantwoordelijke heeft gehandeld in strijd met:
+  - artikel 12, lid 3, AVG, door niet binnen één maand te reageren;
+  - artikel 17, lid 1, AVG, door persoonsgegevens niet onverwijld te wissen;
+  - artikel 21, lid 3, AVG, voor zover de verwerking voor direct marketing na mijn bezwaar is voortgezet.
+
+WAT IK VRAAG
+Ik verzoek de Autoriteit Persoonsgegevens dit te onderzoeken, de verwerkingsverantwoordelijke op te dragen aan mijn verzoek te voldoen, en te overwegen of handhaving passend is.
+
+BIJLAGEN
+  - Mijn oorspronkelijke verzoek van ${rec?.sentAt || '[datum]'}
+  - ${rec?.status === 'refused' ? 'De weigering van de verwerkingsverantwoordelijke' : 'Bewijs van verzending, en de eventueel verstuurde herinnering'}
+
+Met vriendelijke groet,
+${p.fullName || '[naam]'}
+${new Date().toISOString().slice(0, 10)}`
+};
+
+// Template labels as shown in the picker, per interface language.
+export const TEMPLATE_LABELS_NL = {
+  gdpr_erasure: 'AVG-verwijderverzoek (Engels)',
+  gdpr_erasure_nl: 'AVG-verwijderverzoek (Nederlands)',
+  ccpa_delete: 'CCPA/CPRA-verzoek (Californië, Engels)',
+  reminder: 'Herinnering (Engels)',
+  reminder_nl: 'Herinnering (Nederlands)',
+  complaint: 'Klacht bij de toezichthouder (Engels)',
+  complaint_nl: 'Klacht bij de Autoriteit Persoonsgegevens (Nederlands)'
+};
+
 function addDays(dateStr, n) {
   const d = new Date(dateStr + 'T00:00:00');
   d.setDate(d.getDate() + n);

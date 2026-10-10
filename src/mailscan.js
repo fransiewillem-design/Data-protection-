@@ -321,10 +321,13 @@ export function parseMessages(text) {
 export function groupBySender(messages) {
   const map = new Map();
   for (const m of messages) {
-    const key = m.domain;
+    // Forged mail is grouped apart from genuine mail on the same domain. A
+    // spoofed "bol.com" must never drag the real bol.com into the spam pile —
+    // the domain in a forged From line belongs to whoever is being impersonated.
+    const key = m.trust === 'forged' ? m.domain + '#forged' : m.domain;
     if (!map.has(key)) {
       map.set(key, {
-        domain: key, name: m.name || key, count: 0,
+        key, domain: m.domain, name: m.name || m.domain, count: 0,
         unsubHttp: '', unsubMailto: '', unsubFrom: '', oneClick: false,
         addresses: new Set(), recipients: new Set(), subjects: [], isEsp: m.isEsp,
         linkDomains: new Set(), replyToHosts: new Set()
@@ -343,7 +346,7 @@ export function groupBySender(messages) {
     for (const d of m.linkDomains || []) g.linkDomains.add(d);
     if (m.replyToHost) g.replyToHosts.add(m.replyToHost);
     // Prefer a human-looking display name over the bare domain.
-    if ((g.name === key || !g.name) && m.name) g.name = m.name;
+    if ((g.name === g.domain || !g.name) && m.name) g.name = m.name;
   }
   return [...map.values()]
     .map(g => ({ ...g, addresses: [...g.addresses], recipients: [...g.recipients],

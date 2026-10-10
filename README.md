@@ -64,7 +64,7 @@ Drop mail in and Home sorts it into four cards, each with one number and one but
 | Card | What the button does |
 | --- | --- |
 | **Unsubscribe** | One-click unsubscribe for *verified* senders; senders that could not be verified are named, never bulk-clicked |
-| **Block** | One import for your mail app that blocks every scam and its reused link sites and reply addresses |
+| **Block scams** | One import for your mail app that blocks every sender that failed the sender check, via its reused link sites and reply addresses |
 | **Delete my data** | Opens the letters for companies that genuinely hold your data |
 | **Your addresses** | Per-address advice from what the scan found (below) |
 
@@ -76,6 +76,28 @@ Hide My Email, Gmail filter). An address under heavy attack that real senders st
 attack**: the advice is to move those named senders to a fresh address first, then retire it — or keep it
 for people and stop using it for sign-ups. Thresholds: at least two scams, and none (burned) or at least
 half (under attack) of its mail.
+
+**Who gets blocked, and who only gets an unsubscribe.** Each scanned sender is classified from what the
+receiving mail server recorded (`Authentication-Results`, `Received-SPF`, spam score):
+
+| Sender | Offered |
+| --- | --- |
+| Verified, with an unsubscribe link | Unsubscribe, and an erasure letter |
+| Verified, no unsubscribe link (an order confirmation, a bank) | An erasure letter only — never a block |
+| Failed authentication, with an "unsubscribe" link | Block; the link is flagged as a tracker, never clicked |
+| Failed authentication, no link | Block |
+| No authentication result either way | Neither — listed as "could not verify", so it is not blocked or written to by mistake |
+
+Block rules never use the From domain: on forged mail it is either made up or a real company's borrowed
+for the scam. A spoof of a real company (say a fake bol.com) is grouped separately from the genuine
+sender, shown as "(impersonated)", and the real company's domain, link sites and reply hosts are
+excluded from every rule.
+
+**Dutch.** The interface is available in English and Dutch (EN | NL switch in the top bar). It follows
+the browser language on first visit and remembers the choice. The letter language is a separate
+setting in Settings, so a Dutch interface can still produce an English letter to a foreign company;
+Dutch letter templates exist for the erasure request, the reminder and the complaint to the Autoriteit
+Persoonsgegevens.
 
 The navigation is three tabs — Home, Delete data, Settings. The detailed unsubscribe-and-block view,
 aliases, and the other ways to find who has your data are linked from Home's cards and from Settings.
