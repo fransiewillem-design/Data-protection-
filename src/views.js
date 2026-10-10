@@ -568,7 +568,7 @@ function targetRow(b, state) {
         ? ` · ${L('sent', 'verstuurd')} ${esc(r.sentAt)}` : ''}${b.source ? '' : ` · ${esc(CATEGORIES()[b.category] || b.category)}`}</div>
       ${b.notes && lang() === 'en' ? `<div class="meta">${esc(b.notes)}</div>` : ''}
       <div class="meta rel-pick">${L('You and them:', 'Jij en zij:')}
-        <select data-action="set-relation" data-id="${esc(b.id)}">
+        <select data-action="set-relation" data-id="${esc(b.id)}" aria-label="${L(`How you relate to ${esc(b.name)}`, `Jouw relatie met ${esc(b.name)}`)}">
           ${Object.entries(RELATIONS()).map(([k, v]) =>
             `<option value="${k}" ${relationOf(b, r) === k ? 'selected' : ''}>${esc(v.pick)}</option>`).join('')}
         </select>
@@ -577,7 +577,7 @@ function targetRow(b, state) {
     <div class="actions">
       ${safeUrl(b.optOutUrl) ? `<a class="btn" href="${esc(safeUrl(b.optOutUrl))}" target="_blank" rel="noopener noreferrer">${L('Opt-out page ↗', 'Afmeldpagina ↗')}</a>` : ''}
       <a class="btn primary" href="#/letter?b=${encodeURIComponent(b.id)}">${L('Letter', 'Brief')}</a>
-      <select data-action="set-status" data-id="${esc(b.id)}" style="width:auto">
+      <select data-action="set-status" data-id="${esc(b.id)}" style="width:auto" aria-label="${L(`Status of ${esc(b.name)}`, `Status van ${esc(b.name)}`)}">
         ${Object.keys(store.STATUSES).map(k =>
           `<option value="${k}" ${r.status === k ? 'selected' : ''}>${esc(statusLabel(k))}</option>`).join('')}
       </select>
@@ -1187,7 +1187,7 @@ export function blockAllCard(state, { closable = false } = {}) {
           'Alleen mail die de afzendercontrole niet doorstond, wordt geblokkeerd. De regels richten zich op wat deze campagnes hergebruiken — de sites waar hun links naartoe gaan en waar antwoorden heen gaan — nooit op het afzenderadres, want dat is in vervalste mail verzonnen of geleend van een echt bedrijf.')}</p>
       </div>
       <div class="row" style="flex-wrap:nowrap">
-        <select id="block-client" style="width:auto">
+        <select id="block-client" style="width:auto" aria-label="${L('Your mail app', 'Je mailapp')}">
           ${Object.entries(CLIENTS()).map(([k, v]) => `<option value="${k}" ${k === blockClient ? 'selected' : ''}>${v}</option>`).join('')}
         </select>
         ${closable ? `<button class="link-btn" data-action="panel-close">${L('Close', 'Sluiten')}</button>` : ''}
@@ -1222,9 +1222,9 @@ export function blockPanel(bl, client) {
   const steps = {
     outlookcom: `
       <ol class="small">
-        ${bl.links.length ? `<li>${L('<b>Settings</b> (gear) → <b>Mail</b> → <b>Rules</b> → <b>Add new rule</b>. Name it <i>Data Reclaim – links</i>. Condition <b>Subject or body includes</b> — add each of:',
-          '<b>Instellingen</b> (tandwiel) → <b>E-mail</b> → <b>Regels</b> → <b>Nieuwe regel toevoegen</b>. Noem hem <i>Data Reclaim – links</i>. Voorwaarde <b>Onderwerp of hoofdtekst bevat</b> — voeg elk toe van:')} ${sites}. ${L('Action <b>Delete</b>. Save.', 'Actie <b>Verwijderen</b>. Opslaan.')}</li>` : ''}
-        ${reply.length ? `<li>${L('Add a second rule, <i>Data Reclaim – replies</i>. Condition <b>Message header includes</b> —', 'Voeg een tweede regel toe, <i>Data Reclaim – antwoorden</i>. Voorwaarde <b>Berichtkop bevat</b> —')} ${replies}. ${L('Action <b>Delete</b>. Save.', 'Actie <b>Verwijderen</b>. Opslaan.')}</li>` : ''}
+        ${bl.links.length ? `<li>${L('<b>Settings</b> (gear) → <b>Mail</b> → <b>Rules</b> → <b>Add new rule</b>. Name it <i>Unlisted – links</i>. Condition <b>Subject or body includes</b> — add each of:',
+          '<b>Instellingen</b> (tandwiel) → <b>E-mail</b> → <b>Regels</b> → <b>Nieuwe regel toevoegen</b>. Noem hem <i>Unlisted – links</i>. Voorwaarde <b>Onderwerp of hoofdtekst bevat</b> — voeg elk toe van:')} ${sites}. ${L('Action <b>Delete</b>. Save.', 'Actie <b>Verwijderen</b>. Opslaan.')}</li>` : ''}
+        ${reply.length ? `<li>${L('Add a second rule, <i>Unlisted – replies</i>. Condition <b>Message header includes</b> —', 'Voeg een tweede regel toe, <i>Unlisted – antwoorden</i>. Voorwaarde <b>Berichtkop bevat</b> —')} ${replies}. ${L('Action <b>Delete</b>. Save.', 'Actie <b>Verwijderen</b>. Opslaan.')}</li>` : ''}
       </ol>
       ${bl.links.length && reply.length ? twoRules : ''}
       <p class="small muted">${L('Menu names shift slightly between Outlook versions; the conditions are the same.', 'Menunamen verschillen soms per Outlook-versie; de voorwaarden zijn hetzelfde.')}</p>
@@ -1245,15 +1245,15 @@ export function blockPanel(bl, client) {
         <li>${L('Download the filter file below.', 'Download hieronder het filterbestand.')}</li>
         <li>${L('<b>Settings</b> (gear) → <b>See all settings</b> → <b>Filters and Blocked Addresses</b>.',
                '<b>Instellingen</b> (tandwiel) → <b>Alle instellingen bekijken</b> → <b>Filters en geblokkeerde adressen</b>.')}</li>
-        <li>${L('<b>Import filters</b> → choose <code>data-reclaim-filters.xml</code> → <b>Open file</b> → <b>Create filters</b>. Tick <i>Also apply to matching conversations</i> to clear what is already there.',
-               '<b>Filters importeren</b> → kies <code>data-reclaim-filters.xml</code> → <b>Bestand openen</b> → <b>Filters maken</b>. Vink <i>Filter ook toepassen op overeenkomende gesprekken</i> aan om wat er al staat op te ruimen.')}</li>
+        <li>${L('<b>Import filters</b> → choose <code>unlisted-filters.xml</code> → <b>Open file</b> → <b>Create filters</b>. Tick <i>Also apply to matching conversations</i> to clear what is already there.',
+               '<b>Filters importeren</b> → kies <code>unlisted-filters.xml</code> → <b>Bestand openen</b> → <b>Filters maken</b>. Vink <i>Filter ook toepassen op overeenkomende gesprekken</i> aan om wat er al staat op te ruimen.')}</li>
       </ol>
       ${reply.length ? `<p class="small muted">${L('Gmail filters cannot look at the reply address, so the file uses the link sites.', 'Gmail-filters kunnen niet naar het antwoordadres kijken, dus het bestand gebruikt de linksites.')}</p>` : ''}
       <div class="row"><button class="primary" data-action="dl-block" data-fmt="gmail" ${bl.links.length ? '' : 'disabled'}>${L('Download Gmail filters', 'Download Gmail-filters')}</button></div>`,
     apple: `
       <ol class="small">
-        <li>${L('Mail on your Mac → <b>Settings</b> → <b>Rules</b> → <b>Add Rule</b>. Name it <i>Data Reclaim</i>, and set <b>If any of the following conditions are met</b>.',
-               'Mail op je Mac → <b>Instellingen</b> → <b>Regels</b> → <b>Voeg regel toe</b>. Noem hem <i>Data Reclaim</i> en kies <b>Als aan een van de volgende voorwaarden is voldaan</b>.')}</li>
+        <li>${L('Mail on your Mac → <b>Settings</b> → <b>Rules</b> → <b>Add Rule</b>. Name it <i>Unlisted</i>, and set <b>If any of the following conditions are met</b>.',
+               'Mail op je Mac → <b>Instellingen</b> → <b>Regels</b> → <b>Voeg regel toe</b>. Noem hem <i>Unlisted</i> en kies <b>Als aan een van de volgende voorwaarden is voldaan</b>.')}</li>
         ${bl.links.length ? `<li>${L('For each of', 'Voor elk van')} ${sites} ${L('add <b>Message Content</b> · <b>Contains</b> · <i>the site</i>.', 'voeg toe: <b>Berichtinhoud</b> · <b>Bevat</b> · <i>de site</i>.')}</li>` : ''}
         ${reply.length ? `<li>${L('Add <b>Reply-To</b> · <b>Contains</b> ·', 'Voeg toe: <b>Reply-To</b> · <b>Bevat</b> ·')} ${replies} ${L('(choose <i>Edit Header List…</i> in the first menu if Reply-To is not offered).', '(kies <i>Wijzig kopregellijst…</i> in het eerste menu als Reply-To er niet tussen staat).')}</li>` : ''}
         <li>${L('Action <b>Move Message</b> → <b>Trash</b>. Click <b>Apply</b> when asked, to clear existing mail.', 'Actie <b>Verplaats bericht</b> → <b>Prullenmand</b>. Klik op <b>Pas toe</b> als daarom wordt gevraagd, om bestaande mail op te ruimen.')}</li>
@@ -1277,10 +1277,10 @@ export function blockPanel(bl, client) {
 
 export function blockText(state, fmt) {
   const bl = buildBlockList(state.custom, senderClass);
-  if (fmt === 'gmail') return { text: asGmailXml(bl), name: 'data-reclaim-filters.xml', type: 'application/xml' };
-  if (fmt === 'sieve') return { text: asSieve(bl), name: 'data-reclaim.sieve', type: 'text/plain' };
-  if (fmt === 'reply') return { text: asReplyList(bl), name: 'data-reclaim-reply-addresses.txt', type: 'text/plain' };
-  return { text: asLinkList(bl), name: 'data-reclaim-link-sites.txt', type: 'text/plain' };
+  if (fmt === 'gmail') return { text: asGmailXml(bl), name: 'unlisted-filters.xml', type: 'application/xml' };
+  if (fmt === 'sieve') return { text: asSieve(bl), name: 'unlisted.sieve', type: 'text/plain' };
+  if (fmt === 'reply') return { text: asReplyList(bl), name: 'unlisted-reply-addresses.txt', type: 'text/plain' };
+  return { text: asLinkList(bl), name: 'unlisted-link-sites.txt', type: 'text/plain' };
 }
 
 export function downloadText({ text, name, type }) {
@@ -1399,7 +1399,7 @@ export function letter(state, catalog, params) {
   <div class="card no-print">
     <div class="row">
       <label for="tpl" style="margin:0">${L('Template', 'Sjabloon')}</label>
-      <select id="tpl" style="width:auto">
+      <select id="tpl" class="tpl-select">
         ${Object.entries(TEMPLATES).map(([k, t]) =>
           `<option value="${k}" ${k === tid ? 'selected' : ''}>${esc(tplLabel(k, t))}</option>`).join('')}
       </select>
@@ -1414,7 +1414,7 @@ export function letter(state, catalog, params) {
   <div class="card">
     <p class="small muted no-print">${L('To', 'Aan')}: <code>${esc(to || '—')}</code></p>
     <p class="small"><strong>${L('Subject', 'Onderwerp')}:</strong> ${esc(subject)}</p>
-    <div class="letter" id="letter-body">${esc(body)}</div>
+    <div class="letter" id="letter-body" tabindex="0" role="region" aria-label="${L('Letter text', 'Tekst van de brief')}">${esc(body)}</div>
   </div>
 
   <div class="card no-print">
@@ -1728,7 +1728,7 @@ export function mountProfile(root, state, rerender) {
       const url = URL.createObjectURL(blob);
       const link = document.createElement('a');
       link.href = url;
-      link.download = `data-reclaim-backup-${store.today()}.json`;
+      link.download = `unlisted-backup-${store.today()}.json`;
       link.click();
       URL.revokeObjectURL(url);
     }
@@ -1761,4 +1761,60 @@ export function mountProfile(root, state, rerender) {
       toast(L('Everything erased', 'Alles gewist'));
     }
   });
+}
+
+// -------------------------------------------------------------------- about
+
+const REPO = 'https://github.com/fransiewillem-design/Data-protection-';
+
+export function about() {
+  const ext = (href, text) => `<a href="${href}" target="_blank" rel="noopener noreferrer">${text}</a>`;
+  return `
+  <div class="head">
+    <h1>${L('About &amp; privacy', 'Over &amp; privacy')}</h1>
+    <p>${L('Unlisted helps you get off the lists your data ended up on — mailing lists, scam lists and data brokers — without handing that data to yet another company.',
+      'Unlisted helpt je van de lijsten af te komen waar je gegevens op terecht zijn gekomen — mailinglijsten, oplichterslijsten en databrokers — zonder die gegevens aan nóg een bedrijf te geven.')}</p>
+  </div>
+
+  <section class="card">
+    <h2>${L('What it does', 'Wat het doet')}</h2>
+    <ul>${L(`
+      <li><b>Unsubscribe</b> from real companies, in one go where they support it.</li>
+      <li><b>Block scams</b> — only mail that failed the sender check, never a real company.</li>
+      <li><b>Delete your data</b>: letters under the GDPR, sent from your own mail app, with reminders and a complaint to the regulator when a company ignores you.</li>
+      <li><b>Advise on your addresses</b>: which one is burned and how to retire it.</li>`, `
+      <li><b>Uitschrijven</b> bij echte bedrijven, in één keer waar ze dat ondersteunen.</li>
+      <li><b>Oplichting blokkeren</b> — alleen mail die zakte voor de afzendercontrole, nooit een echt bedrijf.</li>
+      <li><b>Je gegevens laten wissen</b>: brieven op grond van de AVG, verstuurd vanuit je eigen mailapp, met herinneringen en een klacht bij de toezichthouder als een bedrijf je negeert.</li>
+      <li><b>Advies over je adressen</b>: welk adres verbrand is en hoe je het opheft.</li>`)}
+    </ul>
+  </section>
+
+  <section class="card">
+    <h2>${L('Privacy statement', 'Privacyverklaring')}</h2>
+    <ul>${L(`
+      <li><b>No server, no account, no cookies, no analytics, no trackers.</b> There is no database to breach, because nothing you enter is ever sent to us.</li>
+      <li>Mail you drop in is read <b>on your device</b>. Only the sender's name, domain, links and unsubscribe address are kept — not subjects, not message text.</li>
+      <li>Your details and progress are stored in <b>this browser only</b> (localStorage). They are not encrypted, so use a device and browser profile only you use. <a href="#/profile">Settings</a> → Erase everything removes it all.</li>
+      <li>The app itself contacts only: the breach database ${ext('https://haveibeenpwned.com', 'Have I Been Pwned')} when you use the breach or password check (a password check sends only the first 5 characters of a scrambled hash, never the password), and a sender's own unsubscribe address when you choose one-click unsubscribe. Letters go out through your own mail app.</li>
+      <li>The site is hosted on GitHub Pages. Like any web host, GitHub sees your IP address and which files your browser loads; see the ${ext('https://docs.github.com/en/site-policy/privacy-policies/github-general-privacy-statement', 'GitHub privacy statement')}.</li>`, `
+      <li><b>Geen server, geen account, geen cookies, geen analytics, geen trackers.</b> Er is geen database die gelekt kan worden, want niets wat je invult wordt ooit naar ons gestuurd.</li>
+      <li>Mail die je erin sleept wordt <b>op je eigen apparaat</b> gelezen. Alleen de naam, het domein, de links en het uitschrijfadres van de afzender worden bewaard — geen onderwerpregels, geen berichttekst.</li>
+      <li>Je gegevens en voortgang staan <b>alleen in deze browser</b> (localStorage). Ze zijn niet versleuteld, dus gebruik een apparaat en browserprofiel dat alleen jij gebruikt. <a href="#/profile">Instellingen</a> → Alles wissen haalt alles weg.</li>
+      <li>De app maakt zelf alleen contact met: de datalekdatabase ${ext('https://haveibeenpwned.com', 'Have I Been Pwned')} als je de datalek- of wachtwoordcheck gebruikt (een wachtwoordcheck stuurt alleen de eerste 5 tekens van een versleutelde hash, nooit het wachtwoord), en het uitschrijfadres van een afzender als je kiest voor uitschrijven met één klik. Brieven gaan via je eigen mailapp.</li>
+      <li>De site draait op GitHub Pages. Zoals elke webhost ziet GitHub je IP-adres en welke bestanden je browser laadt; zie de ${ext('https://docs.github.com/en/site-policy/privacy-policies/github-general-privacy-statement', 'privacyverklaring van GitHub')}.</li>`)}
+    </ul>
+  </section>
+
+  <section class="card">
+    <h2>${L('Good to know', 'Goed om te weten')}</h2>
+    <ul>${L(`
+      <li>This is practical guidance, not legal advice. A company may ask you to prove who you are before it acts.</li>
+      <li>The app cannot see whether a company really deleted your data; it tracks the deadlines so you can hold them to it.</li>
+      <li>Unlisted is free and open source (MIT). Found a problem or have an idea? ${ext(REPO + '/issues', 'Open an issue')}.</li>`, `
+      <li>Dit is praktische uitleg, geen juridisch advies. Een bedrijf mag je vragen te bewijzen wie je bent voordat het iets doet.</li>
+      <li>De app kan niet zien of een bedrijf je gegevens echt heeft gewist; hij houdt de termijnen bij zodat je ze eraan kunt houden.</li>
+      <li>Unlisted is gratis en open source (MIT). Een probleem gevonden of een idee? ${ext(REPO + '/issues', 'Meld het hier')}.</li>`)}
+    </ul>
+  </section>`;
 }

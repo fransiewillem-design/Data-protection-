@@ -1,5 +1,7 @@
 import { L } from './i18n.js';
 // Local-first state. Nothing here ever leaves the browser.
+// Named for the app's original name. Kept as is: renaming it would make every
+// existing user's saved data vanish on their next visit.
 const KEY = 'data-reclaim/v1';
 
 const EMPTY = {
@@ -96,7 +98,7 @@ export function reset() { state = clone(EMPTY); persist(); }
 export function importJSON(text) {
   const parsed = JSON.parse(text);
   if (typeof parsed !== 'object' || parsed === null || parsed.v !== 1) {
-    throw new Error(L('Not a Data Reclaim backup file.', 'Dit is geen Data Reclaim-back-up.'));
+    throw new Error(L('Not an Unlisted backup file.', 'Dit is geen Unlisted-back-up.'));
   }
   state = backfillSources({ ...clone(EMPTY), ...parsed, profile: { ...EMPTY.profile, ...(parsed.profile || {}) } });
   persist();

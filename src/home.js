@@ -165,12 +165,18 @@ export function home(state) {
 
   if (!mail.length) return `
   <section class="hero">
-    <h1>${L('Clean up your inbox', 'Ruim je inbox op')}</h1>
+    <img class="hero-mark" src="assets/img/icon.svg" alt="" width="56" height="56">
+    <h1>${L('Get off their lists.', 'Haal jezelf van hun lijsten.')}</h1>
     <p>${L(`Drop in the mail from your Junk folder. Real companies get an unsubscribe, scams get blocked,
     and you see which companies to make delete your data — on this device. Nothing is uploaded.`,
     `Sleep de mail uit je map Ongewenst hierheen. Echte bedrijven krijgen een uitschrijving, oplichters worden
     geblokkeerd, en je ziet welke bedrijven je gegevens moeten wissen — op dit apparaat. Er wordt niets geüpload.`)}</p>
     ${dropZone(false)}
+    <ul class="trust">
+      <li>${L('Nothing is uploaded', 'Er wordt niets geüpload')}</li>
+      <li>${L('No account', 'Geen account')}</li>
+      <li>${L('Free &amp; open source', 'Gratis &amp; open source')}</li>
+    </ul>
     ${HOWTO()}
     <p class="small muted" style="margin-top:22px">${L(`Already know a company that holds your data?
     <a href="#/delete">Write to it directly</a>.`, `Weet je al welk bedrijf je gegevens heeft?

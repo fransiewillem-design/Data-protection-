@@ -1,7 +1,12 @@
-# Data Reclaim
+<p align="center"><img src="assets/img/icon.svg" width="72" height="72" alt=""></p>
 
-A local-first workstation for getting your personal data deleted and keeping spam off your real
-email address. No account, no server, no analytics — everything you type stays in your browser.
+# Unlisted
+
+**Get off their lists.** Unsubscribe from real companies, block scams, and make companies delete your
+data under the GDPR — all in your browser. No account, no server, no analytics: nothing you enter or
+drop in is ever uploaded. Available in English and Dutch.
+
+**Use it:** https://fransiewillem-design.github.io/Data-protection-/
 
 ## What this actually does, and what it cannot
 
@@ -19,45 +24,16 @@ between operators you cannot reach. Filtering is an arms race you slowly lose. W
 compartmentalisation: give every company a different address, so a leak burns one alias instead of
 your identity — and tells you precisely who leaked it.
 
-So the app has two halves:
+So Unlisted does the parts that work, and is honest about the rest:
 
-| Deletion | Spam |
+| Stop the mail | Get the data deleted |
 | --- | --- |
-| Find who holds your data (breach lookup + broker registry) | One alias per company |
-| Generate a legally precise erasure request | Track which alias went where |
-| Track the statutory deadline | Spot the leaker when spam arrives |
-| Escalate: reminder → complaint to the regulator | Burn the alias, kill the stream at source |
+| Unsubscribe from real companies, one click where they support it | GDPR letters that reveal only what each company already has |
+| Block scams by the sites and reply addresses they reuse | One-click-per-company sending from your own mail app |
+| Tell you which address is burned and how to retire it | Deadlines, reminders and a regulator complaint, tracked for you |
+| One alias per company, so the next leak names the leaker | Suspects first; your own providers get a narrower letter |
 
-## Running it
-
-No build step, no dependencies. It does need to be served over HTTP rather than opened from disk,
-because browsers block `file://` pages from reading local files.
-
-```bash
-python3 -m http.server 8000
-# open http://localhost:8000
-```
-
-### Hosting it on GitHub Pages
-
-`.github/workflows/pages.yml` publishes the site on every push. Two things have to be true first, and
-the second one cannot be automated:
-
-1. **The repository must be eligible for Pages** — public, or private on a paid plan.
-2. **The Pages site must be created once, by hand**, under *Settings → Pages → Build and deployment →
-   Source: **GitHub Actions***.
-
-The workflow passes `enablement: true`, which asks the API to do step 2 for you. Do not count on it: the
-default `GITHUB_TOKEN` is refused with *"Resource not accessible by integration"* no matter how its
-permissions are declared, because creating a Pages site needs repository-admin rights that the token
-does not carry. Once the site exists, the workflow finds it and deploys on every push. Pages is not available for private repositories on the Free plan, and a Pages site built from a
-private repository is served at a public URL anyway (access-controlled Pages is Enterprise-only), so
-making the repository public is usually the honest choice.
-
-Publishing is safe here: the app is entirely client-side and the repository holds no keys and no
-personal data. A public URL exposes the code, never your data — what you enter stays in your browser.
-
-## Home: the whole flow on one screen
+## How it works
 
 Drop mail in and Home sorts it into four cards, each with one number and one button:
 
@@ -132,76 +108,14 @@ letter; international brokers stay in English, with a note saying why. Dutch tem
 erasure request, the customer letter, the reminder and the complaint to the Autoriteit Persoonsgegevens.
 
 The navigation is three tabs — Home, Delete data, Settings. The detailed unsubscribe-and-block view,
-aliases, and the other ways to find who has your data are linked from Home's cards and from Settings.
-
-## The pages
-
-The two jobs are separate pages because they are separate things: unsubscribing is a courtesy the sender
-may withdraw, erasure is an obligation with a deadline. Mixing them made it unclear which one a button
-was doing.
-
-
-- **Overview** — what is in flight, what is past its deadline, what to chase.
-- **Scan your mail** — drag your Junk (or Inbox) messages out of Apple Mail, Outlook or a Gmail Takeout
-  export and drop the `.eml`/`.mbox` files on the page. The browser parses the headers locally, groups
-  senders by company, and sorts them into two piles that need opposite treatment: senders publishing a
-  standards-compliant `List-Unsubscribe` header are real companies, where unsubscribing and an erasure
-  demand both work; senders without one are usually throwaway criminal domains, where clicking anything
-  confirms your address and a letter would bounce. One click turns any sender into a tracked target with
-  a finished letter. Nothing is uploaded — there is no server to upload to.
-- **Who has your data** — three further sources, in order of yield. Your own mailbox first: searching it for
-  `"privacy policy" update`, `"welcome to"`, `unsubscribe` and similar surfaces every company holding
-  your data, costs nothing and involves no third party at all (a policy-update notice is proof they
-  hold you). Anything you find goes in via one box and comes out as a finished letter. Then the data
-  brokers, who need no discovery — assume you are in their files. Then public breach records, free on
-  the breach database's own site; the paid API is optional and tucked away.
-- **Targets** — by default, only companies derived from your own evidence: senders found in the mail you
-  scanned, and numbers you logged from spam calls or texts. Each row shows where it came from and which
-  single identifier its letter will reveal. Splits every sender into what can actually be done to it, so no
-  button is ever dead. The unsubscribe link is looked for in the message *body* as well as the
-  `List-Unsubscribe` header, because most bulk mail — and nearly all Dutch bulk mail — puts it there and
-  nowhere else, as *Uitschrijven* or *Afmelden*. Bodies are decoded first: quoted-printable, base64,
-  multipart trees and non-UTF-8 charsets. A sender offering no way out anywhere in the message is not
-  treated as a company that forgot but as spam to block, because compliant bulk senders are obliged to
-  offer one.
-
-  **An unsubscribe link is only offered if the sender is authenticated.** The receiving mail server
-  records whether each message really came from the domain it claims (SPF, DKIM, DMARC in
-  `Authentication-Results`); the app reads that verdict rather than guessing. Scam mail routinely carries
-  a convincing "Unsubscribe" link precisely because clicking it confirms a person reads the mailbox. So a
-  sender that failed authentication — or whose domain has no TLD at all, which no real domain lacks — has
-  its link listed as bait with its real destination shown, never as a button. Outlook's SafeLinks
-  wrapper is stripped first, so the destination shown is the actual one. One-click POSTs are reserved for
-  verified senders.
-
-  **Block all at once.** Everything marked as spam or bait becomes one import for the user's mail app —
-  Outlook for Windows (blocked-senders list), Gmail (filter XML, its own export format), Sieve for
-  Fastmail, Proton and others — or, where no import exists (Outlook.com, Apple Mail), a single rule with
-  exact steps. Sender domains alone are nearly useless here: scam campaigns generate a fresh domain per
-  message. What they reuse are the sites their links point to and the address replies go to, so those
-  are blocked too. Two safeguards: nothing a verified sender uses is ever included, so a wanted
-  newsletter cannot be caught; and shared mailing services such as `in2.getdrip.com`, which legitimate
-  senders also use, are only ever matched as a reply address, never blocked outright. The app still never
-  touches the mailbox — the user imports the file — which is the price of not holding a mailbox token. Validated against real junk-folder mail: four scams (three with fake unsubscribe
-  links) and one legitimate newsletter, each classified correctly. Senders advertising RFC 8058 one-click (`List-Unsubscribe-Post`) go in a single
-  batch, four at a time, with no page to visit. Senders that published only a link open one at a time,
-  because a browser refuses to let a page open many tabs at once and a loop would silently drop all but
-  the first. Senders that published nothing are listed separately as spam to block, with
-  per-client instructions and an explicit warning not to reply: any response confirms a person reads the
-  mailbox, and a letter to a throwaway domain bounces. Those are also kept off *Delete data* by default
-  for the same reason. Everything else starts selected. The 37 bundled data brokers are one link away but deliberately not in this list — they are not
-  your evidence, they are everyone's.
-- **Letter** — generates the request, in English or Dutch, filled in with your details. Copy it, open
-  it in your mail app, or print it. Marking it sent starts the deadline clock.
-- **Email defence** — the alias system, guidance on handling what is already arriving, and the tracker
-  that tells you who leaked you.
-- **Your details** — the identity fields that fill the letters, plus export / import / wipe.
+aliases, the other ways to find who has your data, and *About & privacy* are linked from Home's cards,
+Settings and the footer.
 
 ## Order of work
 
 The lists feed each other, so sequence matters:
 
-1. Fill in **Your details** — a request without enough to identify you can be refused legitimately.
+1. Fill in **Settings** — a request without enough to identify you can be refused legitimately.
 2. Do the **marketing data brokers** first (Acxiom, LiveRamp, Epsilon). They are upstream suppliers;
    cutting them off reduces what everyone downstream can buy about you.
 3. Then **people-search sites**. Search your own name first and keep the URL of your listing — most
@@ -241,18 +155,20 @@ The list is a plain JSON file: edit it, or add companies through the UI.
 
 ## Privacy and threat model
 
-Your data lives in `localStorage` under the key `data-reclaim/v1`, in one browser profile. The point of
+Your data lives in `localStorage` under the key `data-reclaim/v1` (named for the app's original name, and kept so existing users keep their data), in one browser profile. The point of
 that design: this app holds your name, date of birth, address and every email address you own. On a
 server, that file is a target — exactly the kind of target that produced the breaches this tool exists
 to clean up after. So there is no server.
 
-**What leaves your device, exhaustively.** Three requests, each only when you click something:
+**What leaves your device, exhaustively.** Each only when you click something:
 
 | Request | What it carries |
 | --- | --- |
 | `data/brokers.json` | Nothing — it is a file in this repo |
 | `haveibeenpwned.com/api/v3/breaches` | Nothing about you — the public breach list |
 | `api.pwnedpasswords.com/range/XXXXX` | Five characters of your password's SHA-1 hash |
+| A sender's one-click unsubscribe URL | `List-Unsubscribe=One-Click`, no cookies, no referrer (see below) |
+| Letters | Nothing from the app — they open in your own mail app, and you press Send |
 
 **Letters reveal nothing the recipient did not already have.** A target found in your own mail or SMS has
 demonstrably got exactly one identifier: the address or number it contacted you on. Its letter cites that
@@ -276,7 +192,7 @@ without it. It is optional, it is off unless you add a key, and the UI says so a
 
 Most people should never add a key. Checking your own address is free on haveibeenpwned.com — the paywall
 is on the *automated* lookup, which they closed in 2019 because spammers were bulk-querying it to work out
-which addresses are real. The Exposure page therefore leads with the free route: it copies each address and
+which addresses are real. The *More ways to find who has your data* page therefore leads with the free route: it copies each address and
 opens their site for you, and the key is tucked away as an optional convenience. Note that breaches they
 class as sensitive are hidden from the public search; to see those, verify the address through the
 *Notify me* section of their site, which is also free.
@@ -324,7 +240,7 @@ of it.
 
 - The stored file is **not encrypted**. Anyone with your unlocked machine and this browser profile can
   read it — the same exposure as your saved passwords, but worth knowing.
-- Clearing site data **erases it**. Export a backup from *Your details*.
+- Clearing site data **erases it**. Export a backup from *Settings*.
 - Hosting on GitHub Pages means GitHub sees ordinary web-server request logs (your IP, your browser).
   That is true of any hosted page, and it is about the visit, not your data. Running it locally avoids
   even that.
@@ -333,20 +249,52 @@ of it.
   same commit. Keep two-factor authentication on the GitHub account that owns it. This is the realistic
   attack on a static, serverless app — not the data, which never leaves the device, but the code.
 
+## Running it
+
+No build step, no dependencies. It does need to be served over HTTP rather than opened from disk,
+because browsers block `file://` pages from reading local files.
+
+```bash
+python3 -m http.server 8000
+# open http://localhost:8000
+```
+
+### Hosting it on GitHub Pages
+
+`.github/workflows/pages.yml` publishes the site on every push. Two things have to be true first, and
+the second one cannot be automated:
+
+1. **The repository must be eligible for Pages** — public, or private on a paid plan.
+2. **The Pages site must be created once, by hand**, under *Settings → Pages → Build and deployment →
+   Source: **GitHub Actions***.
+
+The workflow passes `enablement: true`, which asks the API to do step 2 for you. Do not count on it: the
+default `GITHUB_TOKEN` is refused with *"Resource not accessible by integration"* no matter how its
+permissions are declared, because creating a Pages site needs repository-admin rights that the token
+does not carry. Once the site exists, the workflow finds it and deploys on every push. Pages is not available for private repositories on the Free plan, and a Pages site built from a
+private repository is served at a public URL anyway (access-controlled Pages is Enterprise-only), so
+making the repository public is usually the honest choice.
+
+Publishing is safe here: the app is entirely client-side and the repository holds no keys and no
+personal data. A public URL exposes the code, never your data — what you enter stays in your browser.
+
 ## Status
 
-Verified in-browser: routing, persistence across reloads, profile → letter rendering (English and
-Dutch), deadline and overdue calculation, escalation templates, alias tracking, import/export.
+Checked before launch, in a real browser, on every page in English and Dutch, light and dark mode,
+desktop and phone width: no script errors, no failed requests, no horizontal scrolling, no dead
+internal links, every external link `https` and opened without a referrer, and no WCAG 2 A/AA
+violations reported by axe-core.
 
-Verified adversarially: XSS payloads in every text field render as inert text; a `javascript:` URL in an
-imported backup is never rendered as a link; exfiltration of the stored profile to an unlisted host is
-refused by the CSP; and the CSP blocks nothing the app legitimately needs (zero violations across all
-views).
+End-to-end tests cover: classification of real junk mail (scams, a spoofed bol.com, a genuine order
+confirmation, a real newsletter); one-click unsubscribe delivery against a test server; the block list
+never containing a verified sender's domain; the send queue, a corrected recipient, reminders after 30
+days and the complaint after 14 more (with time simulated); the relationship groups and their order;
+Dutch letters following the interface; migration of older saved data; and the adversarial suite (XSS
+in every field and in imported backups, exfiltration blocked by CSP, the unsubscribe worker isolated).
 
 **Not verified end-to-end:** the Have I Been Pwned calls. The network this was built on blocks those
-domains at the proxy, so the requests could not be exercised against the live service. The code follows
-the documented v3 API and the k-anonymity range model, and fails gracefully, but the first real call is
-untested — check it once when you run it.
+domains, so the requests could not be exercised against the live service. The code follows the
+documented v3 API and the k-anonymity range model and fails gracefully — check it once when you run it.
 
 ## Licence
 

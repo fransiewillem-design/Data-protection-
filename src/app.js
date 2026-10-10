@@ -11,7 +11,8 @@ const ROUTES = [
   { path: '/unsubscribe', view: views.unsubscribe, mount: views.mountUnsubscribe, nav: false },
   { path: '/aliases',     view: views.email,       mount: views.mountEmail,       nav: false },
   { path: '/find',        view: views.exposure,    mount: views.mountExposure,    nav: false },
-  { path: '/print',       view: views.printAll,    mount: views.mountPrintAll,    nav: false }
+  { path: '/print',       view: views.printAll,    mount: views.mountPrintAll,    nav: false },
+  { path: '/about',       view: views.about,                                      nav: false }
 ];
 
 // Old hashes people may have bookmarked or that older copy still links to.
@@ -54,6 +55,9 @@ function renderChrome() {
     'Everything you type stays in this browser (<code>localStorage</code>). No account, no server, no analytics. Back it up from <a href="#/profile">Settings</a>.',
     'Alles wat je invult blijft in deze browser (<code>localStorage</code>). Geen account, geen server, geen analytics. Maak een back-up via <a href="#/profile">Instellingen</a>.'));
   set('foot-build', L('Build', 'Versie'));
+  set('foot-about', L('About &amp; privacy', 'Over &amp; privacy'));
+  set('foot-source', L('Source code', 'Broncode'));
+  document.querySelector('.brand')?.setAttribute('aria-label', L('Unlisted — home', 'Unlisted — home'));
   set('foot-legal', L(
     'Guidance here is practical, not legal advice. Deadlines and rights cited are GDPR (EU/NL) and CCPA/CPRA (California).',
     'De uitleg hier is praktisch, geen juridisch advies. Genoemde termijnen en rechten komen uit de AVG (EU/NL) en de CCPA/CPRA (Californië).'));
