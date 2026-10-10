@@ -1768,7 +1768,7 @@ export function mountProfile(root, state, rerender) {
 const REPO = 'https://github.com/fransiewillem-design/Data-protection-';
 // The address for privacy questions. Empty until the maintainer sets one; the
 // page then falls back to GitHub, with a warning not to post personal details.
-const CONTACT_EMAIL = 'hallo@hoopup.tech';
+const CONTACT_EMAIL = 'hello@hoopup.tech';
 const UPDATED = { en: '10 October 2026', nl: '10 oktober 2026' };
 
 // The statement names whichever host is actually serving this copy, so it
