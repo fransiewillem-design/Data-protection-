@@ -144,3 +144,71 @@ export function guessClient(targets) {
   }
   return Object.entries(votes).sort((a, b) => b[1] - a[1])[0]?.[0] || 'outlookcom';
 }
+
+// ---- one-paste scripts ------------------------------------------------------
+// Apple Mail and Outlook have no way to paste a list into one rule field: a
+// pasted list becomes a single value no message contains. A script that builds
+// the rule is the one thing the user can copy once and paste once. Every value
+// in these lists comes from received mail, i.e. from the scammer, so only plain
+// hostnames are let through: nothing else can reach the script's syntax.
+const HOST = /^[a-z0-9](?:[a-z0-9-]*[a-z0-9])?(?:\.[a-z0-9](?:[a-z0-9-]*[a-z0-9])?)+$/;
+const hosts = arr => arr.filter(h => HOST.test(h));
+const scriptName = day => `HoopUp ${/^\d{4}-\d\d-\d\d$/.test(day) ? day : ''}`.trim();
+
+// Script Editor on a Mac: paste, press Run. One rule, "any condition", which
+// moves matches to the Trash and is then run once over Junk and Inbox.
+export function asAppleScript(bl, day) {
+  const name = scriptName(day);
+  const links = hosts(bl.links), replies = hosts([...bl.replyTo, ...bl.sharedReplyTo]);
+  const conds = [
+    ...links.map(h => `    make new rule condition at end of rule conditions with properties {rule type:message content, qualifier:does contain value, expression:"${h}"}`),
+    ...replies.map(h => `    make new rule condition at end of rule conditions with properties {rule type:header key, header:"Reply-To", qualifier:does contain value, expression:"${h}"}`)
+  ];
+  // A rule with no conditions under "any" would match every message.
+  if (!conds.length) return '-- Nothing to block yet.\n';
+  return `-- HoopUp: adds the rule "${name}" to Apple Mail. Press Run (▶).
+tell application "Mail"
+  if exists rule "${name}" then delete rule "${name}"
+  set r to make new rule at end of rules with properties {name:"${name}", enabled:true, all conditions must be met:false, delete message:true, stop evaluating rules:true}
+  tell r
+${conds.join('\n')}
+  end tell
+  try
+    delete (every rule condition of r whose expression is "")
+  end try
+  try
+    perform mail action with messages (every message of junk mailbox) for rule r
+  end try
+  try
+    perform mail action with messages (every message of inbox) for rule r
+  end try
+end tell
+display dialog "HoopUp: rule added with ${conds.length} conditions. Scams already in Junk and Inbox went to the Trash." buttons {"OK"} default button "OK"
+`;
+}
+
+// Classic Outlook for Windows, via PowerShell: paste, press Enter. Two rules,
+// because within one Outlook rule every condition must match at once.
+export function asPowerShell(bl, day) {
+  const name = scriptName(day);
+  const list = arr => '@(' + arr.map(h => `'${h}'`).join(',') + ')';
+  const links = hosts(bl.links), replies = hosts([...bl.replyTo, ...bl.sharedReplyTo]);
+  const rule = (label, cond, arr) => `  $n = '${name} ${label}'; try { $rules.Remove($n) } catch {}
+  $r = $rules.Create($n, 0)
+  $r.Conditions.${cond}.Text = [string[]]${list(arr)}
+  $r.Conditions.${cond}.Enabled = $true
+  $r.Actions.DeleteMessage.Enabled = $true
+  $made += $r`;
+  if (!links.length && !replies.length) return '# Nothing to block yet.\n';
+  return `# HoopUp: adds block rules to Outlook. Paste into PowerShell and press Enter.
+& {
+  try { $ol = New-Object -ComObject Outlook.Application } catch { Write-Host 'HoopUp: classic Outlook is not installed here. In the new Outlook, follow the Outlook.com steps.'; return }
+  $rules = $ol.Session.DefaultStore.GetRules()
+  $made = @()
+${[links.length ? rule('links', 'BodyOrSubject', links) : '', replies.length ? rule('replies', 'MessageHeader', replies) : ''].filter(Boolean).join('\n')}
+  $rules.Save()
+  foreach ($f in 23, 6) { foreach ($r in $made) { try { $r.Execute($false, $ol.Session.GetDefaultFolder($f)) } catch {} } }
+  Write-Host 'HoopUp: rules added. Scams already in Junk and Inbox were deleted.'
+}
+`;
+}

@@ -40,7 +40,7 @@ Drop mail in and Home sorts it into four cards, each with one number and one but
 | Card | What the button does |
 | --- | --- |
 | **Unsubscribe** | One-click unsubscribe for *verified* senders; senders that could not be verified are named, never bulk-clicked |
-| **Block scams** | One import for your mail app that blocks every unsafe sender via its reused link sites and reply addresses. Press *Done* once the rules are in; the next batch then shows only rules you do not have yet |
+| **Block scams** | One copy or one import for your mail app — a filter file for Gmail, a Sieve script for Fastmail/Proton, a script you paste into Script Editor (Apple Mail) or PowerShell (classic Outlook) — that blocks every unsafe sender via its reused link sites and reply addresses. Each site and address becomes its own condition, so a message has to match only one. Press *Done* once the rules are in; the next batch then shows only rules you do not have yet |
 | **Delete my data** | Opens the letters for companies that genuinely hold your data |
 | **Your addresses** | Which address gets mostly spam, and one question to decide whether to keep or retire it (below) |
 
