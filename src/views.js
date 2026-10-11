@@ -1199,17 +1199,55 @@ const CLIENTS = () => ({
 });
 let blockClient = null;
 
+// What the user has confirmed adding to their mail app ("Done"). An older
+// "exported" record counts too: before the Done button existed, downloading
+// the list was the only signal there was.
+const isBlockable = t => ['spam', 'bait'].includes(senderClass(t));
+export const blockDoneIds = state => new Set(state.blockDone?.ids || state.blockExport?.ids || []);
+export const blockDoneAt = state => state.blockDone?.at || state.blockExport?.at || '';
+export const ruleCount = bl => bl.links.length + bl.replyTo.length + bl.sharedReplyTo.length;
+let showAllRules = false;
+
+// The rules still to add. After a "Done", a new batch shows only rules the
+// earlier ones do not already contain: new senders often reuse the same link
+// sites, and those need nothing at all.
+export function blockView(state, all = showAllRules) {
+  const full = buildBlockList(state.custom, senderClass);
+  const doneIds = blockDoneIds(state);
+  if (!doneIds.size || all) return { bl: full, delta: false };
+  const done = buildBlockList(state.custom.filter(t => !isBlockable(t) || doneIds.has(t.id)), senderClass);
+  const minus = (a, b) => a.filter(x => !b.includes(x));
+  return {
+    delta: true,
+    bl: {
+      count: state.custom.filter(t => isBlockable(t) && !doneIds.has(t.id)).length,
+      links: minus(full.links, done.links),
+      replyTo: minus(full.replyTo, done.replyTo),
+      sharedReplyTo: minus(full.sharedReplyTo, done.sharedReplyTo)
+    }
+  };
+}
+
 export function blockAllCard(state, { closable = false } = {}) {
-  const bl = buildBlockList(state.custom, senderClass);
-  if (!blockClient) blockClient = guessClient(state.custom.filter(t => ['spam', 'bait'].includes(senderClass(t))));
+  const view = blockView(state);
+  const bl = view.bl;
+  if (!blockClient) blockClient = guessClient(state.custom.filter(isBlockable));
   const reply = bl.replyTo.length + bl.sharedReplyTo.length;
   const rules = bl.links.length + reply;
+  const at = esc(blockDoneAt(state));
+  const toggle = blockDoneIds(state).size ? `<button class="link-btn" data-action="block-toggle">${showAllRules
+    ? L('Show only new rules', 'Toon alleen nieuwe regels') : L('Show all rules', 'Toon alle regels')}</button>` : '';
+
+  const title = !view.delta
+    ? L(`Block all ${bl.count} at once`, `Blokkeer alle ${bl.count} in één keer`)
+    : rules ? L(`${rules} new ${rules === 1 ? 'rule' : 'rules'} since ${at}`, `${rules} ${rules === 1 ? 'nieuwe regel' : 'nieuwe regels'} sinds ${at}`)
+            : L('All blocked', 'Alles geblokkeerd');
 
   return `
-  <section class="card block-card ${closable ? 'panel' : ''}">
+  <section class="card block-card ${closable ? 'panel' : ''}" data-closable="${closable ? 1 : ''}">
     <div class="row between" style="align-items:flex-start;gap:16px">
       <div>
-        <h2>${L(`Block all ${bl.count} at once`, `Blokkeer alle ${bl.count} in één keer`)}</h2>
+        <h2>${title}</h2>
         <p class="small muted" style="max-width:58ch;margin:0">${L('Only unsafe senders are blocked, never a real company. The rules target what these campaigns reuse — the sites their links go to and where replies go — not the From address, which in forged mail is made up or borrowed from a real company.',
           'Alleen onveilige afzenders worden geblokkeerd, nooit een echt bedrijf. De regels richten zich op wat deze campagnes hergebruiken — de sites waar hun links naartoe gaan en waar antwoorden heen gaan — niet op het afzenderadres, want dat is in vervalste mail verzonnen of geleend van een echt bedrijf.')}</p>
       </div>
@@ -1221,13 +1259,26 @@ export function blockAllCard(state, { closable = false } = {}) {
       </div>
     </div>
 
+    ${view.delta && !rules ? `
+    <p class="small" style="margin-top:12px">${L(`The rules you added on ${at} already cover every unsafe sender scanned so far. Drop in your next batch of junk mail, and only rules you do not have yet will show up here.`,
+      `De regels die je op ${at} toevoegde, dekken alle onveilige afzenders die tot nu toe gescand zijn. Sleep je volgende lading ongewenste mail erin, dan verschijnen hier alleen regels die je nog niet hebt.`)}</p>
+    <div class="row">${toggle}<button class="link-btn" data-action="block-reset">${L('Start over (e.g. new mail app)', 'Opnieuw beginnen (bijv. andere mailapp)')}</button></div>` : `
     <div class="block-facts small">
       <span><b>${bl.links.length}</b> ${plural(bl.links.length, 'link site', 'link sites', 'linksite', 'linksites')}</span>
       <span><b>${reply}</b> ${plural(reply, 'reply address', 'reply addresses', 'antwoordadres', 'antwoordadressen')}</span>
     </div>
+    ${view.delta ? `<p class="small">${L(`Only what is new since ${at}. Add these to the rules you made then, or make a new rule — both work.`,
+      `Alleen wat nieuw is sinds ${at}. Voeg ze toe aan de regels die je toen maakte, of maak een nieuwe regel — allebei werkt.`)}</p>` : ''}
 
     <div id="block-panel">${rules ? blockPanel(bl, blockClient) : `<p class="small muted">${L('Nothing blockable yet: these senders left no reusable trace. Drop the messages in again so their links and reply addresses are recorded.',
       'Nog niets te blokkeren: deze afzenders lieten geen herbruikbaar spoor achter. Zet de mails er opnieuw in, zodat hun links en antwoordadressen worden vastgelegd.')}</p>`}</div>
+    ${rules ? `
+    <div class="block-done">
+      <button class="primary" data-action="block-done">${L("I've added these rules — done", 'Ik heb deze regels toegevoegd — klaar')}</button>
+      <span class="small muted">${L('HoopUp cannot see your mail app, so tell it. Next time, only new rules show up.',
+        'HoopUp kan niet in je mailapp kijken, dus laat het weten. De volgende keer verschijnen alleen nieuwe regels.')}</span>
+      ${toggle}
+    </div>` : ''}`}
   </section>`;
 }
 
@@ -1303,7 +1354,7 @@ export function blockPanel(bl, client) {
 }
 
 export function blockText(state, fmt) {
-  const bl = buildBlockList(state.custom, senderClass);
+  const bl = blockView(state).bl;
   if (fmt === 'gmail') return { text: asGmailXml(bl), name: 'hoopup-filters.xml', type: 'application/xml' };
   if (fmt === 'sieve') return { text: asSieve(bl), name: 'hoopup.sieve', type: 'text/plain' };
   if (fmt === 'reply') return { text: asReplyList(bl), name: 'hoopup-reply-addresses.txt', type: 'text/plain' };
@@ -1319,12 +1370,15 @@ export function downloadText({ text, name, type }) {
 }
 
 // Block-card controls, shared by every page that shows the card.
-export function wireBlock(root, state) {
+export function wireBlock(root, state, onChange) {
+  const redraw = el => {
+    const card = el.closest('.block-card');
+    if (card) card.outerHTML = blockAllCard(store.get(), { closable: !!card.dataset.closable });
+  };
   root.addEventListener('change', e => {
     if (e.target.id !== 'block-client') return;
     blockClient = e.target.value;
-    root.querySelector('#block-panel').innerHTML =
-      blockPanel(buildBlockList(store.get().custom, senderClass), blockClient);
+    root.querySelector('#block-panel').innerHTML = blockPanel(blockView(store.get()).bl, blockClient);
   });
   root.addEventListener('click', e => {
     const btn = e.target.closest('[data-action]');
@@ -1332,16 +1386,26 @@ export function wireBlock(root, state) {
     const act = btn.dataset.action;
     if (act === 'dl-block') {
       downloadText(blockText(store.get(), btn.dataset.fmt));
-      // Remember what was exported, so Home can say when new senders arrive.
-      const ids = store.get().custom.filter(t => ['spam', 'bait'].includes(senderClass(t))).map(t => t.id);
-      store.update(st => { st.blockExport = { at: new Date().toISOString().slice(0, 10), ids }; });
-      toast(L('Downloaded — import it in your mail app', 'Gedownload — importeer het in je mailapp'));
+      toast(L('Downloaded — import it, then press Done', 'Gedownload — importeer het en druk dan op Klaar'));
     }
     if (act === 'copy-block') {
-      const ids = store.get().custom.filter(t => ['spam', 'bait'].includes(senderClass(t))).map(t => t.id);
-      store.update(st => { st.blockExport = { at: new Date().toISOString().slice(0, 10), ids }; });
       navigator.clipboard.writeText(blockText(store.get(), btn.dataset.fmt).text)
         .then(() => toast(L('Copied', 'Gekopieerd'))).catch(() => toast(L('Could not copy', 'Kopiëren mislukt')));
+    }
+    if (act === 'block-done') {
+      const ids = store.get().custom.filter(isBlockable).map(t => t.id);
+      showAllRules = false;
+      store.update(st => { st.blockDone = { at: store.today(), ids }; delete st.blockExport; });
+      toast(L('Marked as blocked. Next time, only new rules show up.', 'Gemarkeerd als geblokkeerd. De volgende keer verschijnen alleen nieuwe regels.'));
+      if (onChange) onChange(); else redraw(btn);
+    }
+    if (act === 'block-toggle') { showAllRules = !showAllRules; redraw(btn); }
+    if (act === 'block-reset') {
+      if (!confirm(L('Forget which rules you added? Next time HoopUp shows the full list again.',
+        'Vergeten welke regels je toevoegde? HoopUp toont dan weer de volledige lijst.'))) return;
+      showAllRules = false;
+      store.update(st => { delete st.blockDone; delete st.blockExport; });
+      if (onChange) onChange(); else redraw(btn);
     }
   });
 }

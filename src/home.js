@@ -7,7 +7,8 @@ import { relationOf } from './letters.js';
 import { parseMessages, groupBySender } from './mailscan.js';
 import {
   esc, toast, senderClass, unsubTier, upsertSender, runOneClickBatch,
-  startUnsubQueue, wireQueue, wireBlock, blockAllCard, hostOf, nameOf, akaOf, deleteWork, unsafeReason
+  startUnsubQueue, wireQueue, wireBlock, blockAllCard, hostOf, nameOf, akaOf, deleteWork, unsafeReason,
+  blockDoneIds, blockDoneAt, blockView, ruleCount
 } from './views.js';
 
 const ICONS = {
@@ -212,8 +213,13 @@ export function home(state) {
   const blocked = mail.filter(t => ['spam', 'bait'].includes(cls(t)));
   const bait = blocked.filter(t => cls(t) === 'bait').length;
   const unclear = mail.filter(t => cls(t) === 'unclear').length;
-  const exported = new Set(state.blockExport?.ids || []);
-  const blockNew = state.blockExport ? blocked.filter(t => !exported.has(t.id)) : blocked;
+  // After the user pressed Done, only senders that need a rule they do not
+  // have yet count. New senders reusing known link sites are already covered.
+  const doneIds = blockDoneIds(state);
+  const doneAt = esc(blockDoneAt(state));
+  const blockNew = blocked.filter(t => !doneIds.has(t.id));
+  const newRules = doneIds.size ? ruleCount(blockView(state, false).bl) : null;
+  const blockTodo = !doneIds.size ? blocked.length : newRules ? blockNew.length : 0;
   const companies = state.custom.filter(t => !['spam', 'bait', 'unclear'].includes(cls(t)));
   const work = deleteWork(companies);
   const toAsk = work.send.length + work.forms.length;
@@ -248,12 +254,18 @@ export function home(state) {
     + (unchecked.length ? L(` ${unchecked.length} more could not be verified — check ${unchecked.length === 1 ? 'it' : 'them'} in Details.`,
                             ` ${unchecked.length} ${unchecked.length === 1 ? 'andere kon' : 'andere konden'} niet worden bevestigd — bekijk ze bij Details.`) : '');
 
-  const blockText = blockNew.length
-    ? L(`${blockNew.length} ${plural(blockNew.length, 'sender', 'senders', '', '')} ${blockNew.length === 1 ? 'is' : 'are'} unsafe — scams or spam${bait ? `, ${bait} with fake unsubscribe links` : ''}. One import blocks them all.`,
-        `${blockNew.length} ${plural(blockNew.length, 'afzender', 'afzenders', 'afzender', 'afzenders')} ${blockNew.length === 1 ? 'is' : 'zijn'} onveilig — oplichting of spam${bait ? `, ${bait} met nep-uitschrijflinks` : ''}. Eén import blokkeert ze allemaal.`)
-    : state.blockExport
-      ? L(`Block list exported ${esc(state.blockExport.at)}. Nothing new since.`, `Blokkeerlijst geëxporteerd op ${esc(state.blockExport.at)}. Sindsdien niets nieuws.`)
-      : L('No scams found. Real companies are never blocked — only unsubscribed.', 'Geen oplichting gevonden. Echte bedrijven worden nooit geblokkeerd — alleen uitgeschreven.');
+  const blockText = !blocked.length
+    ? L('No scams found. Real companies are never blocked — only unsubscribed.', 'Geen oplichting gevonden. Echte bedrijven worden nooit geblokkeerd — alleen uitgeschreven.')
+    : !doneIds.size
+    ? L(`${blocked.length} ${plural(blocked.length, 'sender', 'senders', '', '')} ${blocked.length === 1 ? 'is' : 'are'} unsafe — scams or spam${bait ? `, ${bait} with fake unsubscribe links` : ''}. One import blocks them all.`,
+        `${blocked.length} ${plural(blocked.length, 'afzender', 'afzenders', 'afzender', 'afzenders')} ${blocked.length === 1 ? 'is' : 'zijn'} onveilig — oplichting of spam${bait ? `, ${bait} met nep-uitschrijflinks` : ''}. Eén import blokkeert ze allemaal.`)
+    : newRules
+    ? L(`${blockNew.length} new unsafe ${plural(blockNew.length, 'sender', 'senders', '', '')} since you blocked on ${doneAt} — ${newRules} new ${newRules === 1 ? 'rule' : 'rules'} to add.`,
+        `${blockNew.length} nieuwe onveilige ${plural(blockNew.length, '', '', 'afzender', 'afzenders')} sinds je op ${doneAt} blokkeerde — ${newRules} ${newRules === 1 ? 'nieuwe regel' : 'nieuwe regels'} toe te voegen.`)
+    : blockNew.length
+    ? L(`Blocked on ${doneAt}. Those rules already cover the ${blockNew.length} new ${plural(blockNew.length, 'sender', 'senders', '', '')} too.`,
+        `Geblokkeerd op ${doneAt}. Die regels dekken ook de ${blockNew.length} nieuwe ${plural(blockNew.length, '', '', 'afzender', 'afzenders')}.`)
+    : L(`Blocked on ${doneAt}. Nothing new since.`, `Geblokkeerd op ${doneAt}. Sindsdien niets nieuws.`);
 
   const addrText = open.length
     ? `<span class="mono">${esc(open[0].address)}</span> ${L('gets mostly spam. One question decides what to do.', 'krijgt vooral spam. Eén vraag bepaalt wat je doet.')}${open.length > 1
@@ -278,11 +290,11 @@ export function home(state) {
       cta: L(`Unsubscribe from ${pending.length}`, `Bij ${pending.length} uitschrijven`), action: 'home-unsub',
       done: L('Nothing left', 'Niets meer te doen'), more: '#/unsubscribe' })}
 
-    ${card({ icon: 'block', n: blockNew.length, tone: blockNew.length ? 'tone-bad' : '',
+    ${card({ icon: 'block', n: blockTodo, tone: blockTodo ? 'tone-bad' : '',
       title: L('Block scams', 'Oplichting blokkeren'),
       text: blockText,
-      cta: state.blockExport ? L(`Block ${blockNew.length} new`, `${blockNew.length} nieuwe blokkeren`)
-                             : L(`Block all ${blockNew.length}`, `Alle ${blockNew.length} blokkeren`),
+      cta: doneIds.size ? L(`Block ${blockTodo} new`, `${blockTodo} nieuwe blokkeren`)
+                        : L(`Block all ${blockTodo}`, `Alle ${blockTodo} blokkeren`),
       action: 'home-block', done: blocked.length ? L('Blocked', 'Geblokkeerd') : L('Nothing to block', 'Niets te blokkeren'),
       more: '#/unsubscribe' })}
 
@@ -346,7 +358,7 @@ export function home(state) {
 
 export function mountHome(root, state, rerender) {
   wireQueue(root, rerender);
-  wireBlock(root, state);
+  wireBlock(root, state, rerender);
 
   async function handleFiles(list) {
     const files = [...list];

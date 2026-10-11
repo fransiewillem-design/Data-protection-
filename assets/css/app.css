@@ -423,3 +423,5 @@ button, .btn { border-radius: 9px; transition: border-color .12s, color .12s, fi
 .steps b { color: var(--text); font-size: .95rem; }
 @media (max-width: 560px) { .steps { grid-template-columns: 1fr; } .steps li { flex-direction: row; gap: 6px; justify-content: flex-start; } .steps li::before { margin: 0 4px 0 0; } }
 .aka { display: block; font-weight: 400; font-size: .8rem; color: var(--muted); }
+.block-done { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; margin-top: 16px; padding-top: 14px; border-top: 1px solid var(--line); }
+.block-done .small { flex: 1 1 220px; }
