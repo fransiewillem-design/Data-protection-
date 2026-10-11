@@ -352,7 +352,7 @@
     },
     {
       "id": "google-results",
-      "name": "Google — Results about you",
+      "name": "Google: Results about you",
       "category": "search-engine",
       "regions": ["US", "EU", "NL"],
       "site": "google.com",
@@ -364,7 +364,7 @@
     },
     {
       "id": "bing-removal",
-      "name": "Microsoft Bing — content removal",
+      "name": "Microsoft Bing: content removal",
       "category": "search-engine",
       "regions": ["US", "EU", "NL"],
       "site": "bing.com",
@@ -436,7 +436,7 @@
     },
     {
       "id": "kvk-nl",
-      "name": "KVK — non-mailing indicator (NL)",
+      "name": "KVK: non-mailing indicator (NL)",
       "category": "nl",
       "regions": ["NL"],
       "site": "kvk.nl",

@@ -3,7 +3,7 @@
 # These add what a <meta> tag cannot: protection against the page being framed
 # by another site, forced HTTPS, and no MIME sniffing. The Content-Security-
 # Policy is set per page, never on /*, because two policies on one response are
-# both enforced — a site-wide one would strip the unsubscribe worker of the
+# both enforced, and a site-wide one would strip the unsubscribe worker of the
 # connect-src https: it exists to hold.
 
 /*

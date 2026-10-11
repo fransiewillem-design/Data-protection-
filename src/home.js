@@ -1,5 +1,5 @@
-// Home: the whole flow on one screen. Drop mail in, get four cards — each with
-// one number and one button — and act on them without leaving the page.
+// Home: the whole flow on one screen. Drop mail in, get four cards, each with
+// one number and one button, and act on them without leaving the page.
 
 import * as store from './store.js';
 import { L, plural } from './i18n.js';
@@ -60,8 +60,8 @@ function retireSteps(addr) {
       `Is het een <b>alias</b> van je Microsoft-account: Microsoft-account → <b>Beheren hoe je je aanmeldt</b> → verwijder ${code}.`),
     L(`If it is a <b>separate account</b> you only used for sign-ups: close that account once nothing you need is tied to it.`,
       `Is het een <b>apart account</b> dat je alleen voor aanmeldingen gebruikte: sluit het zodra er niets meer aan hangt wat je nodig hebt.`),
-    L(`Until then, one Outlook rule — anything sent to ${code} → <b>Delete</b> — keeps it out of sight.`,
-      `Tot die tijd houdt één Outlook-regel — alles aan ${code} → <b>Verwijderen</b> — het uit beeld.`)
+    L(`Until then, one Outlook rule (anything sent to ${code} → <b>Delete</b>) keeps it out of sight.`,
+      `Tot die tijd houdt één Outlook-regel (alles aan ${code} → <b>Verwijderen</b>) het uit beeld.`)
   ];
   if (/^(icloud|me|mac)\./i.test(d)) return [
     L(`If it is a <b>Hide My Email</b> address: Settings → your name → iCloud → Hide My Email → choose it → <b>Deactivate</b>. Mail to it stops arriving at all.`,
@@ -70,8 +70,8 @@ function retireSteps(addr) {
       `Is het je hoofdadres bij iCloud, dan kun je het niet opheffen. Gebruik het alleen nog voor mensen en geef elk bedrijf voortaan een eigen Verberg mijn e-mailadres-adres.`)
   ];
   if (/^(gmail|googlemail)\./i.test(d)) return [
-    L(`Gmail cannot drop one address without closing the account. Add a filter — To ${code} → <b>Delete it</b> — and stop giving it out.`,
-      `Gmail kan geen los adres opheffen zonder het hele account te sluiten. Maak een filter — Aan ${code} → <b>Verwijderen</b> — en geef het niet meer uit.`)
+    L(`Gmail cannot drop one address without closing the account. Add a filter (To ${code} → <b>Delete it</b>) and stop giving it out.`,
+      `Gmail kan geen los adres opheffen zonder het hele account te sluiten. Maak een filter (Aan ${code} → <b>Verwijderen</b>) en geef het niet meer uit.`)
   ];
   return [L(`Delete the address or alias at your mail provider, or route everything sent to ${code} to Trash.`,
             `Verwijder het adres of de alias bij je mailprovider, of stuur alles aan ${code} naar de prullenbak.`)];
@@ -87,7 +87,7 @@ function addressPanel(state) {
     <div class="row between"><h2>${L('Your addresses', 'Je adressen')}</h2>
       <button class="link-btn" data-action="panel-close">${L('Close', 'Sluiten')}</button></div>
     <p class="small muted" style="margin-top:-4px">${L(
-      'Based only on the mail you dropped in — usually your junk folder. Mail from people you know is in your inbox, so HoopUp cannot see who else relies on an address. That is why it asks.',
+      'Based only on the mail you dropped in, usually your junk folder. Mail from people you know is in your inbox, so HoopUp cannot see who else relies on an address. That is why it asks.',
       'Dit is alleen gebaseerd op de mail die je erin sleepte, meestal je map Ongewenst. Mail van mensen die je kent staat in je inbox, dus HoopUp kan niet zien wie een adres nog meer gebruikt. Daarom vragen we het jou.')}</p>
     ${health.map(h => {
       const pct = Math.round(100 * h.scam / Math.max(h.total, 1));
@@ -99,7 +99,7 @@ function addressPanel(state) {
       let body;
       if (h.verdict === 'ok') {
         body = `<p class="small muted">${h.total} ${plural(h.total, 'mail', 'mails', 'mail', 'mails')}, ${h.scam
-          ? L(`${h.scam} of them spam — nothing to act on`, `waarvan ${h.scam} spam — geen actie nodig`)
+          ? L(`${h.scam} of them spam, nothing to act on`, `waarvan ${h.scam} spam, geen actie nodig`)
           : L('no spam', 'geen spam')}.</p>`;
       } else if (answers[a] === 'retire') {
         body = `<p>${seen}</p>
@@ -109,13 +109,13 @@ function addressPanel(state) {
                                    `Geef eerst ${names} een nieuw adres, zodat hun mail blijft komen.`)] : []),
             ...retireSteps(a)
           ].map(x => `<li>${x}</li>`).join('')}</ol>
-          <p class="small muted">${L('Before you do, check that no account you need still logs in with it — password resets go to this address.',
-            'Controleer eerst of er geen account dat je nodig hebt nog met dit adres inlogt — wachtwoordherstel gaat naar dit adres.')} ${change(a)}</p>`;
+          <p class="small muted">${L('Before you do, check that no account you need still logs in with it: password resets go to this address.',
+            'Controleer eerst of er geen account dat je nodig hebt nog met dit adres inlogt: wachtwoordherstel gaat naar dit adres.')} ${change(a)}</p>`;
       } else if (answers[a] === 'keep') {
         body = `<p>${seen}</p>
           <p><b>${L('Keep it, and make it quieter:', 'Houd het, maar maak het rustiger:')}</b></p>
           <ol class="small">
-            <li>${L('Block the scams with one import — the <b>Block scams</b> card on Home.', 'Blokkeer de oplichters met één import, via de kaart <b>Oplichters blokkeren</b> op Home.')}</li>
+            <li>${L('Block the scams with one import, using the <b>Block scams</b> card on Home.', 'Blokkeer de oplichters met één import, via de kaart <b>Oplichters blokkeren</b> op Home.')}</li>
             <li>${L('Stop giving this address out. Use a separate address for every new sign-up, so the next leak shows who leaked it (<a href="#/aliases">Aliases</a>).',
                     'Geef dit adres niet meer uit. Gebruik voor elke nieuwe aanmelding een apart adres, zodat het volgende lek laat zien wie lekte (<a href="#/aliases">Aliassen</a>).')}</li>
             ${h.real.length ? `<li>${L(`When convenient, move ${names} to their own address too.`, `Verhuis ${names} als het uitkomt ook naar een eigen adres.`)}</li>` : ''}
@@ -151,8 +151,8 @@ function dropZone(compact) {
   return `
   <div id="drop" class="drop ${compact ? 'drop-compact' : 'drop-hero'}">
     ${compact
-      ? `<span>${icon('drop')}</span><span>${L(`<b>Drop more mail</b> to update — or ${pick}`,
-                                             `<b>Sleep meer mail hierheen</b> om bij te werken — of ${pick}`)}</span>`
+      ? `<span>${icon('drop')}</span><span>${L(`<b>Drop more mail</b> to update, or ${pick}`,
+                                             `<b>Sleep meer mail hierheen</b> om bij te werken, of ${pick}`)}</span>`
       : `<div class="drop-icon">${icon('drop')}</div>
          <p class="drop-title">${L('Drop your junk mail here', 'Sleep je ongewenste mail hierheen')}</p>
          <p class="small muted">${L(`.eml or .mbox files · or ${pick}`, `.eml- of .mbox-bestanden · of ${pick}`)}</p>`}
@@ -209,7 +209,7 @@ export function home(state) {
   const instant = pending.filter(t => unsubTier(t) === 'instant');
   // Blocking is only for unsafe senders (forged, provider-rated high-confidence
   // spam, or gambling/crypto/prize/adult content). A real company is never
-  // offered a block — only an unsubscribe and an erasure letter.
+  // offered a block, only an unsubscribe and an erasure letter.
   const blocked = mail.filter(t => ['spam', 'bait'].includes(cls(t)));
   const bait = blocked.filter(t => cls(t) === 'bait').length;
   const unclear = mail.filter(t => cls(t) === 'unclear').length;
@@ -251,17 +251,17 @@ export function home(state) {
       : unsub.length && !unchecked.length
         ? L(`Unsubscribed from all ${unsub.length}.`, `Bij alle ${unsub.length} uitgeschreven.`)
         : L('No verified company left to unsubscribe from.', 'Geen echt bedrijf meer om je bij uit te schrijven.'))
-    + (unchecked.length ? L(` ${unchecked.length} more could not be verified — check ${unchecked.length === 1 ? 'it' : 'them'} in Details.`,
-                            ` ${unchecked.length} ${unchecked.length === 1 ? 'andere kon' : 'andere konden'} niet worden gecontroleerd — bekijk ze bij Details.`) : '');
+    + (unchecked.length ? L(` ${unchecked.length} more could not be verified. Check ${unchecked.length === 1 ? 'it' : 'them'} in Details.`,
+                            ` ${unchecked.length} ${unchecked.length === 1 ? 'andere kon' : 'andere konden'} niet worden gecontroleerd. Bekijk ze bij Details.`) : '');
 
   const blockText = !blocked.length
-    ? L('No scams found. Real companies are never blocked — only unsubscribed.', 'Geen oplichters gevonden. Echte bedrijven worden nooit geblokkeerd, alleen uitgeschreven.')
+    ? L('No scams found. Real companies are never blocked, only unsubscribed.', 'Geen oplichters gevonden. Echte bedrijven worden nooit geblokkeerd, alleen uitgeschreven.')
     : !doneIds.size
-    ? L(`${blocked.length} ${plural(blocked.length, 'sender', 'senders', '', '')} ${blocked.length === 1 ? 'is' : 'are'} unsafe — scams or spam${bait ? `, ${bait} with fake unsubscribe links` : ''}. One import blocks them all.`,
-        `${blocked.length} ${plural(blocked.length, 'afzender', 'afzenders', 'afzender', 'afzenders')} ${blocked.length === 1 ? 'is' : 'zijn'} onveilig — oplichters of spam${bait ? `, ${bait} met nep-uitschrijflinks` : ''}. Eén import blokkeert ze allemaal.`)
+    ? L(`${blocked.length} ${plural(blocked.length, 'sender', 'senders', '', '')} ${blocked.length === 1 ? 'is' : 'are'} unsafe: scams or spam${bait ? `, ${bait} with fake unsubscribe links` : ''}. One import blocks them all.`,
+        `${blocked.length} ${plural(blocked.length, 'afzender', 'afzenders', 'afzender', 'afzenders')} ${blocked.length === 1 ? 'is' : 'zijn'} onveilig: oplichters of spam${bait ? `, ${bait} met nep-uitschrijflinks` : ''}. Eén import blokkeert ze allemaal.`)
     : newRules
-    ? L(`${blockNew.length} new unsafe ${plural(blockNew.length, 'sender', 'senders', '', '')} since you blocked on ${doneAt} — ${newRules} new ${newRules === 1 ? 'rule' : 'rules'} to add.`,
-        `${blockNew.length} nieuwe onveilige ${plural(blockNew.length, '', '', 'afzender', 'afzenders')} sinds je op ${doneAt} blokkeerde — ${newRules} ${newRules === 1 ? 'nieuwe regel' : 'nieuwe regels'} toe te voegen.`)
+    ? L(`${blockNew.length} new unsafe ${plural(blockNew.length, 'sender', 'senders', '', '')} since you blocked on ${doneAt}: ${newRules} new ${newRules === 1 ? 'rule' : 'rules'} to add.`,
+        `${blockNew.length} nieuwe onveilige ${plural(blockNew.length, '', '', 'afzender', 'afzenders')} sinds je op ${doneAt} blokkeerde: ${newRules} ${newRules === 1 ? 'nieuwe regel' : 'nieuwe regels'} toe te voegen.`)
     : blockNew.length
     ? L(`Blocked on ${doneAt}. Those rules already cover the ${blockNew.length} new ${plural(blockNew.length, 'sender', 'senders', '', '')} too.`,
         `Geblokkeerd op ${doneAt}. Die regels dekken ook de ${blockNew.length} nieuwe ${plural(blockNew.length, '', '', 'afzender', 'afzenders')}.`)
@@ -305,13 +305,13 @@ export function home(state) {
                   `${toAsk} ${toAsk === 1 ? 'bedrijf heeft' : 'bedrijven hebben'} je gegevens. Een AVG-verzoek verplicht ze die binnen een maand te wissen.`) : '',
         suspect ? L(`${suspect} with no reason to have it ${suspect === 1 ? 'goes' : 'go'} first.`,
                     `${suspect} zonder reden om ze te hebben ${suspect === 1 ? 'gaat' : 'gaan'} voor.`) : '',
-        work.reminders.length ? L(`${work.reminders.length} did not answer in time — a reminder is ready.`,
-                                  `${work.reminders.length} ${work.reminders.length === 1 ? 'reageerde' : 'reageerden'} niet op tijd — een herinnering staat klaar.`) : '',
+        work.reminders.length ? L(`${work.reminders.length} did not answer in time. A reminder is ready.`,
+                                  `${work.reminders.length} ${work.reminders.length === 1 ? 'reageerde' : 'reageerden'} niet op tijd. Er staat een herinnering klaar.`) : '',
         work.complaints.length ? L(`${work.complaints.length} ready for a complaint to the regulator.`,
                                    `${work.complaints.length} klaar voor een klacht bij de toezichthouder.`) : '',
         !toAsk && !followUps ? (companies.length
-          ? L(`All ${companies.length} asked. Deadlines are tracked — reminders appear here when one is due.`,
-              `Alle ${companies.length} aangeschreven. De termijnen worden bijgehouden — herinneringen verschijnen hier zodra het tijd is.`)
+          ? L(`All ${companies.length} asked. Deadlines are tracked, and reminders appear here when one is due.`,
+              `Alle ${companies.length} aangeschreven. De termijnen worden bijgehouden en herinneringen verschijnen hier zodra het tijd is.`)
           : L('No company to write to yet.', 'Nog geen bedrijf om aan te schrijven.')) : ''
       ].filter(Boolean).join(' '),
       cta: work.send.length ? L(`Send ${work.send.length} ${work.send.length === 1 ? 'request' : 'requests'}`, `${work.send.length} ${work.send.length === 1 ? 'verzoek' : 'verzoeken'} versturen`)
@@ -352,8 +352,8 @@ export function home(state) {
     </div>
   </details>
   <p class="small muted" style="margin-top:18px">${L(`<a href="#/find">More ways to find who has your data</a>
-  — breach records, mailbox searches, data brokers.`, `<a href="#/find">Meer manieren om te zien wie je gegevens heeft</a>
-  — datalekken, zoeken in je mailbox, databrokers.`)}</p>`;
+  : breach records, mailbox searches, data brokers.`, `<a href="#/find">Meer manieren om te zien wie je gegevens heeft</a>
+  : datalekken, zoeken in je mailbox, databrokers.`)}</p>`;
 }
 
 export function mountHome(root, state, rerender) {
@@ -366,7 +366,7 @@ export function mountHome(root, state, rerender) {
     try {
       const texts = await Promise.all(files.map(f => f.text()));
       const messages = texts.flatMap(t => parseMessages(t));
-      if (!messages.length) { toast(L('No mail headers found — use .eml or .mbox exports', 'Geen mailheaders gevonden — gebruik .eml- of .mbox-bestanden')); return; }
+      if (!messages.length) { toast(L('No mail headers found. Use .eml or .mbox exports', 'Geen mailheaders gevonden. Gebruik .eml- of .mbox-bestanden')); return; }
       const senders = groupBySender(messages);
       senders.forEach(sn => upsertSender(sn));
       rerender();

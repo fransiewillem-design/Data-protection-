@@ -1,7 +1,7 @@
 {
   "name": "HoopUp",
   "short_name": "HoopUp",
-  "description": "Stop spam and get your data deleted: unsubscribe, block scams and ask companies to erase your data — all in your browser.",
+  "description": "Stop spam and get your data deleted: unsubscribe, block scams and ask companies to erase your data, all in your browser.",
   "start_url": "./",
   "scope": "./",
   "display": "standalone",

@@ -15,7 +15,7 @@ export async function allBreaches() {
   return res.json();
 }
 
-// NOTE: this is the only call in the app that transmits personal data — the address
+// NOTE: this is the only call in the app that transmits personal data: the address
 // being checked goes to HIBP, because there is no k-anonymous form of this lookup.
 export async function breachesForAccount(email, apiKey) {
   if (!apiKey) throw new Error('needs-key');
@@ -25,7 +25,7 @@ export async function breachesForAccount(email, apiKey) {
   );
   if (res.status === 404) return [];              // clean, as far as HIBP knows
   if (res.status === 401) throw new Error(L('That API key was rejected.', 'Die API-sleutel werd geweigerd.'));
-  if (res.status === 429) throw new Error(L('Rate limited by HIBP — wait a moment and retry.', 'Te veel verzoeken bij HIBP — wacht even en probeer opnieuw.'));
+  if (res.status === 429) throw new Error(L('Rate limited by HIBP. Wait a moment and retry.', 'Te veel verzoeken bij HIBP. Wacht even en probeer opnieuw.'));
   if (!res.ok) throw new Error(`HIBP returned ${res.status}`);
   return res.json();
 }

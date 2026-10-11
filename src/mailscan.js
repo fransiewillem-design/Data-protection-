@@ -269,7 +269,7 @@ export function parseAuth(h) {
 // an online casino that owns its domain passes SPF, DKIM and DMARC perfectly.
 // These categories are unsafe whoever sends them, so they override "verified".
 // Each needs two hits (a strong pattern counts as two), so a single stray word
-// — a shop's "bonus" offer, a bank mentioning "investment" — never trips it.
+// (a shop's "bonus" offer, a bank mentioning "investment") never trips it.
 
 const RISK = [
   { cat: 'gambling',
@@ -420,7 +420,7 @@ export function groupBySender(messages) {
   const map = new Map();
   for (const m of messages) {
     // Forged mail is grouped apart from genuine mail on the same domain. A
-    // spoofed "bol.com" must never drag the real bol.com into the spam pile —
+    // spoofed "bol.com" must never drag the real bol.com into the spam pile:
     // the domain in a forged From line belongs to whoever is being impersonated.
     const key = m.trust === 'forged' ? m.domain + '#forged' : m.domain;
     if (!map.has(key)) {

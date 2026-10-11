@@ -4,13 +4,13 @@ import { lang } from './i18n.js';
 
 // A target found in the user's own mail or SMS has demonstrably got exactly one
 // identifier: the address or number it contacted them on. Handing it a full name,
-// date of birth and postal address would give a scammer more than it started with
-// — the opposite of what this letter is for. So evidence-derived targets get a
+// date of birth and postal address would give a scammer more than it started with,
+// which is the opposite of what this letter is for. So evidence-derived targets get a
 // minimal block, and the letter says why.
 export function isEvidenceDerived(b) {
   if (!b) return false;
   // Anything we learned from the user's own mail or SMS is minimal-disclosure by
-  // default, even if we could not pin down which address received it — failing
+  // default, even if we could not pin down which address received it; failing
   // open here would leak a full profile to a scammer.
   // Every target the user added themselves is evidence-derived: it came from
   // their mail, their phone, a breach they were in, or their own typing. Only
@@ -29,8 +29,8 @@ function minimalBlock(b, nl) {
     ? 'E-mailadres: [vul het adres in waarop u hun bericht ontving]'
     : 'Email address: [fill in the address their message reached you on]';
   const why = nl
-    ? 'Dit is het enige identificatiegegeven dat ik verstrek, omdat u het aantoonbaar al van mij\nheeft — u heeft mij hierop benaderd — en het volstaat om mijn gegevens te vinden. Op grond\nvan artikel 12, lid 2, AVG moet u de uitoefening van mijn rechten faciliteren. Op grond van\nartikel 12, lid 6, mag u alleen om aanvullende gegevens vragen als u redelijke twijfel heeft\nover mijn identiteit, en dan alleen wat nodig is om die twijfel weg te nemen.'
-    : 'This is the only identifier I am providing, because it is the one you demonstrably\nalready hold — it is how you contacted me — and it is enough to locate my records.\nUnder Article 12(2) GDPR you must facilitate the exercise of my rights. Under Article\n12(6) you may ask for additional information only if you have reasonable doubts about\nmy identity, and then only what is necessary to resolve them.';
+    ? 'Dit is het enige identificatiegegeven dat ik verstrek, omdat u het aantoonbaar al van mij\nheeft (u heeft mij hierop benaderd) en het volstaat om mijn gegevens te vinden. Op grond\nvan artikel 12, lid 2, AVG moet u de uitoefening van mijn rechten faciliteren. Op grond van\nartikel 12, lid 6, mag u alleen om aanvullende gegevens vragen als u redelijke twijfel heeft\nover mijn identiteit, en dan alleen wat nodig is om die twijfel weg te nemen.'
+    : 'This is the only identifier I am providing, because it is the one you demonstrably\nalready hold (it is how you contacted me) and it is enough to locate my records.\nUnder Article 12(2) GDPR you must facilitate the exercise of my rights. Under Article\n12(6) you may ask for additional information only if you have reasonable doubts about\nmy identity, and then only what is necessary to resolve them.';
   return id + '\n\n' + why;
 }
 
@@ -89,7 +89,7 @@ export const TEMPLATES = {
   gdpr_erasure: {
     label: 'GDPR erasure (Art. 17 + 15 + 21)',
     jurisdiction: 'EU',
-    subject: (b, p) => `Request under Articles 15, 17 and 21 GDPR — ${subjectId(b, p)}`,
+    subject: (b, p) => `Request under Articles 15, 17 and 21 GDPR, ${subjectId(b, p)}`,
     body: (b, p) => `To the Data Protection Officer / Privacy Team of ${b.name},
 
 I am a data subject within the meaning of Regulation (EU) 2016/679 (GDPR). I am writing to exercise my rights in respect of all personal data you hold about me.
@@ -101,13 +101,13 @@ ${isEvidenceDerived(b) ? minimalBlock(b, false) : identityBlock(p)}
 
 I request that you do the following.
 
-1. ERASURE — Article 17 GDPR
+1. ERASURE (Article 17 GDPR)
 Erase all personal data you hold concerning me, including data obtained from third parties, data inferred or derived about me, and any copies held by processors acting on your behalf. Where you have made this data public or transferred it onwards, Article 17(2) requires you to inform the recipients of this erasure request.
 
-2. OBJECTION — Article 21 GDPR
+2. OBJECTION (Article 21 GDPR)
 Insofar as any processing relies on legitimate interests, I object to that processing. Where the processing is for direct marketing purposes, Article 21(3) gives this objection absolute effect: you must stop that processing entirely, without weighing interests.
 
-3. ACCESS — Article 15 GDPR
+3. ACCESS (Article 15 GDPR)
 If you assert that any data may not be erased, provide for that data:
    a. the specific categories of personal data retained;
    b. the exact legal basis and, where relevant, the statutory retention obligation relied on;
@@ -137,7 +137,7 @@ ${longDate(todayISO(), false)}`
   gdpr_erasure_nl: {
     label: 'AVG verwijderingsverzoek (NL)',
     jurisdiction: 'EU',
-    subject: (b, p) => `Verzoek op grond van artikel 15, 17 en 21 AVG — ${subjectId(b, p)}`,
+    subject: (b, p) => `Verzoek op grond van artikel 15, 17 en 21 AVG, ${subjectId(b, p)}`,
     body: (b, p) => `Aan de Functionaris Gegevensbescherming / het privacyteam van ${b.name},
 
 Ik ben betrokkene in de zin van de Algemene verordening gegevensbescherming (AVG / Verordening (EU) 2016/679). Hierbij doe ik een beroep op mijn rechten met betrekking tot alle persoonsgegevens die u over mij verwerkt.
@@ -149,13 +149,13 @@ ${isEvidenceDerived(b) ? minimalBlock(b, true) : identityBlockNL(p)}
 
 Ik verzoek u het volgende.
 
-1. VERWIJDERING — artikel 17 AVG
+1. VERWIJDERING (artikel 17 AVG)
 Wis alle persoonsgegevens die u over mij verwerkt, inclusief gegevens die u van derden hebt verkregen, gegevens die u over mij hebt afgeleid of gegenereerd, en kopieën bij verwerkers die namens u handelen. Voor zover u deze gegevens openbaar hebt gemaakt of hebt doorgegeven, verplicht artikel 17, lid 2, u om de ontvangers van dit verzoek op de hoogte te stellen.
 
-2. BEZWAAR — artikel 21 AVG
+2. BEZWAAR (artikel 21 AVG)
 Voor zover de verwerking berust op een gerechtvaardigd belang, maak ik daartegen bezwaar. Voor zover de verwerking plaatsvindt ten behoeve van direct marketing, geldt dit bezwaar absoluut: op grond van artikel 21, lid 3, dient u die verwerking zonder belangenafweging volledig te staken.
 
-3. INZAGE — artikel 15 AVG
+3. INZAGE (artikel 15 AVG)
 Indien u stelt dat bepaalde gegevens niet gewist kunnen worden, verzoek ik u voor die gegevens op te geven:
    a. om welke categorieën persoonsgegevens het gaat;
    b. de precieze rechtsgrond en, indien van toepassing, de wettelijke bewaarplicht waarop u zich beroept;
@@ -183,7 +183,7 @@ ${longDate(todayISO(), true)}`
   ccpa_delete: {
     label: 'CCPA/CPRA delete + opt out of sale',
     jurisdiction: 'US',
-    subject: (b, p) => `CCPA/CPRA request to delete and to opt out of sale/sharing — ${subjectId(b, p)}`,
+    subject: (b, p) => `CCPA/CPRA request to delete and to opt out of sale/sharing, ${subjectId(b, p)}`,
     body: (b, p) => `To the Privacy Team of ${b.name},
 
 I am making a consumer rights request under the California Consumer Privacy Act as amended by the CPRA (Cal. Civ. Code § 1798.100 et seq.).
@@ -195,11 +195,11 @@ ${isEvidenceDerived(b) ? minimalBlock(b, false) : identityBlock(p)}
 
 I request that you:
 
-1. DELETE (§ 1798.105) — delete all personal information you have collected about me, and direct your service providers, contractors and any third parties to whom you sold or disclosed it to do the same.
+1. DELETE (§ 1798.105): delete all personal information you have collected about me, and direct your service providers, contractors and any third parties to whom you sold or disclosed it to do the same.
 
-2. OPT OUT OF SALE AND SHARING (§ 1798.120, § 1798.121) — stop selling or sharing my personal information, including for cross-context behavioural advertising, and limit any use of sensitive personal information to what § 1798.121 permits.
+2. OPT OUT OF SALE AND SHARING (§ 1798.120, § 1798.121): stop selling or sharing my personal information, including for cross-context behavioural advertising, and limit any use of sensitive personal information to what § 1798.121 permits.
 
-3. DISCLOSE (§ 1798.110, § 1798.115) — tell me the categories of personal information you collected about me, the categories of sources, the business purpose for collecting or selling it, the categories of third parties to whom it was sold or disclosed, and the specific pieces of personal information you hold.
+3. DISCLOSE (§ 1798.110, § 1798.115): tell me the categories of personal information you collected about me, the categories of sources, the business purpose for collecting or selling it, the categories of third parties to whom it was sold or disclosed, and the specific pieces of personal information you hold.
 
 4. If you deny any part of this request, state the specific statutory exemption you rely on for each part denied.
 
@@ -216,9 +216,9 @@ ${longDate(todayISO(), false)}`
 
   // --- Follow-ups -------------------------------------------------------------
   reminder: {
-    label: 'Reminder — deadline passed',
+    label: 'Reminder: deadline passed',
     jurisdiction: 'any',
-    subject: (b, p) => `Overdue: request under Articles 15, 17 and 21 GDPR — ${subjectId(b, p)}`,
+    subject: (b, p) => `Overdue: request under Articles 15, 17 and 21 GDPR, ${subjectId(b, p)}`,
     body: (b, p, rec) => `To the Data Protection Officer / Privacy Team of ${b.name},
 
 On ${rec?.sentAt ? longDate(rec.sentAt, false) : '[date]'} I sent you a request to erase my personal data and to stop processing it, under Articles 15, 17 and 21 GDPR. The one-month period set by Article 12(3) has now passed without an adequate response.
@@ -275,9 +275,9 @@ ${longDate(todayISO(), false)}`
 // Dutch escalation letters, so a Dutch user can go request → herinnering →
 // klacht without switching language halfway.
 TEMPLATES.reminder_nl = {
-  label: 'Herinnering — termijn verstreken',
+  label: 'Herinnering: termijn verstreken',
   jurisdiction: 'EU',
-  subject: (b, p) => `Termijn verstreken: verzoek op grond van artikel 15, 17 en 21 AVG — ${subjectId(b, p)}`,
+  subject: (b, p) => `Termijn verstreken: verzoek op grond van artikel 15, 17 en 21 AVG, ${subjectId(b, p)}`,
   body: (b, p, rec) => `Aan de Functionaris Gegevensbescherming / het privacyteam van ${b.name},
 
 Op ${rec?.sentAt ? longDate(rec.sentAt, true) : '[datum]'} heb ik u verzocht mijn persoonsgegevens te wissen en de verwerking ervan te staken, op grond van artikel 15, 17 en 21 AVG. De termijn van één maand uit artikel 12, lid 3, is inmiddels verstreken zonder toereikende reactie.
@@ -342,9 +342,9 @@ const breachNote = (b, nl) => b.source !== 'breach' ? '' : nl
   : `\nYour organisation has suffered a data breach involving customer data. That makes it all the more important that you keep no more than is strictly necessary (Article 5(1)(c) and (e) GDPR).\n`;
 
 TEMPLATES.customer_minimise = {
-  label: 'Existing customer — stop marketing, keep only what is needed',
+  label: 'Existing customer: stop marketing, keep only what is needed',
   jurisdiction: 'EU',
-  subject: (b, p) => `Request under Articles 15, 17 and 21 GDPR (existing customer) — ${subjectId(b, p)}`,
+  subject: (b, p) => `Request under Articles 15, 17 and 21 GDPR (existing customer), ${subjectId(b, p)}`,
   body: (b, p) => `To the Data Protection Officer / Privacy Team of ${b.name},
 
 I am a customer of yours and I intend to remain one. This is not a request to close my account or end any contract.
@@ -356,7 +356,7 @@ I ask you to:
 
 1. Stop processing my personal data for direct marketing, including profiling for that purpose, by email, phone, text, post or online advertising (Article 21(2) and (3) GDPR). This objection is unconditional.
 
-2. Erase all personal data you no longer need to provide your service to me or to meet a legal obligation — for example data from past contracts or orders beyond their retention period, usage and browsing profiles, and data obtained from third parties (Article 17(1)(a) and (c) GDPR).
+2. Erase all personal data you no longer need to provide your service to me or to meet a legal obligation, for example data from past contracts or orders beyond their retention period, usage and browsing profiles, and data obtained from third parties (Article 17(1)(a) and (c) GDPR).
 
 3. Stop passing my personal data to third parties for their own purposes, and tell me which recipients you have disclosed it to so far (Articles 15(1)(c) and 19 GDPR).
 
@@ -370,9 +370,9 @@ ${longDate(todayISO(), false)}`
 };
 
 TEMPLATES.customer_minimise_nl = {
-  label: 'Bestaande klant — geen marketing, alleen bewaren wat nodig is',
+  label: 'Bestaande klant: geen marketing, alleen bewaren wat nodig is',
   jurisdiction: 'EU',
-  subject: (b, p) => `Verzoek op grond van artikel 15, 17 en 21 AVG (bestaande klant) — ${subjectId(b, p)}`,
+  subject: (b, p) => `Verzoek op grond van artikel 15, 17 en 21 AVG (bestaande klant), ${subjectId(b, p)}`,
   body: (b, p) => `Aan de Functionaris Gegevensbescherming / het privacyteam van ${b.name},
 
 Ik ben klant bij u en wil dat blijven. Dit is geen verzoek om mijn account op te heffen of een overeenkomst te beëindigen.
@@ -384,7 +384,7 @@ Ik verzoek u:
 
 1. Mijn persoonsgegevens niet langer te verwerken voor direct marketing, inclusief profilering voor dat doel, per e-mail, telefoon, sms, post of online advertenties (artikel 21, lid 2 en 3, AVG). Dit bezwaar is onvoorwaardelijk.
 
-2. Alle persoonsgegevens te wissen die u niet meer nodig heeft om uw dienst aan mij te leveren of om aan een wettelijke plicht te voldoen — bijvoorbeeld gegevens van eerdere contracten of bestellingen waarvan de bewaartermijn is verstreken, gebruiks- en surfprofielen, en gegevens die u van derden heeft verkregen (artikel 17, lid 1, onder a en c, AVG).
+2. Alle persoonsgegevens te wissen die u niet meer nodig heeft om uw dienst aan mij te leveren of om aan een wettelijke plicht te voldoen, bijvoorbeeld gegevens van eerdere contracten of bestellingen waarvan de bewaartermijn is verstreken, gebruiks- en surfprofielen, en gegevens die u van derden heeft verkregen (artikel 17, lid 1, onder a en c, AVG).
 
 3. Mijn persoonsgegevens niet langer aan derden te verstrekken voor hun eigen doeleinden, en mij te laten weten aan welke ontvangers u ze tot nu toe heeft verstrekt (artikel 15, lid 1, onder c, en artikel 19 AVG).
 
@@ -424,8 +424,8 @@ export function guessRelation(b) {
   if (b.source === 'breach') return 'customer'; // breach notices come from services you had an account with
   if (b.source === 'mail') {
     if (b.trust !== 'verified') return 'none';  // marketing from a sender that could not be checked
-    // Verified mail with no unsubscribe at all is transactional — an order,
-    // an invoice, an account notice — which only goes to customers.
+    // Verified mail with no unsubscribe at all is transactional (an order,
+    // an invoice, an account notice), which only goes to customers.
     return b.unsubUrl ? 'maybe' : 'customer';
   }
   return 'maybe';

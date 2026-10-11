@@ -61,8 +61,8 @@ export function exposure(state) {
 
   const QUERIES = [
     ['"privacy policy" update', '"privacybeleid" wijziging',
-     L('The highest-yield search there is. A company changing its privacy policy must notify everyone whose data it holds — so every hit is a company holding yours, including ones you forgot years ago.',
-       'De zoekopdracht die het meest oplevert. Een bedrijf dat zijn privacybeleid wijzigt, moet iedereen van wie het gegevens heeft inlichten — dus elke treffer is een bedrijf dat jouw gegevens heeft, ook bedrijven die je allang vergeten was.')],
+     L('The highest-yield search there is. A company changing its privacy policy must notify everyone whose data it holds, so every hit is a company holding yours, including ones you forgot years ago.',
+       'De zoekopdracht die het meest oplevert. Een bedrijf dat zijn privacybeleid wijzigt, moet iedereen van wie het gegevens heeft inlichten, dus elke treffer is een bedrijf dat jouw gegevens heeft, ook bedrijven die je allang vergeten was.')],
     ['"welcome to"', '"welkom bij"',
      L('Signup confirmations. Every account you have ever opened.', 'Aanmeldbevestigingen. Elk account dat je ooit hebt aangemaakt.')],
     ['"verify your email"', '"bevestig je e-mailadres"',
@@ -83,8 +83,8 @@ export function exposure(state) {
 
   <div class="card">
     <h2>${L('Search your mailbox', 'Doorzoek je mailbox')}</h2>
-    <p class="small muted">${L('No export needed — run these searches in your mail app and add what you find by hand.',
-      'Geen export nodig — voer deze zoekopdrachten uit in je mailapp en voeg toe wat je vindt.')}</p>
+    <p class="small muted">${L('No export needed. Run these searches in your mail app and add what you find by hand.',
+      'Geen export nodig. Voer deze zoekopdrachten uit in je mailapp en voeg toe wat je vindt.')}</p>
     <details>
       <summary class="small muted" style="cursor:pointer">${L('Show the searches', 'Toon de zoekopdrachten')}</summary>
       ${QUERIES.map(([en, nl, why]) => { const q = L(en, nl); return `
@@ -122,7 +122,7 @@ export function exposure(state) {
   </div>
 
   <div class="card">
-    <h2>${L('Data brokers — assume they already have you', 'Databrokers — ga ervan uit dat ze je al hebben')}</h2>
+    <h2>${L('Data brokers: assume they already have you', 'Databrokers: ga ervan uit dat ze je al hebben')}</h2>
     <p class="small muted">${L('These never emailed you and never will. They buy, merge and resell personal data on almost every adult in Europe, so there is nothing to discover: assume you are in their files and make them prove otherwise. 37 are bundled, each with its opt-out page and a letter.',
       'Deze hebben je nooit gemaild en zullen dat ook niet doen. Ze kopen, koppelen en verkopen persoonsgegevens van bijna elke volwassene in Europa, dus er valt niets te ontdekken: ga ervan uit dat je in hun bestanden staat en laat ze het tegendeel bewijzen. Er zitten er 37 in de app, elk met afmeldpagina en brief.')}</p>
     <div class="row">
@@ -132,8 +132,8 @@ export function exposure(state) {
 
   <div class="card">
     <h2>${L('Public breach records', 'Openbare datalekken')}</h2>
-    <p class="small muted">${L('Companies that lost your data to attackers. Free to check — the breach database charges only for automated lookups, never for searching your own address on their site.',
-      'Bedrijven die jouw gegevens bij een hack zijn kwijtgeraakt. Gratis te controleren — de lekdatabase vraagt alleen geld voor geautomatiseerd opzoeken, nooit voor het zoeken naar je eigen adres op hun site.')}</p>
+    <p class="small muted">${L('Companies that lost your data to attackers. Free to check: the breach database charges only for automated lookups, never for searching your own address on their site.',
+      'Bedrijven die jouw gegevens bij een hack zijn kwijtgeraakt. Gratis te controleren: de lekdatabase vraagt alleen geld voor geautomatiseerd opzoeken, nooit voor het zoeken naar je eigen adres op hun site.')}</p>
 
     ${state.profile.emails.length ? `
       ${state.profile.emails.map(e => `
@@ -143,13 +143,13 @@ export function exposure(state) {
             <button data-action="hibp-open" data-email="${esc(e)}">${L('Copy &amp; check ↗', 'Kopieer &amp; controleer ↗')}</button>
           </div>
         </div>`).join('')}
-      <p class="small muted" style="margin-top:10px">${L('Copies the address and opens the database — paste it into their search box.',
-        'Kopieert het adres en opent de database — plak het in hun zoekvak.')}</p>
+      <p class="small muted" style="margin-top:10px">${L('Copies the address and opens the database. Paste it into their search box.',
+        'Kopieert het adres en opent de database. Plak het in hun zoekvak.')}</p>
     ` : `<p class="small muted">${L('Add your email addresses in <a href="#/profile">Settings</a> first, then check each one here.',
         'Voeg eerst je e-mailadressen toe bij <a href="#/profile">Instellingen</a>, en controleer ze dan hier.')}</p>`}
 
-    <p class="small muted">${L('Breaches classed as sensitive are hidden from the public search. To see those, verify the address through the <em>Notify me</em> section of that site — also free, and it warns you about future breaches.',
-      'Gevoelige lekken zijn verborgen in de openbare zoekfunctie. Om die te zien, bevestig je je adres via <em>Notify me</em> op die site — ook gratis, en je krijgt een seintje bij toekomstige lekken.')}</p>
+    <p class="small muted">${L('Breaches classed as sensitive are hidden from the public search. To see those, verify the address through the <em>Notify me</em> section of that site. It is also free, and it warns you about future breaches.',
+      'Gevoelige lekken zijn verborgen in de openbare zoekfunctie. Om die te zien, bevestig je je adres via <em>Notify me</em> op die site. Dat is ook gratis, en je krijgt een seintje bij toekomstige lekken.')}</p>
 
     <div class="row" style="margin-top:12px">
       <input id="breach-q" placeholder="${L('Or search the breach list (e.g. linkedin)', 'Of doorzoek de lijst met lekken (bijv. linkedin)')}" style="flex:1;min-width:200px">
@@ -159,8 +159,8 @@ export function exposure(state) {
 
     <details style="margin-top:14px">
       <summary class="small muted" style="cursor:pointer">${L('Optional: automate this with a paid API key', 'Optioneel: automatiseer dit met een betaalde API-sleutel')}</summary>
-      <p class="small muted" style="margin-top:10px">${L('<strong>This is the one request in this app that transmits personal data</strong> — it sends the address being checked. Nothing else here does.',
-        '<strong>Dit is het enige verzoek in deze app dat persoonsgegevens verstuurt</strong> — het adres dat je controleert. Niets anders hier doet dat.')}</p>
+      <p class="small muted" style="margin-top:10px">${L('<strong>This is the one request in this app that transmits personal data</strong>: it sends the address being checked. Nothing else here does.',
+        '<strong>Dit is het enige verzoek in deze app dat persoonsgegevens verstuurt</strong>: het adres dat je controleert. Niets anders hier doet dat.')}</p>
       <div class="row">
         <select id="acct-email" style="flex:1;min-width:200px">
           ${state.profile.emails.length
@@ -169,8 +169,8 @@ export function exposure(state) {
         </select>
         <button data-action="check-account" ${state.hibpKey ? '' : 'disabled'}>${L('Check address', 'Controleer adres')}</button>
       </div>
-      ${state.hibpKey ? '' : `<p class="small muted" style="margin-top:8px">${L('No key saved — add one in <a href="#/profile">Settings</a> to enable this.',
-        'Geen sleutel opgeslagen — voeg er een toe bij <a href="#/profile">Instellingen</a>.')}</p>`}
+      ${state.hibpKey ? '' : `<p class="small muted" style="margin-top:8px">${L('No key saved. Add one in <a href="#/profile">Settings</a> to enable this.',
+        'Geen sleutel opgeslagen. Voeg er een toe bij <a href="#/profile">Instellingen</a>.')}</p>`}
       <div id="acct-result" style="margin-top:10px"></div>
     </details>
   </div>
@@ -203,21 +203,21 @@ export function mountExposure(root, state, rerender) {
       try {
         const n = await pwnedPasswordCount(pw);
         out.innerHTML = n === 0
-          ? `<span class="pill done">${L('Not found', 'Niet gevonden')}</span> ${L('This password does not appear in any known leak. That is not the same as "strong" — a unique passphrase in a password manager still beats it.',
-              'Dit wachtwoord komt in geen enkel bekend lek voor. Dat is niet hetzelfde als "sterk" — een unieke wachtzin in een wachtwoordmanager is nog steeds beter.')}`
+          ? `<span class="pill done">${L('Not found', 'Niet gevonden')}</span> ${L('This password does not appear in any known leak. That is not the same as "strong": a unique passphrase in a password manager still beats it.',
+              'Dit wachtwoord komt in geen enkel bekend lek voor. Dat is niet hetzelfde als "sterk": een unieke wachtzin in een wachtwoordmanager is nog steeds beter.')}`
           : `<span class="pill overdue">${L(`Seen ${n.toLocaleString()}×`, `${n.toLocaleString('nl-NL')}× gezien`)}</span> ${L('This password has leaked. Change it anywhere you used it, and never reuse it.',
               'Dit wachtwoord is gelekt. Verander het overal waar je het gebruikt, en gebruik het nooit meer.')}`;
         root.querySelector('#pw').value = '';
       } catch (err) {
         out.innerHTML = `<span class="pill overdue">${L('Could not reach the service', 'Dienst niet bereikbaar')}</span>
-          ${esc(err.message)}. ${L('Check your connection — some networks and content blockers block this API.', 'Controleer je verbinding — sommige netwerken en blockers blokkeren deze dienst.')}`;
+          ${esc(err.message)}. ${L('Check your connection. Some networks and content blockers block this API.', 'Controleer je verbinding. Sommige netwerken en blockers blokkeren deze dienst.')}`;
       }
     }
 
     if (action === 'copy-query') {
       try {
         await navigator.clipboard.writeText(btn.dataset.q);
-        toast(L('Copied — paste it into your mail search', 'Gekopieerd — plak het in de zoekbalk van je mail'));
+        toast(L('Copied. Paste it into your mail search', 'Gekopieerd. Plak het in de zoekbalk van je mail'));
       } catch {
         toast(L('Type it into your mail search box', 'Typ het in de zoekbalk van je mail'));
       }
@@ -280,7 +280,7 @@ export function mountExposure(root, state, rerender) {
       nameEl.value = '';
       domEl.value = '';
       nameEl.focus();
-      toast(L(`${name} added — letter ready`, `${name} toegevoegd — brief staat klaar`));
+      toast(L(`${name} added, letter ready`, `${name} toegevoegd, brief staat klaar`));
     }
 
     if (action === 'hibp-open') {
@@ -289,9 +289,9 @@ export function mountExposure(root, state, rerender) {
       window.open('https://haveibeenpwned.com/', '_blank', 'noopener,noreferrer');
       try {
         await navigator.clipboard.writeText(btn.dataset.email);
-        toast(L('Address copied — paste it into their search box', 'Adres gekopieerd — plak het in hun zoekvak'));
+        toast(L('Address copied. Paste it into their search box', 'Adres gekopieerd. Plak het in hun zoekvak'));
       } catch {
-        toast(L('Opened — type the address into their search box', 'Geopend — typ het adres in hun zoekvak'));
+        toast(L('Opened. Type the address into their search box', 'Geopend. Typ het adres in hun zoekvak'));
       }
     }
 
@@ -384,7 +384,7 @@ function breachRow(b, state) {
 
 // Adds a scanned sender, or refreshes it if it is already known. Only what a
 // rule or a letter needs is kept: names, domains, the address it reached and
-// how many mails — never subject lines or message text.
+// how many mails, never subject lines or message text.
 // Stored names are language-neutral apart from this one marker, translated on display.
 export const nameOf = b => String(b.name || '').replace(/ \(impersonated\)$/, L(' (impersonated)', ' (nagemaakt)'));
 // "LuckyGem · also as Koko.bet, Mr. Punter" for senders that rotate names.
@@ -478,7 +478,7 @@ export function brokers(state, catalog, params) {
   return `
   <div class="head">
     <h1>${L('Delete data', 'Gegevens verwijderen')}</h1>
-    <p>${L('Order these companies to erase you under Article 17 GDPR. They have one month to comply. Unsubscribing only stops the mail — <a href="#/unsubscribe">that is the other page</a>.',
+    <p>${L('Order these companies to erase you under Article 17 GDPR. They have one month to comply. Unsubscribing only stops the mail; <a href="#/unsubscribe">that is the other page</a>.',
            'Laat deze bedrijven je gegevens wissen op grond van artikel 17 AVG. Ze hebben daar een maand de tijd voor. Uitschrijven stopt alleen de mail; dat doe je op <a href="#/unsubscribe">de andere pagina</a>.')}</p>
   </div>
 
@@ -507,7 +507,7 @@ export function brokers(state, catalog, params) {
         : `${L('Only what came from your own evidence.', 'Alleen wat uit je eigen mail en meldingen komt.')}
            <a href="#/delete?all=1">${L(`Add the ${catalog.length} bundled data brokers`, `Toon ook ${catalog.length} bekende databrokers`)}</a>`}
       ${spam.length && !showSpam
-        ? `<br>${L(`${spam.length} spam or unverified ${spam.length === 1 ? 'sender is' : 'senders are'} hidden — a letter to those bounces and confirms your address is live.`,
+        ? `<br>${L(`${spam.length} spam or unverified ${spam.length === 1 ? 'sender is' : 'senders are'} hidden: a letter to those bounces and confirms your address is live.`,
                    `${spam.length} onveilige of niet te controleren ${spam.length === 1 ? 'afzender is' : 'afzenders zijn'} verborgen: een brief daarheen komt terug, of laat ze weten dat je adres actief is.`)}
            <a href="#/delete?spam=1">${L('Show them anyway', 'Toch tonen')}</a>`
         : ''}
@@ -601,7 +601,7 @@ export function mountBrokers(root, state, rerender) {
     if (rel) {
       store.setRelation(rel.dataset.id, rel.value);
       toast(rel.value === 'customer'
-        ? L('Moved to your providers — they get the customer letter', 'Verplaatst naar je leveranciers — zij krijgen de klantenbrief')
+        ? L('Moved to your providers. They get the customer letter', 'Verplaatst naar je leveranciers. Zij krijgen de klantenbrief')
         : L('Moved', 'Verplaatst'));
     }
   });
@@ -637,7 +637,7 @@ export function mountBrokers(root, state, rerender) {
 //
 // Erasure requests in bulk, without the app ever touching the mailbox: each
 // letter opens as a filled-in draft in the user's own mail app, they press
-// Send, and the next one is ready. One click per company is the floor — a
+// Send, and the next one is ready. One click per company is the floor: a
 // page cannot send mail, and should not be able to.
 
 const isEU = b => ['EU', 'NL', 'UK'].some(r => (b.regions || []).includes(r));
@@ -684,8 +684,8 @@ function sendQueueCard(state) {
       <p class="small">${reminder
         ? L(`They have ${REMINDER_GRACE} days. Anyone still silent after that shows up here with a complaint to the regulator ready.`,
             `Ze hebben ${REMINDER_GRACE} dagen. Wie daarna nog zwijgt, verschijnt hier met een klacht bij de toezichthouder klaar.`)
-        : L('The one-month deadlines are running. Anyone who has not answered by then shows up here with a reminder ready — you do not need to keep track.',
-            'De termijn van een maand loopt. Wie dan nog niet heeft gereageerd, verschijnt hier met een herinnering klaar — je hoeft niets bij te houden.')}</p>
+        : L('The one-month deadlines are running. Anyone who has not answered by then shows up here with a reminder ready, so you do not need to keep track.',
+            'De termijn van een maand loopt. Wie dan nog niet heeft gereageerd, verschijnt hier met een herinnering klaar. Je hoeft niets bij te houden.')}</p>
       <p class="small muted">${L('Did not send one after all? Set it back to "Not started" in the list below.',
         'Toch eentje niet verstuurd? Zet hem in de lijst hieronder terug op "Niet gestart".')}</p>
       <div class="row"><button data-action="send-close">${L('Close', 'Sluiten')}</button></div>
@@ -718,14 +718,14 @@ function sendQueueCard(state) {
         `Een gok op basis van hun domein. Komt hij terug, zoek dan "privacy" of "functionaris gegevensbescherming" in hun privacyverklaring, pas het hier aan en verstuur opnieuw.`)}</p>` : ''}
     </div>
     <p class="small">${reveals
-      ? L(`The letter reveals only <span class="mono">${esc(reveals)}</span> — what they already have.`,
-          `De brief noemt alleen <span class="mono">${esc(reveals)}</span> — wat ze al hebben.`)
+      ? L(`The letter reveals only <span class="mono">${esc(reveals)}</span>: what they already have.`,
+          `De brief noemt alleen <span class="mono">${esc(reveals)}</span>: wat ze al hebben.`)
       : L('The letter includes your name and address, so this broker can find your record.',
           'De brief bevat je naam en adres, zodat deze databroker je gegevens kan vinden.')}
       <a href="#/letter?b=${encodeURIComponent(b.id)}&t=${queueTemplate(q.kind, b, state.profile)}">${L('Read it', 'Lees de brief')}</a></p>
     ${!reminder && relationOf(b, r) === 'customer' ? `<p class="small"><span class="pill done">${L('customer letter', 'klantenbrief')}</span>
-      ${L('You are a customer here, so this asks them to stop marketing and delete what they do not need — your account stays.',
-          'Je bent hier klant, dus deze brief vraagt om te stoppen met marketing en te wissen wat ze niet nodig hebben — je account blijft.')}</p>` : ''}
+      ${L('You are a customer here, so this asks them to stop marketing and delete what they do not need. Your account stays.',
+          'Je bent hier klant, dus deze brief vraagt om te stoppen met marketing en te wissen wat ze niet nodig hebben. Je account blijft.')}</p>` : ''}
     <div class="row">
       <button class="primary" data-action="send-open">${L(`Open email to ${esc(nameOf(b))} →`, `Open de mail aan ${esc(nameOf(b))} →`)}</button>
       <button data-action="send-skip">${L('Skip', 'Overslaan')}</button>
@@ -853,7 +853,7 @@ function wireSend(root, rerender) {
 
     if (act === 'form-done') {
       store.setStatus(btn.dataset.id, 'sent');
-      toast(L('Marked as done — deadline started', 'Gemarkeerd als gedaan — de termijn loopt'));
+      toast(L('Marked as done, deadline started', 'Gemarkeerd als gedaan, de termijn loopt'));
     }
   });
 }
@@ -918,9 +918,9 @@ export function runOneClickBatch(root, items, rest) {
       <div class="notice ${finished ? '' : 'warn'}">
         <p><strong>${finished ? L(`Sent ${done} of ${total}`, `${done} van ${total} verstuurd`)
                               : L(`Unsubscribing… ${done} of ${total}`, `Bezig met uitschrijven… ${done} van ${total}`)}</strong>${failed
-          ? L(` — ${failed} could not be reached`, ` — ${failed} niet bereikbaar`) : ''}</p>
-        ${finished ? `<p class="small">${L('Delivered, not confirmed: a browser hides cross-site responses, so the app cannot read what each sender replied. Compliant senders act on it immediately. If mail from one continues, send it a deletion letter — that one you can enforce.',
-          'Verstuurd, niet bevestigd: een browser verbergt antwoorden van andere sites, dus de app kan niet lezen wat elke afzender terugstuurde. Nette afzenders verwerken het meteen. Blijft er mail komen, stuur die afzender dan een verwijderverzoek — dat kun je afdwingen.')}</p>` : ''}
+          ? L(`, ${failed} could not be reached`, `, ${failed} niet bereikbaar`) : ''}</p>
+        ${finished ? `<p class="small">${L('Delivered, not confirmed: a browser hides cross-site responses, so the app cannot read what each sender replied. Compliant senders act on it immediately. If mail from one continues, send it a deletion letter. That one you can enforce.',
+          'Verstuurd, niet bevestigd: een browser verbergt antwoorden van andere sites, dus de app kan niet lezen wat elke afzender terugstuurde. Nette afzenders verwerken het meteen. Blijft er mail komen, stuur die afzender dan een verwijderverzoek. Dat kun je afdwingen.')}</p>` : ''}
         ${finished && failed ? `<p class="small">${L('The ones that could not be reached stay on your list, so you can try again.', 'De niet-bereikbare blijven op je lijst staan, zodat je het opnieuw kunt proberen.')}</p>` : ''}
         ${finished && rest.length ? `<p class="small"><strong>${L(`${rest.length} more`, `Nog ${rest.length}`)}</strong> ${L('published a link but not one-click, so they need opening individually.', 'gaven een link maar geen één-klik, dus die moeten één voor één open.')}</p>` : ''}
         <div class="row" style="margin-top:8px">
@@ -994,7 +994,7 @@ export function wireQueue(root, onClose) {
       const urls = JSON.parse(q.dataset.urls || '[]');
       navigator.clipboard.writeText(urls.map(u => u.url).join('\n'))
         .then(() => toast(L(`${urls.length} links copied`, `${urls.length} links gekopieerd`)))
-        .catch(() => toast(L('Could not copy — select them by hand', 'Kopiëren mislukt — selecteer ze zelf')));
+        .catch(() => toast(L('Could not copy. Select them by hand', 'Kopiëren mislukt. Selecteer ze zelf')));
     }
 
     if (act === 'unsub-close') { q.innerHTML = ''; onClose?.(); }
@@ -1016,11 +1016,11 @@ function renderQueue(q, urls, i) {
   q.innerHTML = `
     <div class="notice ${done ? '' : 'warn'}">
       ${done
-        ? `<p><strong>${L(`All ${urls.length} opened.`, `Alle ${urls.length} geopend.`)}</strong> ${L('Each opened in its own tab — finish any that ask for a confirmation click.', 'Elk opende in een eigen tabblad — rond af waar nog om een bevestiging wordt gevraagd.')}</p>`
+        ? `<p><strong>${L(`All ${urls.length} opened.`, `Alle ${urls.length} geopend.`)}</strong> ${L('Each opened in its own tab. Finish any that ask for a confirmation click.', 'Elk opende in een eigen tabblad. Rond af waar nog om een bevestiging wordt gevraagd.')}</p>`
         : `<p><strong>${L(`Unsubscribing: ${i} of ${urls.length} done.`, `Uitschrijven: ${i} van ${urls.length} klaar.`)}</strong> ${L('Next:', 'Volgende:')}
            <strong>${esc(urls[i].name)}</strong></p>
-           <p class="small muted">${L('Your browser blocks a page from opening many tabs at once, so this steps through them — one click each, no hunting for the link.',
-             'Je browser laat een pagina niet veel tabbladen tegelijk openen, dus dit gaat er één voor één doorheen — één klik per afzender, zonder de link te hoeven zoeken.')}</p>`}
+           <p class="small muted">${L('Your browser blocks a page from opening many tabs at once, so this steps through them: one click each, no hunting for the link.',
+             'Je browser laat een pagina niet veel tabbladen tegelijk openen, dus dit gaat er één voor één doorheen: één klik per afzender, zonder de link te hoeven zoeken.')}</p>`}
       <div class="row" style="margin-top:8px">
         ${done ? '' : `<button class="primary" data-action="unsub-next">${L(`Open ${esc(urls[i].name)} →`, `Open ${esc(urls[i].name)} →`)}</button>`}
         <button data-action="unsub-copy">${L(`Copy all ${urls.length} links`, `Kopieer alle ${urls.length} links`)}</button>
@@ -1032,8 +1032,8 @@ function renderQueue(q, urls, i) {
 // ------------------------------------------------------------- unsubscribe
 
 // Three outcomes, and only two of them are unsubscribing. A sender with no
-// unsubscribe anywhere in its message is not a company that forgot — compliant
-// bulk mail must offer one — so it is treated as spam to block, not written to.
+// unsubscribe anywhere in its message is not a company that forgot (compliant
+// bulk mail must offer one), so it is treated as spam to block, not written to.
 // An unsubscribe link in a mail whose sender failed authentication is not a
 // way out, it is a tracker: clicking it confirms a person reads this mailbox.
 // So a forged sender's link is never offered, however legitimate it looks.
@@ -1046,7 +1046,7 @@ export function senderClass(b) {
   if (unsafeReason(b)) return hasLink ? 'bait' : 'spam';
   if (hasLink) return 'unsub';
   // A verified sender without an unsubscribe link is a real company sending
-  // receipts or account mail — a deletion letter, never a block. One that
+  // receipts or account mail: a deletion letter, never a block. One that
   // could not be verified either way is left for the user to judge.
   return b.trust === 'verified' ? 'company' : 'unclear';
 }
@@ -1122,7 +1122,7 @@ export function unsubscribe(state) {
             <input type="checkbox" data-action="sel" data-id="${esc(b.id)}" ${selected.has(b.id) ? 'checked' : ''}>
             <span class="pick-name">${esc(nameOf(b))}</span>
             ${b.trust === 'verified' ? `<span class="pill done">${L('verified sender', 'gecontroleerde afzender')}</span>`
-              : `<span class="pill low">${L('unverified — check first', 'niet gecontroleerd — kijk eerst zelf')}</span>`}
+              : `<span class="pill low">${L('unverified, check first', 'niet gecontroleerd, kijk eerst zelf')}</span>`}
             ${b.unsubscribedAt ? `<span class="pill">${L('unsubscribed', 'uitgeschreven')}</span>` : ''}
             <span class="pick-meta mono">${esc(b.site || '')}</span>
           </label>`).join('')}
@@ -1139,8 +1139,8 @@ export function unsubscribe(state) {
   <div class="head">
     <a class="back" href="#/">${L('← Home', '← Home')}</a>
     <h1>${L('Unsubscribe &amp; block', 'Uitschrijven &amp; blokkeren')}</h1>
-    <p>${L('Real companies get an unsubscribe. Unsafe senders — scams, gambling and other spam — get blocked. Stopping the mail is not deletion — <a href="#/delete">that is the other page</a>.',
-           'Bij echte bedrijven schrijf je je uit. Onveilige afzenders — oplichters, gokreclame en andere spam — blokkeer je. Uitschrijven stopt alleen de mail; je gegevens laten wissen doe je op <a href="#/delete">de andere pagina</a>.')}</p>
+    <p>${L('Real companies get an unsubscribe. Unsafe senders (scams, gambling and other spam) get blocked. Stopping the mail is not deletion; <a href="#/delete">that is the other page</a>.',
+           'Bij echte bedrijven schrijf je je uit. Onveilige afzenders (oplichters, gokreclame en andere spam) blokkeer je. Uitschrijven stopt alleen de mail; je gegevens laten wissen doe je op <a href="#/delete">de andere pagina</a>.')}</p>
   </div>
 
   ${!mail.length ? `<div class="notice">
@@ -1156,25 +1156,17 @@ export function unsubscribe(state) {
     n => L(`Unsubscribe ${n || ''} now`, `Schrijf je nu uit bij ${n || ''}`), 'primary')}
 
   ${group('link', L('Opens their page', 'Via hun eigen pagina'),
-    L('These published a link — usually as "Uitschrijven" or "Unsubscribe" at the bottom — but not one-click, so the page has to load. They open one at a time.',
+    L('These published a link (usually "Uitschrijven" or "Unsubscribe" at the bottom), but not one-click, so the page has to load. They open one at a time.',
       'Deze afzenders hebben een uitschrijflink (meestal "Uitschrijven" onderaan de mail), maar geen uitschrijving met één klik. Hun pagina\'s openen één voor één.'),
     n => L(`Open ${n || ''}`, `${n || ''} openen`), '')}
 
   ${bait.length + spam.length ? blockAllCard(state) : ''}
 
-  ${bait.length ? `
-    <section class="card danger-card">
-      <h2>${L('Fake unsubscribe links — do not click', 'Nep-uitschrijflinks — niet klikken')} <span class="count">${bait.length}</span></h2>
-      <p class="small" style="max-width:62ch">${L('These contain an "unsubscribe" link, but the sender is <strong>unsafe</strong> — the reason is shown per sender. From senders like these the link is not a way out but a tracker: clicking it tells them a real person reads this mailbox.',
-        'Deze bevatten een "uitschrijven"-link, maar de afzender is <strong>onveilig</strong> — de reden staat per afzender. Bij zulke afzenders is de link geen uitweg maar een tracker: als je klikt, weten ze dat er echt iemand deze mailbox leest.')}</p>
-      ${list(bait, b => unsafeReason(b) + ' · ' + L('link goes to ', 'link gaat naar ') + hostOf(b.unsubUrl))}
-    </section>` : ''}
-
   ${spam.length ? `
     <section class="card">
-      <h2>${L('Spam — block, do not reply', 'Spam — blokkeren, niet reageren')} <span class="count">${spam.length}</span></h2>
-      <p class="small muted" style="max-width:60ch">${L('These are unsafe — the reason is shown per sender — and offered no way to unsubscribe. Do not click anything in them, and do not send them a letter: any response confirms a person reads this mailbox.',
-        'Deze zijn onveilig — de reden staat per afzender — en boden geen manier om je uit te schrijven. Klik nergens op en stuur geen brief: elke reactie bevestigt dat er een mens deze mailbox leest.')}</p>
+      <h2>${L('Spam: block, do not reply', 'Spam: blokkeren, niet reageren')} <span class="count">${spam.length}</span></h2>
+      <p class="small muted" style="max-width:60ch">${L('These are unsafe (the reason is shown per sender) and offered no way to unsubscribe. Do not click anything in them, and do not send them a letter: any response confirms a person reads this mailbox.',
+        'Deze zijn onveilig (de reden staat per afzender) en boden geen manier om je uit te schrijven. Klik nergens op en stuur geen brief: elke reactie bevestigt dat er een mens deze mailbox leest.')}</p>
       ${list(spam, b => unsafeReason(b) + (b.site ? ' · ' + b.site : ''))}
     </section>` : ''}
 
@@ -1248,7 +1240,7 @@ export function blockAllCard(state, { closable = false } = {}) {
     <div class="row between" style="align-items:flex-start;gap:16px">
       <div>
         <h2>${title}</h2>
-        <p class="small muted" style="max-width:58ch;margin:0">${L('Only unsafe senders are blocked, never a real company. The rules target what these campaigns reuse — the sites their links go to and where replies go — not the From address, which in forged mail is made up or borrowed from a real company.',
+        <p class="small muted" style="max-width:58ch;margin:0">${L('Only unsafe senders are blocked, never a real company. The rules target what these campaigns reuse: the sites their links go to and where replies go. Not the From address, which in forged mail is made up or borrowed from a real company.',
           'Alleen onveilige afzenders worden geblokkeerd, nooit een echt bedrijf. De regels richten zich op wat deze afzenders steeds opnieuw gebruiken: de websites waar hun links naartoe gaan en de adressen waar antwoorden heen gaan. Niet op het afzenderadres, want dat is bij nepmail verzonnen of geleend van een echt bedrijf.')}</p>
       </div>
       <div class="row" style="flex-wrap:nowrap">
@@ -1267,14 +1259,14 @@ export function blockAllCard(state, { closable = false } = {}) {
       <span><b>${bl.links.length}</b> ${plural(bl.links.length, 'link site', 'link sites', 'website', 'websites')}</span>
       <span><b>${reply}</b> ${plural(reply, 'reply address', 'reply addresses', 'antwoordadres', 'antwoordadressen')}</span>
     </div>
-    ${view.delta ? `<p class="small">${L(`Only what is new since ${at}. Add these to the rules you made then, or make a new rule — both work.`,
-      `Alleen wat nieuw is sinds ${at}. Voeg ze toe aan de regels die je toen maakte, of maak een nieuwe regel — allebei werkt.`)}</p>` : ''}
+    ${view.delta ? `<p class="small">${L(`Only what is new since ${at}. Add these to the rules you made then, or make a new rule. Both work.`,
+      `Alleen wat nieuw is sinds ${at}. Voeg ze toe aan de regels die je toen maakte, of maak een nieuwe regel. Allebei werkt.`)}</p>` : ''}
 
     <div id="block-panel">${rules ? blockPanel(bl, blockClient) : `<p class="small muted">${L('Nothing blockable yet: these senders left no reusable trace. Drop the messages in again so their links and reply addresses are recorded.',
       'Nog niets te blokkeren: deze afzenders lieten geen herbruikbaar spoor achter. Zet de mails er opnieuw in, zodat hun links en antwoordadressen worden vastgelegd.')}</p>`}</div>
     ${rules ? `
     <div class="block-done">
-      <button class="primary" data-action="block-done">${L("I've added these rules — done", 'Ik heb deze regels toegevoegd — klaar')}</button>
+      <button class="primary" data-action="block-done">${L("I've added these rules", 'Ik heb deze regels toegevoegd')}</button>
       <span class="small muted">${L('HoopUp cannot see your mail app, so tell it. Next time, only new rules show up.',
         'HoopUp kan niet in je mailapp kijken, dus laat het hier weten. De volgende keer zie je alleen nieuwe regels.')}</span>
       ${toggle}
@@ -1338,9 +1330,11 @@ export function blockPanel(bl, client) {
         <li>${L('Copy the script:', 'Kopieer het script:')} ${scriptBtn('applescript')}</li>
         <li>${L('Open <b>Script Editor</b>: press <b>⌘ Space</b>, type <i>Script Editor</i>, press Enter (choose <b>New Document</b> if asked).', 'Open <b>Scripteditor</b>: druk op <b>⌘ spatie</b>, typ <i>Scripteditor</i>, druk op Enter (kies <b>Nieuw document</b> als daarom wordt gevraagd).')}</li>
         <li>${L('Paste (<b>⌘V</b>) and click <b>▶</b> (Run). When macOS asks whether Script Editor may control Mail, click <b>OK</b>.', 'Plak (<b>⌘V</b>) en klik op <b>▶</b> (Start). Vraagt macOS of Scripteditor Mail mag bedienen, klik dan op <b>OK</b>.')}</li>
+        <li>${L('To clear what is already there: in Mail, open <b>Junk</b>, select all (<b>⌘A</b>) and choose <b>Message</b> → <b>Apply Rules</b> (<b>⌥⌘L</b>).',
+          'Om op te ruimen wat er al staat: open in Mail de map <b>Ongewenst</b>, selecteer alles (<b>⌘A</b>) en kies <b>Bericht</b> → <b>Pas regels toe</b> (<b>⌥⌘L</b>).')}</li>
       </ol>
-      <p class="small muted">${L('The script adds one rule to Mail (Settings → Rules) and moves the scams already in Junk and Inbox to the Trash. It reads nothing and sends nothing. Mac rules run while Mail is open.',
-        'Het script zet één regel in Mail (Instellingen → Regels) en verplaatst de oplichtersmails die al in Ongewenst en Postvak IN staan naar de prullenmand. Het leest niets en verstuurt niets. Regels op de Mac werken zolang Mail open is.')}</p>`,
+      <p class="small muted">${L('The script adds one rule to Mail (Settings → Rules), checks every condition it made, and tells you how many it added. It reads nothing and sends nothing. Mac rules run while Mail is open.',
+        'Het script zet één regel in Mail (Instellingen → Regels), controleert elke voorwaarde die het maakte en meldt hoeveel het er toevoegde. Het leest niets en verstuurt niets. Regels op de Mac werken zolang Mail open is.')}</p>`,
     sieve: `
       <ol class="small">
         <li>${L('Download the Sieve script below.', 'Download hieronder het Sieve-script.')}</li>
@@ -1352,8 +1346,8 @@ export function blockPanel(bl, client) {
   };
 
   return steps[client] + sharedNote + `
-    <p class="small muted" style="margin-top:10px">${L('New variants keep coming: these operations change domains constantly. Scan your junk again in a few weeks and update the rules — the list grows each time. If one address gets little else, see <b>Your addresses</b> on Home.',
-      'Er blijven nieuwe varianten komen: deze partijen wisselen voortdurend van domein. Scan over een paar weken je ongewenste mail opnieuw en werk de regels bij — de lijst groeit elke keer. Krijgt één adres weinig anders meer, kijk dan bij <b>Je adressen</b> op Home.')}</p>`;
+    <p class="small muted" style="margin-top:10px">${L('New variants keep coming: these operations change domains constantly. Scan your junk again in a few weeks and update the rules. The list grows each time. If one address gets little else, see <b>Your addresses</b> on Home.',
+      'Er blijven nieuwe varianten komen: deze partijen wisselen voortdurend van domein. Scan over een paar weken je ongewenste mail opnieuw en werk de regels bij. De lijst groeit elke keer. Krijgt één adres weinig anders meer, kijk dan bij <b>Je adressen</b> op Home.')}</p>`;
 }
 
 export function blockText(state, fmt) {
@@ -1391,7 +1385,7 @@ export function wireBlock(root, state, onChange) {
     const act = btn.dataset.action;
     if (act === 'dl-block') {
       downloadText(blockText(store.get(), btn.dataset.fmt));
-      toast(L('Downloaded — import it, then press Done', 'Gedownload — importeer het en druk dan op Klaar'));
+      toast(L('Downloaded. Import it, then press the button below', 'Gedownload. Importeer het en druk dan op de knop hieronder'));
     }
     if (act === 'copy-next') {
       const bl = blockView(store.get()).bl;
@@ -1401,13 +1395,13 @@ export function wireBlock(root, state, onChange) {
       navigator.clipboard.writeText(arr[i]).then(() => {
         btn.dataset.i = i + 1;
         btn.textContent = nextLabel(btn.dataset.list === 'links' ? 'site' : 'address', i + 1, arr.length);
-        toast(L(`Copied ${arr[i]} — paste it, press Enter`, `${arr[i]} gekopieerd — plak het, druk op Enter`));
+        toast(L(`Copied ${arr[i]}. Paste it, press Enter`, `${arr[i]} gekopieerd. Plak het, druk op Enter`));
       }).catch(() => toast(L('Could not copy', 'Kopiëren mislukt')));
     }
     if (act === 'copy-block') {
       navigator.clipboard.writeText(blockText(store.get(), btn.dataset.fmt).text)
         .then(() => toast(['applescript', 'powershell'].includes(btn.dataset.fmt)
-          ? L('Script copied — now paste it', 'Script gekopieerd — plak het nu') : L('Copied', 'Gekopieerd'))).catch(() => toast(L('Could not copy', 'Kopiëren mislukt')));
+          ? L('Script copied. Now paste it', 'Script gekopieerd. Plak het nu') : L('Copied', 'Gekopieerd'))).catch(() => toast(L('Could not copy', 'Kopiëren mislukt')));
     }
     if (act === 'block-done') {
       const ids = store.get().custom.filter(isBlockable).map(t => t.id);
@@ -1477,24 +1471,24 @@ export function letter(state, catalog, params) {
   <div class="head no-print">
     <a class="back" href="#/delete">← ${L('Delete data', 'Gegevens verwijderen')}</a>
     <h1>${esc(nameOf(b))}</h1>
-    <p>${L(`Read it before you send it. Delete any clause that does not apply to you — a request you can stand
+    <p>${L(`Read it before you send it. Delete any clause that does not apply to you: a request you can stand
     behind beats a maximalist one you cannot.`,
-    `Lees hem door voor je hem verstuurt. Schrap wat niet op jou van toepassing is — een verzoek waar je achter
+    `Lees hem door voor je hem verstuurt. Schrap wat niet op jou van toepassing is. Een verzoek waar je achter
     kunt staan werkt beter dan een maximaal verzoek dat je niet kunt onderbouwen.`)}</p>
   </div>
 
   ${b.method === 'form' && safeUrl(b.optOutUrl) ? `<div class="notice no-print">
     <p>${L(`<strong>This one has a self-serve form.</strong> Use
-    <a href="${esc(safeUrl(b.optOutUrl))}" target="_blank" rel="noopener noreferrer">their opt-out page</a> first —
+    <a href="${esc(safeUrl(b.optOutUrl))}" target="_blank" rel="noopener noreferrer">their opt-out page</a> first:
     it is usually faster. Send this letter if the form fails, asks for ID, or nothing happens.`,
     `<strong>Dit bedrijf heeft een eigen formulier.</strong> Probeer eerst
-    <a href="${esc(safeUrl(b.optOutUrl))}" target="_blank" rel="noopener noreferrer">hun afmeldpagina</a> —
+    <a href="${esc(safeUrl(b.optOutUrl))}" target="_blank" rel="noopener noreferrer">hun afmeldpagina</a>:
     dat gaat meestal sneller. Stuur deze brief als het formulier niet werkt, om een ID vraagt of er niets gebeurt.`)}</p>
   </div>` : ''}
 
   ${letterLang(state.profile) === 'nl' && !writesDutch(b, state.profile) && !params.get('t') ? `<div class="notice no-print">
-    <p>${L('This company works outside the Netherlands, so the letter is in English — a Dutch one would likely go unread. Pick a Dutch template below if you prefer.',
-      'Dit bedrijf werkt buiten Nederland, dus de brief is in het Engels — een Nederlandse brief wordt daar waarschijnlijk niet gelezen. Kies hieronder een Nederlands sjabloon als je dat liever hebt.')}</p>
+    <p>${L('This company works outside the Netherlands, so the letter is in English: a Dutch one would likely go unread. Pick a Dutch template below if you prefer.',
+      'Dit bedrijf werkt buiten Nederland, dus de brief is in het Engels. Een Nederlandse brief wordt daar waarschijnlijk niet gelezen. Kies hieronder een Nederlands sjabloon als je dat liever hebt.')}</p>
   </div>` : ''}
 
   ${b.confidence === 'low' ? `<div class="notice warn no-print">
@@ -1520,7 +1514,7 @@ export function letter(state, catalog, params) {
   </div>
 
   <div class="card">
-    <p class="small muted no-print">${L('To', 'Aan')}: <code>${esc(to || '—')}</code></p>
+    <p class="small muted no-print">${L('To', 'Aan')}: <code>${esc(to || '?')}</code></p>
     <p class="small"><strong>${L('Subject', 'Onderwerp')}:</strong> ${esc(subject)}</p>
     <div class="letter" id="letter-body" tabindex="0" role="region" aria-label="${L('Letter text', 'Tekst van de brief')}">${esc(body)}</div>
   </div>
@@ -1567,13 +1561,13 @@ export function mountLetter(root, state, rerender, params) {
         const sel = getSelection();
         sel.removeAllRanges();
         sel.addRange(range);
-        toast(L('Selected — press Cmd/Ctrl+C', 'Geselecteerd — druk op Cmd/Ctrl+C'));
+        toast(L('Selected. Press Cmd/Ctrl+C', 'Geselecteerd. Druk op Cmd/Ctrl+C'));
       }
     }
     if (a === 'print') window.print();
     if (a === 'mark-sent') {
       store.setStatus(id, 'sent');
-      toast(L('Marked as sent — deadline clock started', 'Gemarkeerd als verstuurd — de termijn loopt'));
+      toast(L('Marked as sent, deadline clock started', 'Gemarkeerd als verstuurd, de termijn loopt'));
     }
     if (a === 'save-notes') {
       store.setNotes(id, root.querySelector('#notes').value);
@@ -1604,7 +1598,7 @@ export function email(state) {
       <li><strong>Keep your real address private.</strong> It goes to people you know, your bank, and the
       tax office. Nothing else, ever again.</li>
       <li><strong>One alias per company.</strong> On iCloud+ this is Hide My Email, built into Safari and
-      Mail — unlimited, free with any paid iCloud plan. Fastmail, Proton, addy.io, SimpleLogin and
+      Mail: unlimited, free with any paid iCloud plan. Fastmail, Proton, addy.io, SimpleLogin and
       DuckDuckGo Email Protection all do the same.</li>
       <li><strong>When an alias starts getting spam, you know who leaked it.</strong> Log it below, then
       delete the alias. The spam stops instantly, at the source, with no filter to maintain.</li>
@@ -1613,7 +1607,7 @@ export function email(state) {
       <li><strong>Houd je echte adres privé.</strong> Dat krijgen mensen die je kent, je bank en de
       Belastingdienst. Verder niemand meer.</li>
       <li><strong>Eén alias per bedrijf.</strong> Bij iCloud+ heet dit 'Verberg mijn e-mailadres', ingebouwd in
-      Safari en Mail — onbeperkt, gratis bij elk betaald iCloud-abonnement. Fastmail, Proton, addy.io,
+      Safari en Mail: onbeperkt, gratis bij elk betaald iCloud-abonnement. Fastmail, Proton, addy.io,
       SimpleLogin en DuckDuckGo Email Protection doen hetzelfde.</li>
       <li><strong>Krijgt een alias spam, dan weet je wie hem heeft gelekt.</strong> Leg het hieronder vast en
       verwijder de alias. De spam stopt direct, bij de bron, zonder filter dat je moet bijhouden.</li>
@@ -1629,22 +1623,22 @@ export function email(state) {
   <div class="card">
     <h2>${L('Handling what is already arriving', 'Wat er nu al binnenkomt')}</h2>
     <ul class="small">${L(`
-      <li><strong>Legitimate marketing you once signed up for</strong> — use the unsubscribe link. In the EU
+      <li><strong>Legitimate marketing you once signed up for:</strong> use the unsubscribe link. In the EU
       they must honour it, and you can cite Art. 21(3) GDPR if they do not.</li>
-      <li><strong>Criminal spam and phishing</strong> — never click unsubscribe. It confirms a live human
+      <li><strong>Criminal spam and phishing:</strong> never click unsubscribe. It confirms a live human
       reads the mailbox and raises your value on the lists. Report as junk and delete.</li>
-      <li><strong>Spam to an address you never gave out</strong> — it came from a breach or a broker. See
+      <li><strong>Spam to an address you never gave out:</strong> it came from a breach or a broker. See
       <a href="#/find">who has your data</a>.</li>
-      <li><strong>Extortion mail quoting a real password</strong> — it is from a breach dump, not a hacked
+      <li><strong>Extortion mail quoting a real password:</strong> it is from a breach dump, not a hacked
       camera. Change that password everywhere, ignore the rest.</li>
       <li><strong>Turn off remote images</strong> in Mail. Tracking pixels confirm you opened it.</li>`, `
-      <li><strong>Echte nieuwsbrieven waar je je ooit voor aanmeldde</strong> — gebruik de afmeldlink. In de EU
+      <li><strong>Echte nieuwsbrieven waar je je ooit voor aanmeldde:</strong> gebruik de afmeldlink. In de EU
       moeten ze die honoreren; doen ze dat niet, verwijs dan naar art. 21 lid 3 AVG.</li>
-      <li><strong>Criminele spam en phishing</strong> — klik nooit op afmelden. Dat bevestigt dat er een mens
+      <li><strong>Criminele spam en phishing:</strong> klik nooit op afmelden. Dat bevestigt dat er een mens
       meeleest en maakt je adres meer waard. Markeer als ongewenst en verwijder.</li>
-      <li><strong>Spam naar een adres dat je nooit uitgaf</strong> — dat komt uit een datalek of van een
+      <li><strong>Spam naar een adres dat je nooit uitgaf:</strong> dat komt uit een datalek of van een
       databroker. Bekijk <a href="#/find">wie je gegevens heeft</a>.</li>
-      <li><strong>Afpersingsmail met een echt wachtwoord</strong> — dat komt uit een gelekte database, niet van
+      <li><strong>Afpersingsmail met een echt wachtwoord:</strong> dat komt uit een gelekte database, niet van
       een gehackte camera. Wijzig dat wachtwoord overal en negeer de rest.</li>
       <li><strong>Zet externe afbeeldingen uit</strong> in Mail. Trackingpixels verraden dat je de mail opende.</li>`)}
     </ul>
@@ -1654,9 +1648,9 @@ export function email(state) {
     <h2>${L('Alias tracker', 'Alias-logboek')} <span class="muted small">${aliases.length} ${L('tracked', 'vastgelegd')}${
       burned.length ? `, ${burned.length} ${L('burned', 'verbrand')}` : ''}</span></h2>
     <p class="small muted">${L(`Log which alias you gave to which company. When spam turns up, this tells you who
-    sold or leaked it — and that company becomes a target for an erasure request.`,
+    sold or leaked it, and that company becomes a target for an erasure request.`,
     `Leg vast welke alias je aan welk bedrijf gaf. Komt er spam op binnen, dan weet je wie hem verkocht of
-    lekte — en dat bedrijf krijgt een verwijderverzoek.`)}</p>
+    lekte, en dat bedrijf krijgt een verwijderverzoek.`)}</p>
     <div class="row">
       <input id="al-alias" placeholder="alias@icloud.com" style="flex:1;min-width:180px">
       <input id="al-service" placeholder="${L('Company it was given to', 'Bedrijf dat hem kreeg')}" style="flex:1;min-width:160px">
@@ -1668,7 +1662,7 @@ export function email(state) {
           <div class="name mono">${esc(a.alias)}
             ${a.status === 'burned' ? `<span class="pill overdue">${L('burned', 'verbrand')}</span>` : ''}
             ${a.spamSeen ? `<span class="pill escalated">${a.spamSeen} spam</span>` : ''}</div>
-          <div class="meta">${L('given to', 'gegeven aan')} ${esc(a.service || '—')} · ${esc(a.createdAt)}</div>
+          <div class="meta">${L('given to', 'gegeven aan')} ${esc(a.service || '?')} · ${esc(a.createdAt)}</div>
         </div>
         <div class="actions">
           <button data-action="spam" data-id="${esc(a.id)}">${L('Got spam', 'Spam ontvangen')}</button>
@@ -1738,10 +1732,10 @@ export function profile(state) {
   </div>
 
   <div class="notice">
-    <p>${L(`Stored in this browser only, under <code>localStorage</code>. It is not encrypted — anyone with access
+    <p>${L(`Stored in this browser only, under <code>localStorage</code>. It is not encrypted: anyone with access
     to your unlocked computer and this browser profile can read it. Clearing site data wipes it, so keep a
     backup below.`,
-    `Alleen opgeslagen in deze browser, in <code>localStorage</code>. Niet versleuteld — wie bij je ontgrendelde
+    `Alleen opgeslagen in deze browser, in <code>localStorage</code>. Niet versleuteld: wie bij je ontgrendelde
     computer en dit browserprofiel kan, kan het lezen. Websitegegevens wissen haalt het weg, dus maak hieronder
     een back-up.`)}</p>
   </div>
@@ -1777,9 +1771,9 @@ export function profile(state) {
   <div class="card">
     <h2>${L('Breach database API key', 'API-sleutel voor de datalekdatabase')} <span class="muted small">${L('optional', 'optioneel')}</span></h2>
     <p class="small muted">${L(`You almost certainly do not need this. Checking your address is free on
-    their website — see <a href="#/find">who has your data</a>. A key only buys you the same answer listed
+    their website; see <a href="#/find">who has your data</a>. A key only buys you the same answer listed
     inside this app instead of on their site.`,
-    `Dit heb je vrijwel zeker niet nodig. Je adres controleren is gratis op hun website — zie
+    `Dit heb je vrijwel zeker niet nodig. Je adres controleren is gratis op hun website, zie
     <a href="#/find">wie je gegevens heeft</a>. Met een sleutel krijg je hetzelfde antwoord, alleen in deze app
     in plaats van op hun site.`)}</p>
     <div class="row">
@@ -1797,9 +1791,9 @@ export function profile(state) {
       <button class="danger" data-action="wipe">${L('Erase everything', 'Alles wissen')}</button>
     </div>
     <p class="small muted" style="margin-top:8px">${L(`Export before you clear browser data, switch machines, or
-    reinstall. The file contains everything above in plain text — keep it somewhere sensible.`,
+    reinstall. The file contains everything above in plain text, so keep it somewhere sensible.`,
     `Exporteer voordat je browsergegevens wist, van computer wisselt of opnieuw installeert. Het bestand bevat
-    alles hierboven als leesbare tekst — bewaar het op een veilige plek.`)}</p>
+    alles hierboven als leesbare tekst, dus bewaar het op een veilige plek.`)}</p>
   </div>`;
 }
 
@@ -1894,24 +1888,24 @@ export function about() {
   const ext = (href, text) => `<a href="${href}" target="_blank" rel="noopener noreferrer">${text}</a>`;
   const contact = CONTACT_EMAIL
     ? `<a href="mailto:${esc(CONTACT_EMAIL)}">${esc(CONTACT_EMAIL)}</a>`
-    : L(`${ext(REPO + '/issues', 'GitHub')} (public — never post personal details there)`,
-        `${ext(REPO + '/issues', 'GitHub')} (openbaar — zet daar nooit persoonsgegevens neer)`);
+    : L(`${ext(REPO + '/issues', 'GitHub')} (public: never post personal details there)`,
+        `${ext(REPO + '/issues', 'GitHub')} (openbaar: zet daar nooit persoonsgegevens neer)`);
   const sec = (title, body) => `<section class="card legal"><h2>${title}</h2>${body}</section>`;
 
   return `
   <div class="head">
     <h1>${L('About &amp; privacy', 'Over &amp; privacy')}</h1>
-    <p>${L('HoopUp — from the Dutch <i>hoepel op!</i>, "get lost" — tells spammers, scammers and data brokers to leave you alone: off their mailing lists, out of their files, and without handing your data to yet another company.',
-      'HoopUp — van <i>hoepel op!</i> — zegt spammers, oplichters en databrokers dat ze je met rust moeten laten: van hun mailinglijsten af, uit hun bestanden, en zonder je gegevens aan nóg een bedrijf te geven.')}</p>
+    <p>${L('HoopUp (from the Dutch <i>hoepel op!</i>, "get lost") tells spammers, scammers and data brokers to leave you alone: off their mailing lists, out of their files, and without handing your data to yet another company.',
+      'HoopUp (van <i>hoepel op!</i>) zegt spammers, oplichters en databrokers dat ze je met rust moeten laten: van hun mailinglijsten af, uit hun bestanden, en zonder je gegevens aan nóg een bedrijf te geven.')}</p>
   </div>
 
   ${sec(L('What it does', 'Wat het doet'), `<ul>${L(`
       <li><b>Unsubscribe</b> from real companies, in one go where they support it.</li>
-      <li><b>Block scams</b> — and other unsafe mail such as gambling spam, never a real company.</li>
+      <li><b>Block scams</b> and other unsafe mail such as gambling spam, never a real company.</li>
       <li><b>Delete your data</b>: letters under the GDPR, sent from your own mail app, with reminders and a complaint to the regulator when a company ignores you.</li>
       <li><b>Advise on your addresses</b>: which one gets mostly spam, and whether to keep or retire it.</li>`, `
       <li><b>Uitschrijven</b> bij echte bedrijven, in één keer waar ze dat ondersteunen.</li>
-      <li><b>Oplichters blokkeren</b> — en andere onveilige mail zoals gokspam, nooit een echt bedrijf.</li>
+      <li><b>Oplichters blokkeren</b> en andere onveilige mail zoals gokspam, nooit een echt bedrijf.</li>
       <li><b>Je gegevens laten wissen</b>: brieven op grond van de AVG, verstuurd vanuit je eigen mailapp, met herinneringen en een klacht bij de toezichthouder als een bedrijf je negeert.</li>
       <li><b>Advies over je adressen</b>: welk adres vooral spam krijgt, en of je het houdt of opheft.</li>`)}</ul>`)}
 
@@ -1971,11 +1965,11 @@ export function about() {
     <li>HoopUp is free and provided as is, without any guarantee. It is practical guidance, not legal advice.</li>
     <li>You send every letter and unsubscribe yourself, and you are responsible for what you send. Read each letter before you send it.</li>
     <li>Use it for your own data. Writing on behalf of someone else needs their permission.</li>
-    <li>Company contact details may be outdated or guessed; the app marks guessed ones. We cannot see whether a company really erased your data — the app tracks deadlines so you can hold them to it.</li>
+    <li>Company contact details may be outdated or guessed; the app marks guessed ones. We cannot see whether a company really erased your data; the app tracks deadlines so you can hold them to it.</li>
     <li>HoopUp is open source under the MIT licence: ${ext(REPO, 'source code')}.</li>`, `
     <li>HoopUp is gratis en wordt geleverd zoals het is, zonder enige garantie. Het is praktische uitleg, geen juridisch advies.</li>
     <li>Je verstuurt elke brief en elke uitschrijving zelf, en je bent verantwoordelijk voor wat je verstuurt. Lees elke brief voordat je hem verstuurt.</li>
     <li>Gebruik het voor je eigen gegevens. Namens iemand anders schrijven mag alleen met diens toestemming.</li>
-    <li>Contactgegevens van bedrijven kunnen verouderd of gegokt zijn; de app markeert gegokte adressen. We kunnen niet zien of een bedrijf je gegevens echt heeft gewist — de app houdt de termijnen bij zodat je ze eraan kunt houden.</li>
+    <li>Contactgegevens van bedrijven kunnen verouderd of gegokt zijn; de app markeert gegokte adressen. We kunnen niet zien of een bedrijf je gegevens echt heeft gewist; de app houdt de termijnen bij zodat je ze eraan kunt houden.</li>
     <li>HoopUp is open source onder de MIT-licentie: ${ext(REPO, 'broncode')}.</li>`)}</ul>`)}`;
 }

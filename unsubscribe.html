@@ -10,7 +10,7 @@
 
   It is loaded in a hidden same-origin iframe. A framed document served from its
   own URL gets its own policy rather than inheriting the parent's, so index.html
-  — the page that actually holds the user's identity file — keeps its strict
+  (the page that actually holds the user's identity file) keeps its strict
   connect-src and still cannot reach any host but the two breach endpoints.
 
   This worker never reads localStorage, never touches the profile, and accepts
