@@ -62,10 +62,19 @@ receiving mail server recorded (`Authentication-Results`, `Received-SPF`, spam s
 | Verified, no unsubscribe link (an order confirmation, a bank) | An erasure letter only — never a block |
 | Failed authentication, with an "unsubscribe" link | Block; the link is flagged as a tracker, never clicked |
 | Failed authentication, no link | Block |
+| Passed authentication, but rated high-confidence spam by the mail provider (Microsoft SCL 9, `CAT:HSPM`/`PHSH`, `X-Spam-Flag: YES`) | Block |
+| Passed authentication, but advertising gambling, crypto get-rich schemes, fake prizes or adult/pharma spam | Block — a casino that owns its domain passes SPF, DKIM and DMARC perfectly |
 | No authentication result either way | Neither — listed as "could not verify", so it is not blocked or written to by mistake |
 
-Block rules never use the From domain: on forged mail it is either made up or a real company's borrowed
-for the scam. A spoof of a real company (say a fake bol.com) is grouped separately from the genuine
+Passing the sender check proves who sent a message, not that it is wanted, so content counts too. Each
+category needs two hits, with a strong pattern ("free spins", "casino", "you have won") counting double,
+so a single ordinary word never trips it: Albert Heijn's "Bonus" offers and a bank's "your account is
+blocked" notice stay real companies (account-scare wording only counts against unverified senders). Only
+the category is stored, never the text.
+
+Block rules never use the From domain of forged mail: it is either made up or a real company's borrowed
+for the scam. A sender that passed the check owns its domain, so for an unsafe verified sender the
+domain itself is blocked too. A spoof of a real company (say a fake bol.com) is grouped separately from the genuine
 sender, shown as "(impersonated)", and the real company's domain, link sites and reply hosts are
 excluded from every rule.
 

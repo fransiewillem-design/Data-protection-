@@ -7,7 +7,7 @@ import { relationOf } from './letters.js';
 import { parseMessages, groupBySender } from './mailscan.js';
 import {
   esc, toast, senderClass, unsubTier, upsertSender, runOneClickBatch,
-  startUnsubQueue, wireQueue, wireBlock, blockAllCard, hostOf, nameOf, deleteWork
+  startUnsubQueue, wireQueue, wireBlock, blockAllCard, hostOf, nameOf, deleteWork, unsafeReason
 } from './views.js';
 
 const ICONS = {
@@ -194,8 +194,9 @@ export function home(state) {
   const pending = unsub.filter(t => !t.unsubscribedAt && t.trust === 'verified');
   const unchecked = unsub.filter(t => !t.unsubscribedAt && t.trust !== 'verified');
   const instant = pending.filter(t => unsubTier(t) === 'instant');
-  // Blocking is only for mail that failed the sender check. A real company is
-  // never offered a block — only an unsubscribe and an erasure letter.
+  // Blocking is only for unsafe senders (forged, provider-rated high-confidence
+  // spam, or gambling/crypto/prize/adult content). A real company is never
+  // offered a block — only an unsubscribe and an erasure letter.
   const blocked = mail.filter(t => ['spam', 'bait'].includes(cls(t)));
   const bait = blocked.filter(t => cls(t) === 'bait').length;
   const unclear = mail.filter(t => cls(t) === 'unclear').length;
@@ -236,8 +237,8 @@ export function home(state) {
                             ` ${unchecked.length} ${unchecked.length === 1 ? 'andere kon' : 'andere konden'} niet worden bevestigd — bekijk ze bij Details.`) : '');
 
   const blockText = blockNew.length
-    ? L(`${blockNew.length} ${plural(blockNew.length, 'sender', 'senders', '', '')} failed the sender check${bait ? `, ${bait} with fake unsubscribe links` : ''}. One import blocks them all.`,
-        `${blockNew.length} ${plural(blockNew.length, 'afzender', 'afzenders', 'afzender', 'afzenders')} zakten voor de afzendercontrole${bait ? `, ${bait} met nep-uitschrijflinks` : ''}. Eén import blokkeert ze allemaal.`)
+    ? L(`${blockNew.length} ${plural(blockNew.length, 'sender', 'senders', '', '')} ${blockNew.length === 1 ? 'is' : 'are'} unsafe — scams or spam${bait ? `, ${bait} with fake unsubscribe links` : ''}. One import blocks them all.`,
+        `${blockNew.length} ${plural(blockNew.length, 'afzender', 'afzenders', 'afzender', 'afzenders')} ${blockNew.length === 1 ? 'is' : 'zijn'} onveilig — oplichting of spam${bait ? `, ${bait} met nep-uitschrijflinks` : ''}. Eén import blokkeert ze allemaal.`)
     : state.blockExport
       ? L(`Block list exported ${esc(state.blockExport.at)}. Nothing new since.`, `Blokkeerlijst geëxporteerd op ${esc(state.blockExport.at)}. Sindsdien niets nieuws.`)
       : L('No scams found. Real companies are never blocked — only unsubscribed.', 'Geen oplichting gevonden. Echte bedrijven worden nooit geblokkeerd — alleen uitgeschreven.');
@@ -314,8 +315,7 @@ export function home(state) {
     <div class="list">
       ${mail.map(t => {
         const c = cls(t);
-        const [p, l] = c === 'bait' ? ['overdue', L('fake unsubscribe · block', 'nep-uitschrijflink · blokkeren')]
-          : c === 'spam' ? ['overdue', L('failed check · block', 'zakte voor controle · blokkeren')]
+        const [p, l] = ['bait', 'spam'].includes(c) ? ['overdue', unsafeReason(t) + ' · ' + L('block', 'blokkeren')]
           : c === 'unclear' ? ['low', L('could not verify', 'niet te bevestigen')]
           : t.trust === 'verified' ? ['done', c === 'unsub' ? L('verified · unsubscribe', 'bevestigd · uitschrijven') : L('verified company', 'bevestigd bedrijf')]
           : ['low', L('unverified', 'onbevestigd')];

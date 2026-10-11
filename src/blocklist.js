@@ -25,11 +25,13 @@ const isRealDomain = d => /^[a-z0-9.-]+\.[a-z]{2,}$/i.test(d || '');
 export function buildBlockList(targets, classOf) {
   const blockable = targets.filter(t => ['spam', 'bait'].includes(classOf(t)));
 
-  // Anything a verified sender relies on is off limits, so a newsletter the
-  // user wants can never be caught by a rule written for a scam.
+  // Anything a legitimate sender relies on is off limits, so a newsletter the
+  // user wants can never be caught by a rule written for a scam. "Legitimate"
+  // is the classification, not just a passed sender check: a casino that owns
+  // its domain passes that check, and must not shield its own link sites.
   const safe = new Set();
   for (const t of targets) {
-    if (t.trust !== 'verified') continue;
+    if (t.trust !== 'verified' || !['unsub', 'company'].includes(classOf(t))) continue;
     if (t.site) safe.add(t.site);
     (t.linkDomains || []).forEach(d => safe.add(d));
     (t.replyToHosts || []).forEach(h => safe.add(registrableDomain(h)));
@@ -43,6 +45,9 @@ export function buildBlockList(targets, classOf) {
 
   for (const t of blockable) {
     (t.linkDomains || []).filter(usable).forEach(d => links.add(d));
+    // A sender that passed the check owns its domain, so here — unlike forged
+    // mail — the domain itself is a fair target.
+    if (t.trust === 'verified' && usable(t.site)) links.add(t.site);
     for (const h of t.replyToHosts || []) {
       const reg = registrableDomain(h);
       if (safe.has(reg)) continue;

@@ -416,6 +416,8 @@ export function upsertSender(sn) {
     spam: !sn.unsubHttp,
     trust: sn.trust || 'unknown',
     trustWhy: sn.trustWhy || '',
+    risk: sn.risk || '',
+    providerSpam: !!sn.providerSpam,
     linkDomains: (sn.linkDomains || []).slice(0, 10),
     replyToHosts: (sn.replyToHosts || []).slice(0, 3),
     mailCount: sn.count || 1,
@@ -1033,13 +1035,31 @@ function renderQueue(q, urls, i) {
 export function senderClass(b) {
   if (b.source !== 'mail') return 'company';
   const hasLink = !!(b.unsubUrl && safeUrl(b.unsubUrl));
-  // Only mail that failed authentication is ever blockable.
-  if (b.trust === 'forged') return hasLink ? 'bait' : 'spam';
+  // Unsafe: failed the sender check, rated high-confidence spam by the mail
+  // provider, or selling something unsafe whoever sends it (gambling, crypto,
+  // prize and adult spam). Passing the sender check only proves who sent it.
+  if (unsafeReason(b)) return hasLink ? 'bait' : 'spam';
   if (hasLink) return 'unsub';
   // A verified sender without an unsubscribe link is a real company sending
   // receipts or account mail — a deletion letter, never a block. One that
   // could not be verified either way is left for the user to judge.
   return b.trust === 'verified' ? 'company' : 'unclear';
+}
+
+// Why a sender is treated as unsafe, or '' when it is not.
+export function unsafeReason(b) {
+  if (b.source !== 'mail') return '';
+  if (b.trust === 'forged') return L('failed the sender check', 'zakte voor de afzendercontrole');
+  const R = {
+    gambling: L('gambling advertising', 'gokreclame'),
+    crypto: L('crypto or get-rich pitch', 'crypto- of snel-rijk-reclame'),
+    prize: L('fake prize', 'nepprijs'),
+    adult: L('adult or pharma spam', 'seks- of medicijnspam'),
+    phishing: L('account scare (phishing)', 'accountdreiging (phishing)')
+  };
+  if (b.risk) return R[b.risk] || b.risk;
+  if (b.providerSpam) return L('rated high-confidence spam by your mail provider', 'door je mailprovider als zekere spam aangemerkt');
+  return '';
 }
 
 export function hostOf(u) { try { return new URL(u).hostname; } catch { return ''; } }
@@ -1112,8 +1132,8 @@ export function unsubscribe(state) {
   <div class="head">
     <a class="back" href="#/">${L('← Home', '← Home')}</a>
     <h1>${L('Unsubscribe &amp; block', 'Uitschrijven &amp; blokkeren')}</h1>
-    <p>${L('Real companies get an unsubscribe. Only mail that failed the sender check gets blocked. Stopping the mail is not deletion — <a href="#/delete">that is the other page</a>.',
-           'Echte bedrijven krijg je een uitschrijving. Alleen mail die de afzendercontrole niet doorstond, wordt geblokkeerd. Mail stoppen is geen verwijderen — <a href="#/delete">dat is de andere pagina</a>.')}</p>
+    <p>${L('Real companies get an unsubscribe. Unsafe senders — scams, gambling and other spam — get blocked. Stopping the mail is not deletion — <a href="#/delete">that is the other page</a>.',
+           'Echte bedrijven krijg je een uitschrijving. Onveilige afzenders — oplichting, gokreclame en andere spam — worden geblokkeerd. Mail stoppen is geen verwijderen — <a href="#/delete">dat is de andere pagina</a>.')}</p>
   </div>
 
   ${!mail.length ? `<div class="notice">
@@ -1138,17 +1158,17 @@ export function unsubscribe(state) {
   ${bait.length ? `
     <section class="card danger-card">
       <h2>${L('Fake unsubscribe links — do not click', 'Nep-uitschrijflinks — niet klikken')} <span class="count">${bait.length}</span></h2>
-      <p class="small" style="max-width:62ch">${L('These contain an "unsubscribe" link, but the sender <strong>failed authentication</strong>: your mail provider could not confirm the message came from who it claims. The link is not a way out — it is a tracker. Clicking it tells them a real person reads this mailbox.',
-        'Deze bevatten een "uitschrijven"-link, maar de afzender <strong>zakte voor de afzendercontrole</strong>: je mailprovider kon niet bevestigen dat de mail kwam van wie hij zegt. De link is geen uitweg maar een tracker. Klikken vertelt ze dat er een echt mens deze mailbox leest.')}</p>
-      ${list(bait, b => L('link goes to ', 'link gaat naar ') + hostOf(b.unsubUrl))}
+      <p class="small" style="max-width:62ch">${L('These contain an "unsubscribe" link, but the sender is <strong>unsafe</strong> — the reason is shown per sender. From senders like these the link is not a way out but a tracker: clicking it tells them a real person reads this mailbox.',
+        'Deze bevatten een "uitschrijven"-link, maar de afzender is <strong>onveilig</strong> — de reden staat per afzender. Bij zulke afzenders is de link geen uitweg maar een tracker: klikken vertelt ze dat er een echt mens deze mailbox leest.')}</p>
+      ${list(bait, b => unsafeReason(b) + ' · ' + L('link goes to ', 'link gaat naar ') + hostOf(b.unsubUrl))}
     </section>` : ''}
 
   ${spam.length ? `
     <section class="card">
       <h2>${L('Spam — block, do not reply', 'Spam — blokkeren, niet reageren')} <span class="count">${spam.length}</span></h2>
-      <p class="small muted" style="max-width:60ch">${L('These failed the sender check and offered no way to unsubscribe. Do not click anything in them, and do not send them a letter — any response confirms a person reads this mailbox.',
-        'Deze zakten voor de afzendercontrole en boden geen manier om je uit te schrijven. Klik nergens op en stuur geen brief — elke reactie bevestigt dat er een mens deze mailbox leest.')}</p>
-      ${list(spam)}
+      <p class="small muted" style="max-width:60ch">${L('These are unsafe — the reason is shown per sender — and offered no way to unsubscribe. Do not click anything in them, and do not send them a letter: any response confirms a person reads this mailbox.',
+        'Deze zijn onveilig — de reden staat per afzender — en boden geen manier om je uit te schrijven. Klik nergens op en stuur geen brief: elke reactie bevestigt dat er een mens deze mailbox leest.')}</p>
+      ${list(spam, b => unsafeReason(b) + (b.site ? ' · ' + b.site : ''))}
     </section>` : ''}
 
   ${unclear.length ? `
@@ -1183,8 +1203,8 @@ export function blockAllCard(state, { closable = false } = {}) {
     <div class="row between" style="align-items:flex-start;gap:16px">
       <div>
         <h2>${L(`Block all ${bl.count} at once`, `Blokkeer alle ${bl.count} in één keer`)}</h2>
-        <p class="small muted" style="max-width:58ch;margin:0">${L('Only mail that failed the sender check is blocked. The rules target what these campaigns reuse — the sites their links go to and where replies go — never the From address, which in forged mail is made up or borrowed from a real company.',
-          'Alleen mail die de afzendercontrole niet doorstond, wordt geblokkeerd. De regels richten zich op wat deze campagnes hergebruiken — de sites waar hun links naartoe gaan en waar antwoorden heen gaan — nooit op het afzenderadres, want dat is in vervalste mail verzonnen of geleend van een echt bedrijf.')}</p>
+        <p class="small muted" style="max-width:58ch;margin:0">${L('Only unsafe senders are blocked, never a real company. The rules target what these campaigns reuse — the sites their links go to and where replies go — not the From address, which in forged mail is made up or borrowed from a real company.',
+          'Alleen onveilige afzenders worden geblokkeerd, nooit een echt bedrijf. De regels richten zich op wat deze campagnes hergebruiken — de sites waar hun links naartoe gaan en waar antwoorden heen gaan — niet op het afzenderadres, want dat is in vervalste mail verzonnen of geleend van een echt bedrijf.')}</p>
       </div>
       <div class="row" style="flex-wrap:nowrap">
         <select id="block-client" style="width:auto" aria-label="${L('Your mail app', 'Je mailapp')}">
@@ -1799,11 +1819,11 @@ export function about() {
 
   ${sec(L('What it does', 'Wat het doet'), `<ul>${L(`
       <li><b>Unsubscribe</b> from real companies, in one go where they support it.</li>
-      <li><b>Block scams</b> — only mail that failed the sender check, never a real company.</li>
+      <li><b>Block scams</b> — and other unsafe mail such as gambling spam, never a real company.</li>
       <li><b>Delete your data</b>: letters under the GDPR, sent from your own mail app, with reminders and a complaint to the regulator when a company ignores you.</li>
       <li><b>Advise on your addresses</b>: which one is burned and how to retire it.</li>`, `
       <li><b>Uitschrijven</b> bij echte bedrijven, in één keer waar ze dat ondersteunen.</li>
-      <li><b>Oplichting blokkeren</b> — alleen mail die zakte voor de afzendercontrole, nooit een echt bedrijf.</li>
+      <li><b>Oplichting blokkeren</b> — en andere onveilige mail zoals gokspam, nooit een echt bedrijf.</li>
       <li><b>Je gegevens laten wissen</b>: brieven op grond van de AVG, verstuurd vanuit je eigen mailapp, met herinneringen en een klacht bij de toezichthouder als een bedrijf je negeert.</li>
       <li><b>Advies over je adressen</b>: welk adres verbrand is en hoe je het opheft.</li>`)}</ul>`)}
 

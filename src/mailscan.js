@@ -243,11 +243,68 @@ export function parseAuth(h) {
   let spf = pick('spf');
   if (!spf) { const r = /^\s*(pass|fail|softfail|neutral|none)/i.exec(h['received-spf'] || ''); spf = r ? r[1].toLowerCase() : ''; }
   const scl = parseInt((h['x-ms-exchange-organization-scl'] || '').trim(), 10);
+  const forefront = (h['x-forefront-antispam-report'] || '') + ';' + (h['x-forefront-antispam-report-untrusted'] || '');
   return {
     spf, dkim: pick('dkim'), dmarc: pick('dmarc'),
     scl: Number.isFinite(scl) ? scl : null,
-    compauthFail: /compauth=fail/i.test(ar)
+    compauthFail: /compauth=fail/i.test(ar),
+    // The receiving provider's own verdict. Only the high-confidence grades
+    // count: ordinary junk (Microsoft SCL 5) also catches real newsletters.
+    providerSpam: (Number.isFinite(scl) && scl >= 9) ||
+      /\bCAT:(HSPM|PHSH|HPHSH|HPHISH|MALW|SPOOF)\b/i.test(forefront) ||
+      /^\s*yes\b/i.test(h['x-spam-flag'] || '')
   };
+}
+
+// --- content risk ----------------------------------------------------------
+//
+// Passing the sender check proves who sent a message, not that it is wanted:
+// an online casino that owns its domain passes SPF, DKIM and DMARC perfectly.
+// These categories are unsafe whoever sends them, so they override "verified".
+// Each needs two hits (a strong pattern counts as two), so a single stray word
+// — a shop's "bonus" offer, a bank mentioning "investment" — never trips it.
+
+const RISK = [
+  { cat: 'gambling',
+    strong: [/\bcasino/i, /\b(free|gratis|bonus|extra)[ -]?spins?\b/i, /\bgiros? gratis\b/i, /\bfreispiele\b/i,
+             /\bno[ -]deposit\b/i, /\b(deposit|stortings)[ -]?bonus\b/i, /\bsportsbook\b/i, /\b\d+\s?FS\b/],
+    weak: [/\bjackpots?\b/i, /\bslots?\b/i, /\bwager/i, /\bbetting\b|\bweddenschap/i, /\bgokken\b|\bgok\b/i,
+           /\b(welcome|welkoms?)[ -]?bonus\b/i, /\broulette\b|\bblackjack\b|\bpoker\b/i, /\bbonus (up to|tot|hasta)\b/i,
+           /\bbono\b/i, /\bspins?\b/i] },
+  { cat: 'crypto',
+    strong: [/\b(guaranteed|gegarandeerd)\b.{0,40}\b(returns?|profits?|rendement|winst)\b/i,
+             /\bdouble your (bitcoin|crypto|money|investment)\b/i, /\b(trading|crypto) ?(bot|robot)\b/i],
+    weak: [/\bbitcoin\b/i, /\bcrypto(currency|valuta|munt)?\b/i, /\bpassive income\b|\bpassief inkomen\b/i,
+           /\bforex\b/i, /\bget rich\b|\brijk worden\b/i] },
+  { cat: 'prize',
+    strong: [/\b(you('ve| have)|u heeft|je hebt) (won|gewonnen)\b/i, /\bclaim your (prize|reward|gift|winnings)\b/i,
+             /\b(selected|geselecteerd) (as|als) (a |the |de )?winn/i, /\bclaim (je|uw) (prijs|beloning|cadeau)\b/i],
+    weak: [/\bwinners?\b|\bwinnaar\b/i, /\b(free|gratis) (iphone|ipad|gift ?card|cadeaukaart)\b/i, /\bcongratulations\b|\bgefeliciteerd\b/i] },
+  { cat: 'adult',
+    strong: [/\b(viagra|cialis|levitra)\b/i, /\b(singles|women|vrouwen)\b.{0,25}\b(near you|in your area|bij jou in de buurt)\b/i],
+    weak: [/\bsexy\b/i, /\bhookups?\b/i, /\bxxx\b/i] },
+  // Only applied to senders that are not verified: a real service may well
+  // write that an account is suspended; a stranger saying so is phishing.
+  { cat: 'phishing', unverifiedOnly: true,
+    strong: [/\b(account|mailbox|cloud ?storage|storage|postvak|opslag|wachtwoord|password)\b.{0,50}\b(disabled|suspended|blocked|deactivated|locked|full|expired?|uitgeschakeld|geblokkeerd|opgeschort|vol|verlopen)\b/i],
+    weak: [/\b(verify|confirm|validate|bevestig|verifieer|valideer)\b/i, /\b(urgent|immediately|within 24 hours|binnen 24 uur|direct)\b/i] }
+];
+
+// Sender names and domains that say it outright.
+const RISKY_NAME = /casino|slots?\b|spins?\b|jackpot|\bbet(s|ting|\d)?\b|bet\d|gambl|lotto|loterij/i;
+
+const plain = html => html.replace(/<style[\s\S]*?<\/style>|<script[\s\S]*?<\/script>/gi, ' ')
+  .replace(/<[^>]+>/g, ' ').replace(/&nbsp;/gi, ' ').replace(/&amp;/gi, '&').replace(/&#\d+;|&\w+;/g, ' ');
+
+export function contentRisk({ subject = '', name = '', domain = '', parts = [], verified = false }) {
+  const text = [subject, ...parts.map(p => p.type === 'html' ? plain(p.text) : p.text)].join('\n').slice(0, 40000);
+  if (RISKY_NAME.test(name) || RISKY_NAME.test(domain)) return 'gambling';
+  for (const r of RISK) {
+    if (r.unverifiedOnly && verified) continue;
+    const score = r.strong.filter(re => re.test(text)).length * 2 + r.weak.filter(re => re.test(text)).length;
+    if (score >= 2) return r.cat;
+  }
+  return '';
 }
 
 // 'verified' only when the receiving server confirmed the sender's domain. A
@@ -285,6 +342,7 @@ export function parseMessages(text) {
     const body = split === -1 ? '' : chunk.slice(split).replace(/^\r?\n\r?\n/, '');
     const parts = extractParts(h, body);
     const headerUnsub = parseUnsubscribe(h['list-unsubscribe']);
+    const auth = parseAuth(h);
     const bodyUnsub = headerUnsub.http ? { url: '', how: '' } : findUnsubInBody(parts);
 
     // Which of the user's own addresses this was sent to. This is the ONLY
@@ -308,7 +366,10 @@ export function parseMessages(text) {
       unsubFrom: headerUnsub.http ? 'header' : bodyUnsub.how,
       // RFC 8058: the sender promises a POST alone completes the unsubscribe.
       oneClick: /one-click/i.test(h['list-unsubscribe-post'] || ''),
-      ...senderTrust(from.domain, parseAuth(h)),
+      ...senderTrust(from.domain, auth),
+      providerSpam: auth.providerSpam,
+      risk: contentRisk({ subject: decodeWords(h.subject || ''), name: from.name, domain: from.domain, parts,
+                          verified: senderTrust(from.domain, auth).trust === 'verified' }),
       replyToHost: (parseFrom(h['reply-to'] || '').address.split('@')[1] || '').toLowerCase(),
       linkDomains: collectLinkDomains(parts),
       isEsp: ESP_DOMAINS.has(from.domain)
@@ -330,7 +391,7 @@ export function groupBySender(messages) {
         key, domain: m.domain, name: m.name || m.domain, count: 0,
         unsubHttp: '', unsubMailto: '', unsubFrom: '', oneClick: false,
         addresses: new Set(), recipients: new Set(), subjects: [], isEsp: m.isEsp,
-        linkDomains: new Set(), replyToHosts: new Set()
+        linkDomains: new Set(), replyToHosts: new Set(), risk: '', providerSpamCount: 0
       });
     }
     const g = map.get(key);
@@ -342,6 +403,8 @@ export function groupBySender(messages) {
     if (m.oneClick) g.oneClick = true;
     const rank = { forged: 0, unknown: 1, verified: 2 };
     if (!g.trust || rank[m.trust] < rank[g.trust]) { g.trust = m.trust; g.trustWhy = m.why; }
+    if (m.risk && !g.risk) g.risk = m.risk;
+    if (m.providerSpam) g.providerSpamCount++;
     for (const r of m.recipients) g.recipients.add(r);
     for (const d of m.linkDomains || []) g.linkDomains.add(d);
     if (m.replyToHost) g.replyToHosts.add(m.replyToHost);
@@ -349,7 +412,8 @@ export function groupBySender(messages) {
     if ((g.name === g.domain || !g.name) && m.name) g.name = m.name;
   }
   return [...map.values()]
-    .map(g => ({ ...g, addresses: [...g.addresses], recipients: [...g.recipients],
+    .map(g => ({ ...g, providerSpam: g.providerSpamCount * 2 >= g.count && g.providerSpamCount > 0,
+                 addresses: [...g.addresses], recipients: [...g.recipients],
                  linkDomains: [...g.linkDomains], replyToHosts: [...g.replyToHosts] }))
     .sort((a, b) => b.count - a.count);
 }
