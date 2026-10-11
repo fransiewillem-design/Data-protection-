@@ -1283,41 +1283,52 @@ export function blockAllCard(state, { closable = false } = {}) {
 }
 
 export function blockPanel(bl, client) {
-  const code = arr => arr.map(d => `<code>${esc(d)}</code>`).join(' ') || '—';
-  const sites = code(bl.links);
   const reply = [...bl.replyTo, ...bl.sharedReplyTo];
-  const replies = code(reply);
-  const copyBtns = `<div class="row">
-      ${bl.links.length ? `<button data-action="copy-block" data-fmt="links">${L('Copy link sites', 'Kopieer websites')}</button>` : ''}
-      ${reply.length ? `<button data-action="copy-block" data-fmt="reply">${L('Copy reply addresses', 'Kopieer antwoordadressen')}</button>` : ''}
-    </div>`;
-  const twoRules = `<p class="small muted">${L('Two rules rather than one: inside a single rule, every condition has to match at once.',
-    'Twee regels in plaats van één: binnen één regel moeten alle voorwaarden tegelijk kloppen.')}</p>`;
+  // Mail apps match each entered value on its own only when it is entered on
+  // its own: a pasted list becomes one long value that no message contains.
+  // So the manual clients get one copy button per item, never a copy-all.
+  const chips = arr => `<div class="copy-chips">${arr.map(d =>
+    `<button type="button" class="copy-chip" data-action="copy-one" data-value="${esc(d)}">${esc(d)}</button>`).join('')}</div>`;
+  const oneByOne = `<p class="small muted">${L('Click an item to copy it, paste it, then do the next one: <b>one item per entry</b>. Pasted together they become one long text that no message contains, and the rule never fires. As separate entries, a message only has to match <i>one</i> of them.',
+    'Klik op een item om het te kopiëren, plak het, en doe dan het volgende: <b>elk item apart</b>. Samen geplakt worden ze één lange tekst die in geen enkel bericht staat, en dan doet de regel niets. Los ingevoerd hoeft een bericht maar met <i>één</i> ervan overeen te komen.')}</p>`;
+  const twoRules = `<p class="small muted">${L('Two rules rather than one: inside a single Outlook rule, every condition has to match at once.',
+    'Twee regels in plaats van één: binnen één Outlook-regel moeten alle voorwaarden tegelijk kloppen.')}</p>`;
   const sharedNote = bl.sharedReplyTo.length ? `<p class="small muted">${bl.sharedReplyTo.map(esc).join(', ')}
     ${L(`${bl.sharedReplyTo.length === 1 ? 'is a mailing service' : 'are mailing services'} that legitimate senders use too, so ${bl.sharedReplyTo.length === 1 ? 'it is' : 'they are'} only matched as a reply address, never blocked outright.`,
         `${bl.sharedReplyTo.length === 1 ? 'is een maildienst die' : 'zijn maildiensten die'} ook door echte afzenders ${bl.sharedReplyTo.length === 1 ? 'wordt' : 'worden'} gebruikt. Daarom blokkeren we ${bl.sharedReplyTo.length === 1 ? 'die' : 'ze'} alleen als antwoordadres, nooit helemaal.`)}</p>` : '';
+  const check = how => `<p class="small muted">${L(`<b>Check it works:</b> ${how} The scams should move to the trash. Any that stay hide their link behind a button; the reply rule catches most of those.`,
+    `<b>Controleer of het werkt:</b> ${how} De oplichtersmails horen naar de prullenmand te gaan. Blijven er een paar staan, dan zit hun link achter een knop verstopt; de antwoordregel vangt de meeste daarvan.`)}</p>`;
 
   const steps = {
     outlookcom: `
+      ${oneByOne}
       <ol class="small">
-        ${bl.links.length ? `<li>${L('<b>Settings</b> (gear) → <b>Mail</b> → <b>Rules</b> → <b>Add new rule</b>. Name it <i>HoopUp – links</i>. Condition <b>Subject or body includes</b> — add each of:',
-          '<b>Instellingen</b> (tandwiel) → <b>E-mail</b> → <b>Regels</b> → <b>Nieuwe regel toevoegen</b>. Noem hem <i>HoopUp – links</i>. Voorwaarde <b>Onderwerp of hoofdtekst bevat</b> — voeg elk van deze toe:')} ${sites}. ${L('Action <b>Delete</b>. Save.', 'Actie <b>Verwijderen</b>. Opslaan.')}</li>` : ''}
-        ${reply.length ? `<li>${L('Add a second rule, <i>HoopUp – replies</i>. Condition <b>Message header includes</b> —', 'Voeg een tweede regel toe, <i>HoopUp – antwoorden</i>. Voorwaarde <b>Berichtkop bevat</b> —')} ${replies}. ${L('Action <b>Delete</b>. Save.', 'Actie <b>Verwijderen</b>. Opslaan.')}</li>` : ''}
+        ${bl.links.length ? `<li>${L('<b>Settings</b> (gear) → <b>Mail</b> → <b>Rules</b> → <b>Add new rule</b>. Name it <i>HoopUp – links</i>. Condition <b>Subject or body includes</b>. Paste the first site and press <b>Enter</b>; it turns into a separate tag. Repeat for each site:',
+          '<b>Instellingen</b> (tandwiel) → <b>E-mail</b> → <b>Regels</b> → <b>Nieuwe regel toevoegen</b>. Noem hem <i>HoopUp – links</i>. Voorwaarde <b>Onderwerp of hoofdtekst bevat</b>. Plak de eerste site en druk op <b>Enter</b>; hij wordt een los label. Herhaal dat voor elke site:')}
+          ${chips(bl.links)}${L('Action <b>Delete</b>. Save.', 'Actie <b>Verwijderen</b>. Opslaan.')}</li>` : ''}
+        ${reply.length ? `<li>${L('Add a second rule, <i>HoopUp – replies</i>. Condition <b>Message header includes</b>, again one address at a time, each followed by <b>Enter</b>:',
+          'Voeg een tweede regel toe, <i>HoopUp – antwoorden</i>. Voorwaarde <b>Berichtkop bevat</b>, weer één adres tegelijk, steeds gevolgd door <b>Enter</b>:')}
+          ${chips(reply)}${L('Action <b>Delete</b>. Save.', 'Actie <b>Verwijderen</b>. Opslaan.')}</li>` : ''}
       </ol>
       ${bl.links.length && reply.length ? twoRules : ''}
-      <p class="small muted">${L('Menu names shift slightly between Outlook versions; the conditions are the same.', 'Menunamen verschillen soms per Outlook-versie; de voorwaarden zijn hetzelfde.')}</p>
-      ${copyBtns}`,
+      ${check(L('open each rule and choose <b>Run rule</b> (or tick <i>Run rule now</i> when saving).', 'open elke regel en kies <b>Regel uitvoeren</b> (of vink <i>Regel nu uitvoeren</i> aan bij het opslaan).'))}
+      <p class="small muted">${L('Menu names shift slightly between Outlook versions; the conditions are the same.', 'Menunamen verschillen soms per Outlook-versie; de voorwaarden zijn hetzelfde.')}</p>`,
     outlookwin: `
+      ${oneByOne}
       <ol class="small">
         <li>${L('<b>Home</b> → <b>Rules</b> → <b>Manage Rules &amp; Alerts</b> → <b>New Rule</b> → <b>Apply rule on messages I receive</b>.',
                '<b>Start</b> → <b>Regels</b> → <b>Regels en waarschuwingen beheren</b> → <b>Nieuwe regel</b> → <b>Regel toepassen op berichten die ik ontvang</b>.')}</li>
-        ${bl.links.length ? `<li>${L('Tick <b>with specific words in the body</b>, add each of', 'Vink <b>met specifieke woorden in de hoofdtekst</b> aan, voeg elk toe van')} ${sites}, ${L('then <b>delete it</b> → <b>Finish</b>.', 'kies dan <b>verwijderen</b> → <b>Voltooien</b>.')}</li>` : ''}
-        ${reply.length ? `<li>${L('Make a second rule the same way, using <b>with specific words in the message header</b>:', 'Maak op dezelfde manier een tweede regel, met <b>met specifieke woorden in de berichtkop</b>:')} ${replies}.</li>` : ''}
+        ${bl.links.length ? `<li>${L('Tick <b>with specific words in the body</b> and click <i>specific words</i>. Paste one site, click <b>Add</b>, and repeat — each one on its own line in the list:',
+          'Vink <b>met specifieke woorden in de hoofdtekst</b> aan en klik op <i>specifieke woorden</i>. Plak één site, klik op <b>Toevoegen</b>, en herhaal — elke site op een eigen regel in de lijst:')}
+          ${chips(bl.links)}${L('Then <b>delete it</b> → <b>Finish</b>.', 'Kies dan <b>verwijderen</b> → <b>Voltooien</b>.')}</li>` : ''}
+        ${reply.length ? `<li>${L('Make a second rule the same way, with <b>with specific words in the message header</b>, again one address per <b>Add</b>:',
+          'Maak op dezelfde manier een tweede regel, met <b>met specifieke woorden in de berichtkop</b>, weer één adres per <b>Toevoegen</b>:')}
+          ${chips(reply)}</li>` : ''}
       </ol>
       ${bl.links.length && reply.length ? twoRules : ''}
+      ${check(L('tick <i>Run this rule now on messages already in “Inbox”</i> on the last screen, or use <b>Run Rules Now</b> on your Junk folder.', 'vink op het laatste scherm <i>Deze regel nu toepassen op berichten die al in Postvak IN staan</i> aan, of gebruik <b>Regels nu toepassen</b> op je map Ongewenste e-mail.'))}
       <p class="small muted">${L('Outlook\'s Blocked Senders list only ever matches who a message is from, which is exactly what forged mail fakes — so rules, not that list.',
-        'De lijst Geblokkeerde afzenders in Outlook kijkt alleen naar de afzender, en dat is precies wat vervalste mail nadoet — dus regels, niet die lijst.')}</p>
-      ${copyBtns}`,
+        'De lijst Geblokkeerde afzenders in Outlook kijkt alleen naar de afzender, en dat is precies wat vervalste mail nadoet — dus regels, niet die lijst.')}</p>`,
     gmail: `
       <ol class="small">
         <li>${L('Download the filter file below.', 'Download hieronder het filterbestand.')}</li>
@@ -1329,15 +1340,22 @@ export function blockPanel(bl, client) {
       ${reply.length ? `<p class="small muted">${L('Gmail filters cannot look at the reply address, so the file uses the link sites.', 'Gmail-filters kunnen niet naar het antwoordadres kijken, dus het bestand gebruikt de websites.')}</p>` : ''}
       <div class="row"><button class="primary" data-action="dl-block" data-fmt="gmail" ${bl.links.length ? '' : 'disabled'}>${L('Download Gmail filters', 'Download Gmail-filters')}</button></div>`,
     apple: `
+      ${oneByOne}
       <ol class="small">
-        <li>${L('Mail on your Mac → <b>Settings</b> → <b>Rules</b> → <b>Add Rule</b>. Name it <i>HoopUp</i>, and set <b>If any of the following conditions are met</b>.',
-               'Mail op je Mac → <b>Instellingen</b> → <b>Regels</b> → <b>Voeg regel toe</b>. Noem hem <i>HoopUp</i> en kies <b>Als aan een van de volgende voorwaarden is voldaan</b>.')}</li>
-        ${bl.links.length ? `<li>${L('For each of', 'Voor elk van')} ${sites} ${L('add <b>Message Content</b> · <b>Contains</b> · <i>the site</i>.', 'voeg toe: <b>Berichtinhoud</b> · <b>Bevat</b> · <i>de site</i>.')}</li>` : ''}
-        ${reply.length ? `<li>${L('Add <b>Reply-To</b> · <b>Contains</b> ·', 'Voeg toe: <b>Reply-To</b> · <b>Bevat</b> ·')} ${replies} ${L('(choose <i>Edit Header List…</i> in the first menu if Reply-To is not offered).', '(kies <i>Wijzig kopregellijst…</i> in het eerste menu als Reply-To er niet tussen staat).')}</li>` : ''}
-        <li>${L('Action <b>Move Message</b> → <b>Trash</b>. Click <b>Apply</b> when asked, to clear existing mail.', 'Actie <b>Verplaats bericht</b> → <b>Prullenmand</b>. Klik op <b>Pas toe</b> als daarom wordt gevraagd, om bestaande mail op te ruimen.')}</li>
+        <li>${L('Mail on your Mac → <b>Settings</b> → <b>Rules</b> → <b>Add Rule</b>. Name it <i>HoopUp</i>, and set the top menu to <b>If <u>any</u> of the following conditions are met</b> — with <i>all</i>, nothing would ever match.',
+               'Mail op je Mac → <b>Instellingen</b> → <b>Regels</b> → <b>Voeg regel toe</b>. Noem hem <i>HoopUp</i> en zet het bovenste menu op <b>Als aan <u>een</u> van de volgende voorwaarden is voldaan</b> — met <i>alle</i> klopt er nooit iets.')}</li>
+        ${bl.links.length ? `<li>${L('One condition row per site: <b>Message Content</b> · <b>contains</b> · paste one site. Click <b>+</b> at the end of the row for the next one.',
+          'Eén voorwaarderegel per site: <b>Berichtinhoud</b> · <b>bevat</b> · plak één site. Klik op <b>+</b> aan het eind van de regel voor de volgende.')}
+          ${chips(bl.links)}</li>` : ''}
+        ${reply.length ? `<li>${L('Reply-To is not in the menu until you add it, once: open the first menu of a new row, choose <b>Edit Header List…</b> (at the bottom), click <b>+</b>, type <code>Reply-To</code> and click <b>OK</b>.',
+          'Reply-To staat pas in het menu als je het één keer toevoegt: open het eerste menu van een nieuwe regel, kies <b>Wijzig kopregellijst…</b> (onderaan), klik op <b>+</b>, typ <code>Reply-To</code> en klik op <b>OK</b>.')}</li>
+        <li>${L('Then one row per address: <b>Reply-To</b> · <b>contains</b> · paste one address, <b>+</b> for the next.',
+          'Daarna één regel per adres: <b>Reply-To</b> · <b>bevat</b> · plak één adres, <b>+</b> voor de volgende.')}
+          ${chips(reply)}</li>` : ''}
+        <li>${L('Action <b>Move Message</b> → <b>Trash</b>. Click <b>OK</b>, then <b>Apply</b> when asked, to clear existing mail.', 'Actie <b>Verplaats bericht</b> → <b>Prullenmand</b>. Klik op <b>OK</b> en dan op <b>Pas toe</b> als daarom wordt gevraagd, om bestaande mail op te ruimen.')}</li>
       </ol>
-      <p class="small muted">${L('Mac rules run while Mail is open.', 'Regels op de Mac werken zolang Mail open is.')}</p>
-      ${copyBtns}`,
+      ${check(L('open your Junk mailbox, select all (⌘A), then <b>Message</b> → <b>Apply Rules</b> (⌥⌘L).', 'open je map Ongewenst, selecteer alles (⌘A) en kies <b>Bericht</b> → <b>Pas regels toe</b> (⌥⌘L).'))}
+      <p class="small muted">${L('Mac rules run while Mail is open.', 'Regels op de Mac werken zolang Mail open is.')}</p>`,
     sieve: `
       <ol class="small">
         <li>${L('Download the Sieve script below.', 'Download hieronder het Sieve-script.')}</li>
@@ -1387,6 +1405,11 @@ export function wireBlock(root, state, onChange) {
     if (act === 'dl-block') {
       downloadText(blockText(store.get(), btn.dataset.fmt));
       toast(L('Downloaded — import it, then press Done', 'Gedownload — importeer het en druk dan op Klaar'));
+    }
+    if (act === 'copy-one') {
+      navigator.clipboard.writeText(btn.dataset.value)
+        .then(() => { btn.classList.add('copied'); toast(L('Copied — paste it as one entry', 'Gekopieerd — plak het als los item')); })
+        .catch(() => toast(L('Could not copy', 'Kopiëren mislukt')));
     }
     if (act === 'copy-block') {
       navigator.clipboard.writeText(blockText(store.get(), btn.dataset.fmt).text)

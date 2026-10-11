@@ -2,7 +2,7 @@
 // client. Generated on the device and handed over as a file or text to import;
 // nothing is sent anywhere, and the app never touches the mailbox itself.
 
-import { registrableDomain } from './mailscan.js';
+import { registrableDomain, cleanHost } from './mailscan.js';
 
 // Mail services shared by many senders, legitimate ones included. Blocking one
 // of these outright would catch wanted mail, so they only ever appear as a
@@ -34,7 +34,7 @@ export function buildBlockList(targets, classOf) {
     if (t.trust !== 'verified' || !['unsub', 'company'].includes(classOf(t))) continue;
     if (t.site) safe.add(t.site);
     (t.linkDomains || []).forEach(d => safe.add(d));
-    (t.replyToHosts || []).forEach(h => safe.add(registrableDomain(h)));
+    (t.replyToHosts || []).forEach(h => safe.add(registrableDomain(cleanHost(h))));
   }
   const usable = d => isRealDomain(d) && !safe.has(d) && !SHARED_SERVICES.has(d);
 
@@ -48,7 +48,8 @@ export function buildBlockList(targets, classOf) {
     // A sender that passed the check owns its domain, so here — unlike forged
     // mail — the domain itself is a fair target.
     if (t.trust === 'verified' && usable(t.site)) links.add(t.site);
-    for (const h of t.replyToHosts || []) {
+    // Cleaned again here for senders stored before cleanHost existed.
+    for (const h of (t.replyToHosts || []).map(cleanHost).filter(Boolean)) {
       const reg = registrableDomain(h);
       if (safe.has(reg)) continue;
       (SHARED_SERVICES.has(reg) ? sharedReplyTo : replyTo).add(h);

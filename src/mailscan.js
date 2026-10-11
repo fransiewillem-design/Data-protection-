@@ -62,6 +62,13 @@ export function registrableDomain(host) {
   return lastTwo;
 }
 
+// The host part of an address, cut at the first character no hostname can
+// hold: malformed headers like 'x@scam.example>' would otherwise carry the
+// stray '>' into a block rule, which then never matches.
+export function cleanHost(h) {
+  return String(h || '').toLowerCase().split(/[\s<>"'()[\],;:\\]/)[0].replace(/^\.+|\.+$/g, '');
+}
+
 export function parseFrom(raw) {
   const value = decodeWords(raw || '');
 
@@ -82,10 +89,10 @@ export function parseFrom(raw) {
     name = address ? '' : bare;
   }
 
-  address = address.replace(/^["']|["']$/g, '').trim();
+  address = address.replace(/^["'<]+|["'>]+$/g, '').trim();
   name = name.replace(/^["']|["']$/g, '').trim();
-  const host = address.split('@')[1] || '';
-  return { address, name, domain: registrableDomain(host) };
+  const host = cleanHost(address.split('@')[1]);
+  return { address, name, host, domain: registrableDomain(host) };
 }
 
 // List-Unsubscribe: <https://...>, <mailto:...?subject=unsub>
@@ -400,7 +407,7 @@ export function parseMessages(text) {
       providerSpam: auth.providerSpam,
       risk: contentRisk({ subject: decodeWords(h.subject || ''), name: from.name, domain: from.domain, parts,
                           verified: senderTrust(from.domain, auth).trust === 'verified' }),
-      replyToHost: (parseFrom(h['reply-to'] || '').address.split('@')[1] || '').toLowerCase(),
+      replyToHost: parseFrom(h['reply-to'] || '').host,
       linkDomains: collectLinkDomains(parts),
       isEsp: ESP_DOMAINS.has(from.domain)
     };
