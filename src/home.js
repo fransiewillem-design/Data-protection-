@@ -88,18 +88,18 @@ function addressPanel(state) {
       <button class="link-btn" data-action="panel-close">${L('Close', 'Sluiten')}</button></div>
     <p class="small muted" style="margin-top:-4px">${L(
       'Based only on the mail you dropped in — usually your junk folder. Mail from people you know is in your inbox, so HoopUp cannot see who else relies on an address. That is why it asks.',
-      'Alleen gebaseerd op de mail die je erin sleepte — meestal je map Ongewenst. Mail van mensen die je kent staat in je inbox, dus HoopUp kan niet zien wie een adres nog meer gebruikt. Daarom vraagt hij het je.')}</p>
+      'Dit is alleen gebaseerd op de mail die je erin sleepte, meestal je map Ongewenst. Mail van mensen die je kent staat in je inbox, dus HoopUp kan niet zien wie een adres nog meer gebruikt. Daarom vragen we het jou.')}</p>
     ${health.map(h => {
       const pct = Math.round(100 * h.scam / Math.max(h.total, 1));
       const a = h.address;
       const names = h.real.map(esc).join(', ');
       const seen = L(`In what you scanned, <b>${h.scam} of ${h.total}</b> mails to this address were spam or scams.`,
-                     `In wat je scande, waren <b>${h.scam} van de ${h.total}</b> mails aan dit adres spam of oplichting.`)
+                     `Van de gescande mails aan dit adres waren er <b>${h.scam} van de ${h.total}</b> spam of oplichting.`)
         + (h.real.length ? ' ' + L(`Real companies that also use it: ${names}.`, `Echte bedrijven die het ook gebruiken: ${names}.`) : '');
       let body;
       if (h.verdict === 'ok') {
         body = `<p class="small muted">${h.total} ${plural(h.total, 'mail', 'mails', 'mail', 'mails')}, ${h.scam
-          ? L(`${h.scam} of them spam — nothing to act on`, `waarvan ${h.scam} spam — niets om iets mee te doen`)
+          ? L(`${h.scam} of them spam — nothing to act on`, `waarvan ${h.scam} spam — geen actie nodig`)
           : L('no spam', 'geen spam')}.</p>`;
       } else if (answers[a] === 'retire') {
         body = `<p>${seen}</p>
@@ -113,9 +113,9 @@ function addressPanel(state) {
             'Controleer eerst of er geen account dat je nodig hebt nog met dit adres inlogt — wachtwoordherstel gaat naar dit adres.')} ${change(a)}</p>`;
       } else if (answers[a] === 'keep') {
         body = `<p>${seen}</p>
-          <p><b>${L('Keep it, and make it quieter:', 'Houd het, en maak het rustiger:')}</b></p>
+          <p><b>${L('Keep it, and make it quieter:', 'Houd het, maar maak het rustiger:')}</b></p>
           <ol class="small">
-            <li>${L('Block the scams with one import — the <b>Block scams</b> card on Home.', 'Blokkeer de oplichting met één import — de kaart <b>Oplichting blokkeren</b> op Home.')}</li>
+            <li>${L('Block the scams with one import — the <b>Block scams</b> card on Home.', 'Blokkeer de oplichters met één import, via de kaart <b>Oplichters blokkeren</b> op Home.')}</li>
             <li>${L('Stop giving this address out. Use a separate address for every new sign-up, so the next leak shows who leaked it (<a href="#/aliases">Aliases</a>).',
                     'Geef dit adres niet meer uit. Gebruik voor elke nieuwe aanmelding een apart adres, zodat het volgende lek laat zien wie lekte (<a href="#/aliases">Aliassen</a>).')}</li>
             ${h.real.length ? `<li>${L(`When convenient, move ${names} to their own address too.`, `Verhuis ${names} als het uitkomt ook naar een eigen adres.`)}</li>` : ''}
@@ -181,10 +181,10 @@ export function home(state) {
     <img class="hero-mark" src="assets/img/icon.svg" alt="" width="56" height="56">
     <h1>${L('Stop spam. Get your data deleted.', 'Stop spam. Laat je gegevens wissen.')}</h1>
     <p>${L('Drop in the mail from your junk folder. HoopUp tells you what to do with each sender.',
-           'Sleep de mail uit je map Ongewenst hierheen. HoopUp vertelt je wat je met elke afzender doet.')}</p>
+           'Sleep de mail uit je map Ongewenst hierheen. HoopUp vertelt je per afzender wat je ermee kunt doen.')}</p>
     <ol class="steps">
       <li><b>${L('Unsubscribe', 'Uitschrijven')}</b><span>${L('from real companies', 'bij echte bedrijven')}</span></li>
-      <li><b>${L('Block', 'Blokkeren')}</b><span>${L('scams and fake senders', 'oplichting en nepafzenders')}</span></li>
+      <li><b>${L('Block', 'Blokkeren')}</b><span>${L('scams and fake senders', 'oplichters en nepafzenders')}</span></li>
       <li><b>${L('Delete', 'Wissen')}</b><span>${L('your data at companies', 'je gegevens bij bedrijven')}</span></li>
     </ol>
     ${dropZone(false)}
@@ -245,20 +245,20 @@ export function home(state) {
 
   const unsubText = (pending.length
       ? L(`${pending.length} verified ${plural(pending.length, 'company', 'companies', '', '')}.`,
-          `${pending.length} ${plural(pending.length, 'bevestigd bedrijf', 'bevestigde bedrijven', 'bevestigd bedrijf', 'bevestigde bedrijven')}.`)
+          `${pending.length} ${plural(pending.length, 'echt bedrijf', 'echte bedrijven', 'echt bedrijf', 'echte bedrijven')}.`)
         + (instant.length ? L(` ${instant.length} ${instant.length === 1 ? 'goes' : 'go'} in one click.`,
-                              ` ${instant.length} met één klik.`) : '')
+                              ` Waarvan ${instant.length} met één klik.`) : '')
       : unsub.length && !unchecked.length
         ? L(`Unsubscribed from all ${unsub.length}.`, `Bij alle ${unsub.length} uitgeschreven.`)
-        : L('No verified company left to unsubscribe from.', 'Geen bevestigd bedrijf meer om je bij uit te schrijven.'))
+        : L('No verified company left to unsubscribe from.', 'Geen echt bedrijf meer om je bij uit te schrijven.'))
     + (unchecked.length ? L(` ${unchecked.length} more could not be verified — check ${unchecked.length === 1 ? 'it' : 'them'} in Details.`,
-                            ` ${unchecked.length} ${unchecked.length === 1 ? 'andere kon' : 'andere konden'} niet worden bevestigd — bekijk ze bij Details.`) : '');
+                            ` ${unchecked.length} ${unchecked.length === 1 ? 'andere kon' : 'andere konden'} niet worden gecontroleerd — bekijk ze bij Details.`) : '');
 
   const blockText = !blocked.length
-    ? L('No scams found. Real companies are never blocked — only unsubscribed.', 'Geen oplichting gevonden. Echte bedrijven worden nooit geblokkeerd — alleen uitgeschreven.')
+    ? L('No scams found. Real companies are never blocked — only unsubscribed.', 'Geen oplichters gevonden. Echte bedrijven worden nooit geblokkeerd, alleen uitgeschreven.')
     : !doneIds.size
     ? L(`${blocked.length} ${plural(blocked.length, 'sender', 'senders', '', '')} ${blocked.length === 1 ? 'is' : 'are'} unsafe — scams or spam${bait ? `, ${bait} with fake unsubscribe links` : ''}. One import blocks them all.`,
-        `${blocked.length} ${plural(blocked.length, 'afzender', 'afzenders', 'afzender', 'afzenders')} ${blocked.length === 1 ? 'is' : 'zijn'} onveilig — oplichting of spam${bait ? `, ${bait} met nep-uitschrijflinks` : ''}. Eén import blokkeert ze allemaal.`)
+        `${blocked.length} ${plural(blocked.length, 'afzender', 'afzenders', 'afzender', 'afzenders')} ${blocked.length === 1 ? 'is' : 'zijn'} onveilig — oplichters of spam${bait ? `, ${bait} met nep-uitschrijflinks` : ''}. Eén import blokkeert ze allemaal.`)
     : newRules
     ? L(`${blockNew.length} new unsafe ${plural(blockNew.length, 'sender', 'senders', '', '')} since you blocked on ${doneAt} — ${newRules} new ${newRules === 1 ? 'rule' : 'rules'} to add.`,
         `${blockNew.length} nieuwe onveilige ${plural(blockNew.length, '', '', 'afzender', 'afzenders')} sinds je op ${doneAt} blokkeerde — ${newRules} ${newRules === 1 ? 'nieuwe regel' : 'nieuwe regels'} toe te voegen.`)
@@ -268,7 +268,7 @@ export function home(state) {
     : L(`Blocked on ${doneAt}. Nothing new since.`, `Geblokkeerd op ${doneAt}. Sindsdien niets nieuws.`);
 
   const addrText = open.length
-    ? `<span class="mono">${esc(open[0].address)}</span> ${L('gets mostly spam. One question decides what to do.', 'krijgt vooral spam. Eén vraag bepaalt wat je doet.')}${open.length > 1
+    ? `<span class="mono">${esc(open[0].address)}</span> ${L('gets mostly spam. One question decides what to do.', 'krijgt vooral spam. Beantwoord één vraag en je weet wat je kunt doen.')}${open.length > 1
         ? L(` ${open.length - 1} more to check.`, ` Nog ${open.length - 1} te bekijken.`) : ''}`
     : flagged.length
     ? L('You decided for every address that gets mostly spam.', 'Je hebt een besluit genomen voor elk adres dat vooral spam krijgt.')
@@ -287,11 +287,11 @@ export function home(state) {
   <div class="actions">
     ${card({ icon: 'unsub', n: pending.length, title: L('Unsubscribe', 'Uitschrijven'),
       text: unsubText,
-      cta: L(`Unsubscribe from ${pending.length}`, `Bij ${pending.length} uitschrijven`), action: 'home-unsub',
+      cta: L(`Unsubscribe from ${pending.length}`, `Schrijf je uit bij ${pending.length}`), action: 'home-unsub',
       done: L('Nothing left', 'Niets meer te doen'), more: '#/unsubscribe' })}
 
     ${card({ icon: 'block', n: blockTodo, tone: blockTodo ? 'tone-bad' : '',
-      title: L('Block scams', 'Oplichting blokkeren'),
+      title: L('Block scams', 'Oplichters blokkeren'),
       text: blockText,
       cta: doneIds.size ? L(`Block ${blockTodo} new`, `${blockTodo} nieuwe blokkeren`)
                         : L(`Block all ${blockTodo}`, `Alle ${blockTodo} blokkeren`),
@@ -322,13 +322,13 @@ export function home(state) {
     ${card({ icon: 'addr', n: open.length,
       title: L('Your addresses', 'Je adressen'),
       text: addrText,
-      cta: L('Take a look', 'Bekijk het'), action: 'home-addr',
+      cta: L('Take a look', 'Bekijken'), action: 'home-addr',
       done: flagged.length ? `<button class="link-btn" data-action="home-addr">${L('Review', 'Bekijken')}</button>` : L('All fine', 'Alles in orde') })}
   </div>
 
   ${unclear ? `<p class="small muted">${L(
     `${unclear} ${plural(unclear, 'sender', 'senders', '', '')} could not be checked either way, so ${unclear === 1 ? 'it is' : 'they are'} neither blocked nor written to. <a href="#/unsubscribe">See which</a>.`,
-    `${unclear} ${plural(unclear, '', '', 'afzender', 'afzenders')} ${unclear === 1 ? 'kon' : 'konden'} niet gecontroleerd worden, dus ${unclear === 1 ? 'die wordt' : 'die worden'} niet geblokkeerd en niet aangeschreven. <a href="#/unsubscribe">Bekijk welke</a>.`)}</p>` : ''}
+    `${unclear} ${plural(unclear, '', '', 'afzender', 'afzenders')} ${unclear === 1 ? 'kon' : 'konden'} niet gecontroleerd worden. Die blokkeren we niet en schrijven we niet aan. <a href="#/unsubscribe">Bekijk welke</a>.`)}</p>` : ''}
 
   <div id="unsub-queue"></div>
   <div id="panel"></div>
@@ -341,9 +341,9 @@ export function home(state) {
       ${mail.map(t => {
         const c = cls(t);
         const [p, l] = ['bait', 'spam'].includes(c) ? ['overdue', unsafeReason(t) + ' · ' + L('block', 'blokkeren')]
-          : c === 'unclear' ? ['low', L('could not verify', 'niet te bevestigen')]
-          : t.trust === 'verified' ? ['done', c === 'unsub' ? L('verified · unsubscribe', 'bevestigd · uitschrijven') : L('verified company', 'bevestigd bedrijf')]
-          : ['low', L('unverified', 'onbevestigd')];
+          : c === 'unclear' ? ['low', L('could not verify', 'niet te controleren')]
+          : t.trust === 'verified' ? ['done', c === 'unsub' ? L('verified · unsubscribe', 'echt bedrijf · uitschrijven') : L('verified company', 'echt bedrijf')]
+          : ['low', L('unverified', 'niet gecontroleerd')];
         return `<div class="pick" style="cursor:default">
           <span class="pick-name">${esc(nameOf(t))}${akaOf(t) ? `<span class="aka">${esc(akaOf(t))}</span>` : ''}</span><span class="pill ${p}">${l}</span>
           ${t.unsubscribedAt ? `<span class="pill">${L('unsubscribed', 'uitgeschreven')}</span>` : ''}

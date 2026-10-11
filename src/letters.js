@@ -70,7 +70,19 @@ function identityBlockNL(p) {
   return lines.length ? lines.join('\n') : '[Vul je gegevens in op de pagina Instellingen]';
 }
 
-const ref = () => 'DR-' + Math.random().toString(36).slice(2, 7).toUpperCase();
+const ref = () => 'HU-' + Math.random().toString(36).slice(2, 7).toUpperCase();
+
+// Letters carry dates the way people write them: "11 oktober 2026".
+const MONTHS = {
+  nl: ['januari', 'februari', 'maart', 'april', 'mei', 'juni', 'juli', 'augustus', 'september', 'oktober', 'november', 'december'],
+  en: ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December']
+};
+const todayISO = () => new Date().toISOString().slice(0, 10);
+export function longDate(iso, nl) {
+  const [y, m, d] = String(iso || '').split('-').map(Number);
+  if (!y || !m || !d) return iso || '';
+  return `${d} ${MONTHS[nl ? 'nl' : 'en'][m - 1]} ${y}`;
+}
 
 export const TEMPLATES = {
   // --- GDPR: erasure + access + objection in one letter -----------------------
@@ -119,14 +131,14 @@ Please confirm receipt of this request.
 
 Yours faithfully,
 ${signature(b, p, false)}
-${new Date().toISOString().slice(0, 10)}`
+${longDate(todayISO(), false)}`
   },
 
   gdpr_erasure_nl: {
     label: 'AVG verwijderingsverzoek (NL)',
     jurisdiction: 'EU',
     subject: (b, p) => `Verzoek op grond van artikel 15, 17 en 21 AVG — ${subjectId(b, p)}`,
-    body: (b, p) => `Aan de Functionaris Gegevensbescherming / Privacy Team van ${b.name},
+    body: (b, p) => `Aan de Functionaris Gegevensbescherming / het privacyteam van ${b.name},
 
 Ik ben betrokkene in de zin van de Algemene verordening gegevensbescherming (AVG / Verordening (EU) 2016/679). Hierbij doe ik een beroep op mijn rechten met betrekking tot alle persoonsgegevens die u over mij verwerkt.
 
@@ -164,7 +176,7 @@ Graag ontvang ik een ontvangstbevestiging.
 
 Met vriendelijke groet,
 ${signature(b, p, true)}
-${new Date().toISOString().slice(0, 10)}`
+${longDate(todayISO(), true)}`
   },
 
   // --- CCPA / CPRA ------------------------------------------------------------
@@ -199,7 +211,7 @@ If I am outside California and you decline on that basis, treat this letter as a
 
 Yours faithfully,
 ${signature(b, p, false)}
-${new Date().toISOString().slice(0, 10)}`
+${longDate(todayISO(), false)}`
   },
 
   // --- Follow-ups -------------------------------------------------------------
@@ -209,7 +221,7 @@ ${new Date().toISOString().slice(0, 10)}`
     subject: (b, p) => `Overdue: request under Articles 15, 17 and 21 GDPR — ${subjectId(b, p)}`,
     body: (b, p, rec) => `To the Data Protection Officer / Privacy Team of ${b.name},
 
-On ${rec?.sentAt || '[date]'} I sent you a request to erase my personal data and to stop processing it, under Articles 15, 17 and 21 GDPR. The one-month period set by Article 12(3) has now passed without an adequate response.
+On ${rec?.sentAt ? longDate(rec.sentAt, false) : '[date]'} I sent you a request to erase my personal data and to stop processing it, under Articles 15, 17 and 21 GDPR. The one-month period set by Article 12(3) has now passed without an adequate response.
 
 IDENTIFYING DETAILS
 ${isEvidenceDerived(b) ? minimalBlock(b, false) : identityBlock(p)}
@@ -220,7 +232,7 @@ Failure to respond is itself an infringement of Article 12(3) and (4). If I have
 
 Yours faithfully,
 ${signature(b, p, false)}
-${new Date().toISOString().slice(0, 10)}`
+${longDate(todayISO(), false)}`
   },
 
   complaint: {
@@ -235,9 +247,9 @@ COMPLAINANT
 ${identityBlock(p)}
 
 WHAT HAPPENED
-On ${rec?.sentAt || '[date]'} I sent ${b.name} a request under Articles 15, 17 and 21 GDPR, asking them to erase my personal data, to stop processing it for direct marketing, and to disclose the source of any data they retain.
+On ${rec?.sentAt ? longDate(rec.sentAt, false) : '[date]'} I sent ${b.name} a request under Articles 15, 17 and 21 GDPR, asking them to erase my personal data, to stop processing it for direct marketing, and to disclose the source of any data they retain.
 
-The statutory period under Article 12(3) expired on ${rec?.sentAt ? addDays(rec.sentAt, 30) : '[date]'}. ${rec?.status === 'refused'
+The statutory period under Article 12(3) expired on ${rec?.sentAt ? longDate(addDays(rec.sentAt, 30), false) : '[date]'}. ${rec?.status === 'refused'
   ? 'The controller refused the request without providing an adequate legal basis.'
   : 'The controller has not responded, or has not responded adequately.'}
 
@@ -251,12 +263,12 @@ WHAT I ASK
 I ask the authority to investigate, to order the controller to comply with my request, and to consider whether enforcement action is appropriate.
 
 ENCLOSURES
-  - My original request of ${rec?.sentAt || '[date]'}
+  - My original request of ${rec?.sentAt ? longDate(rec.sentAt, false) : '[date]'}
   - ${rec?.status === 'refused' ? 'The controller’s refusal' : 'Proof of delivery, and any reminder sent'}
 
 Yours faithfully,
 ${p.fullName || '[your name]'}
-${new Date().toISOString().slice(0, 10)}`
+${longDate(todayISO(), false)}`
   }
 };
 
@@ -268,7 +280,7 @@ TEMPLATES.reminder_nl = {
   subject: (b, p) => `Termijn verstreken: verzoek op grond van artikel 15, 17 en 21 AVG — ${subjectId(b, p)}`,
   body: (b, p, rec) => `Aan de Functionaris Gegevensbescherming / het privacyteam van ${b.name},
 
-Op ${rec?.sentAt || '[datum]'} heb ik u verzocht mijn persoonsgegevens te wissen en de verwerking ervan te staken, op grond van artikel 15, 17 en 21 AVG. De termijn van één maand uit artikel 12, lid 3, is inmiddels verstreken zonder toereikende reactie.
+Op ${rec?.sentAt ? longDate(rec.sentAt, true) : '[datum]'} heb ik u verzocht mijn persoonsgegevens te wissen en de verwerking ervan te staken, op grond van artikel 15, 17 en 21 AVG. De termijn van één maand uit artikel 12, lid 3, is inmiddels verstreken zonder toereikende reactie.
 
 IDENTIFICATIEGEGEVENS
 ${isEvidenceDerived(b) ? minimalBlock(b, true) : identityBlockNL(p)}
@@ -279,7 +291,7 @@ Het uitblijven van een reactie is op zichzelf een schending van artikel 12, lid 
 
 Met vriendelijke groet,
 ${signature(b, p, true)}
-${new Date().toISOString().slice(0, 10)}`
+${longDate(todayISO(), true)}`
 };
 
 TEMPLATES.complaint_nl = {
@@ -294,9 +306,9 @@ KLAGER
 ${identityBlockNL(p)}
 
 WAT ER GEBEURDE
-Op ${rec?.sentAt || '[datum]'} heb ik ${b.name} verzocht op grond van artikel 15, 17 en 21 AVG mijn persoonsgegevens te wissen, de verwerking voor direct marketing te staken en de bron te noemen van gegevens die zij bewaren.
+Op ${rec?.sentAt ? longDate(rec.sentAt, true) : '[datum]'} heb ik ${b.name} verzocht op grond van artikel 15, 17 en 21 AVG mijn persoonsgegevens te wissen, de verwerking voor direct marketing te staken en de bron te noemen van gegevens die zij bewaren.
 
-De wettelijke termijn uit artikel 12, lid 3, is verstreken op ${rec?.sentAt ? addDays(rec.sentAt, 30) : '[datum]'}. ${rec?.status === 'refused'
+De wettelijke termijn uit artikel 12, lid 3, is verstreken op ${rec?.sentAt ? longDate(addDays(rec.sentAt, 30), true) : '[datum]'}. ${rec?.status === 'refused'
   ? 'De verwerkingsverantwoordelijke heeft het verzoek geweigerd zonder toereikende rechtsgrond.'
   : 'De verwerkingsverantwoordelijke heeft niet, of niet toereikend, gereageerd.'}
 
@@ -310,12 +322,12 @@ WAT IK VRAAG
 Ik verzoek de Autoriteit Persoonsgegevens dit te onderzoeken, de verwerkingsverantwoordelijke op te dragen aan mijn verzoek te voldoen, en te overwegen of handhaving passend is.
 
 BIJLAGEN
-  - Mijn oorspronkelijke verzoek van ${rec?.sentAt || '[datum]'}
+  - Mijn oorspronkelijke verzoek van ${rec?.sentAt ? longDate(rec.sentAt, true) : '[datum]'}
   - ${rec?.status === 'refused' ? 'De weigering van de verwerkingsverantwoordelijke' : 'Bewijs van verzending, en de eventueel verstuurde herinnering'}
 
 Met vriendelijke groet,
 ${p.fullName || '[naam]'}
-${new Date().toISOString().slice(0, 10)}`
+${longDate(todayISO(), true)}`
 };
 
 // --- Existing customers ---------------------------------------------------------
@@ -354,7 +366,7 @@ Please respond within one month, as Article 12(3) GDPR requires.
 
 Yours faithfully,
 ${signature(b, p, false)}
-${new Date().toISOString().slice(0, 10)}`
+${longDate(todayISO(), false)}`
 };
 
 TEMPLATES.customer_minimise_nl = {
@@ -382,7 +394,7 @@ Ik verzoek u binnen één maand te reageren, zoals artikel 12, lid 3, AVG voorsc
 
 Met vriendelijke groet,
 ${signature(b, p, true)}
-${new Date().toISOString().slice(0, 10)}`
+${longDate(todayISO(), true)}`
 };
 
 // --- Which letter, in which language ---------------------------------------------
