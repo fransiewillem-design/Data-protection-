@@ -7,7 +7,7 @@ import { relationOf } from './letters.js';
 import { parseMessages, groupBySender } from './mailscan.js';
 import {
   esc, toast, senderClass, unsubTier, upsertSender, runOneClickBatch,
-  startUnsubQueue, wireQueue, wireBlock, blockAllCard, hostOf, nameOf, deleteWork, unsafeReason
+  startUnsubQueue, wireQueue, wireBlock, blockAllCard, hostOf, nameOf, akaOf, deleteWork, unsafeReason
 } from './views.js';
 
 const ICONS = {
@@ -320,7 +320,7 @@ export function home(state) {
           : t.trust === 'verified' ? ['done', c === 'unsub' ? L('verified · unsubscribe', 'bevestigd · uitschrijven') : L('verified company', 'bevestigd bedrijf')]
           : ['low', L('unverified', 'onbevestigd')];
         return `<div class="pick" style="cursor:default">
-          <span class="pick-name">${esc(nameOf(t))}</span><span class="pill ${p}">${l}</span>
+          <span class="pick-name">${esc(nameOf(t))}${akaOf(t) ? `<span class="aka">${esc(akaOf(t))}</span>` : ''}</span><span class="pill ${p}">${l}</span>
           ${t.unsubscribedAt ? `<span class="pill">${L('unsubscribed', 'uitgeschreven')}</span>` : ''}
           <span class="pick-meta mono">${esc(t.site || '')}</span></div>`;
       }).join('')}

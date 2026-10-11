@@ -280,8 +280,13 @@ const RISK = [
     strong: [/\b(you('ve| have)|u heeft|je hebt) (won|gewonnen)\b/i, /\bclaim your (prize|reward|gift|winnings)\b/i,
              /\b(selected|geselecteerd) (as|als) (a |the |de )?winn/i, /\bclaim (je|uw) (prijs|beloning|cadeau)\b/i],
     weak: [/\bwinners?\b|\bwinnaar\b/i, /\b(free|gratis) (iphone|ipad|gift ?card|cadeaukaart)\b/i, /\bcongratulations\b|\bgefeliciteerd\b/i] },
+  { cat: 'pharma',
+    strong: [/\b(viagra|cialis|levitra|sildenafil|tadalafil|kamagra)\b/i, /\b(no|without) (a )?prescription\b|\bzonder recept\b/i,
+             /\b(cheap|discount|goedkope?)\b.{0,25}\b(meds|medication|pills|tablets|medicijnen|pillen)\b/i],
+    weak: [/\bpharmacy\b/i, /\b(pills|tablets|meds|pillen)\b/i, /\b(erectile|erectie|potency|potentie)\b/i,
+           /\b(weight loss|afvallen|ozempic|wegovy)\b/i] },
   { cat: 'adult',
-    strong: [/\b(viagra|cialis|levitra)\b/i, /\b(singles|women|vrouwen)\b.{0,25}\b(near you|in your area|bij jou in de buurt)\b/i],
+    strong: [/\b(singles|women|vrouwen)\b.{0,25}\b(near you|in your area|bij jou in de buurt)\b/i],
     weak: [/\bsexy\b/i, /\bhookups?\b/i, /\bxxx\b/i] },
   // Only applied to senders that are not verified: a real service may well
   // write that an account is suspended; a stranger saying so is phishing.
@@ -291,14 +296,39 @@ const RISK = [
 ];
 
 // Sender names and domains that say it outright.
-const RISKY_NAME = /casino|slots?\b|spins?\b|jackpot|\bbet(s|ting|\d)?\b|bet\d|gambl|lotto|loterij/i;
+const RISKY_NAME = [
+  ['gambling', /casino|slots?\b|spins?\b|jackpot|\bbet(s|ting|\d)?\b|bet\d|gambl|lotto|loterij/i],
+  ['pharma', /pharmacy|pharma\b|\bmeds\b|pills|\brx\b|viagra|cialis/i]
+];
+
+// A sender name that claims an organisation people trust, sent from a domain
+// that is not that organisation's. Passing the sender check does not help: the
+// check only vouches for the domain, and the domain is not the one claimed.
+const OFFICIAL = [
+  [/\bbelastingdienst\b|\btoeslagen\b/i, ['belastingdienst.nl', 'toeslagen.nl']],
+  [/\b(rijks)?overheid\b|\binformatievoorziening\b|\bmijnoverheid\b/i, ['overheid.nl', 'rijksoverheid.nl', 'mijnoverheid.nl']],
+  [/\bdigid\b/i, ['digid.nl', 'logius.nl']],
+  [/\bcjib\b/i, ['cjib.nl']], [/\brdw\b/i, ['rdw.nl']], [/\buwv\b/i, ['uwv.nl']], [/\bsvb\b/i, ['svb.nl']],
+  [/\bing\b/i, ['ing.nl', 'ing.com', 'ing.be']], [/\brabobank\b/i, ['rabobank.nl', 'rabobank.com']],
+  [/\babn ?amro\b/i, ['abnamro.nl', 'abnamro.com']], [/\bsns( bank)?\b/i, ['snsbank.nl']], [/\basn ?bank\b/i, ['asnbank.nl']],
+  [/\bpostnl\b/i, ['postnl.nl', 'postnl.com']], [/\bdhl\b/i, ['dhl.com', 'dhl.nl', 'dhl.de', 'dhlparcel.nl', 'dhlecommerce.nl']],
+  [/\bdpd\b/i, ['dpd.nl', 'dpd.com']], [/\bkpn\b/i, ['kpn.com', 'kpn.nl']], [/\bziggo\b/i, ['ziggo.nl', 'vodafoneziggo.nl']],
+  [/\bodido\b/i, ['odido.nl']], [/\bpaypal\b/i, ['paypal.com', 'paypal.nl', 'paypal.de']]
+];
+const ownedBy = (domain, allowed) => allowed.some(a => domain === a || domain.endsWith('.' + a));
+
+export function impersonates(name, domain) {
+  const d = String(domain || '').toLowerCase();
+  return OFFICIAL.some(([re, allowed]) => re.test(name || '') && !ownedBy(d, allowed));
+}
 
 const plain = html => html.replace(/<style[\s\S]*?<\/style>|<script[\s\S]*?<\/script>/gi, ' ')
   .replace(/<[^>]+>/g, ' ').replace(/&nbsp;/gi, ' ').replace(/&amp;/gi, '&').replace(/&#\d+;|&\w+;/g, ' ');
 
 export function contentRisk({ subject = '', name = '', domain = '', parts = [], verified = false }) {
   const text = [subject, ...parts.map(p => p.type === 'html' ? plain(p.text) : p.text)].join('\n').slice(0, 40000);
-  if (RISKY_NAME.test(name) || RISKY_NAME.test(domain)) return 'gambling';
+  for (const [cat, re] of RISKY_NAME) if (re.test(name) || re.test(domain)) return cat;
+  if (impersonates(name, domain)) return 'impersonation';
   for (const r of RISK) {
     if (r.unverifiedOnly && verified) continue;
     const score = r.strong.filter(re => re.test(text)).length * 2 + r.weak.filter(re => re.test(text)).length;
@@ -391,7 +421,7 @@ export function groupBySender(messages) {
         key, domain: m.domain, name: m.name || m.domain, count: 0,
         unsubHttp: '', unsubMailto: '', unsubFrom: '', oneClick: false,
         addresses: new Set(), recipients: new Set(), subjects: [], isEsp: m.isEsp,
-        linkDomains: new Set(), replyToHosts: new Set(), risk: '', providerSpamCount: 0
+        linkDomains: new Set(), replyToHosts: new Set(), risk: '', providerSpamCount: 0, names: new Set()
       });
     }
     const g = map.get(key);
@@ -404,6 +434,7 @@ export function groupBySender(messages) {
     const rank = { forged: 0, unknown: 1, verified: 2 };
     if (!g.trust || rank[m.trust] < rank[g.trust]) { g.trust = m.trust; g.trustWhy = m.why; }
     if (m.risk && !g.risk) g.risk = m.risk;
+    if (m.name) g.names.add(m.name);
     if (m.providerSpam) g.providerSpamCount++;
     for (const r of m.recipients) g.recipients.add(r);
     for (const d of m.linkDomains || []) g.linkDomains.add(d);
@@ -413,7 +444,7 @@ export function groupBySender(messages) {
   }
   return [...map.values()]
     .map(g => ({ ...g, providerSpam: g.providerSpamCount * 2 >= g.count && g.providerSpamCount > 0,
-                 addresses: [...g.addresses], recipients: [...g.recipients],
+                 names: [...g.names], addresses: [...g.addresses], recipients: [...g.recipients],
                  linkDomains: [...g.linkDomains], replyToHosts: [...g.replyToHosts] }))
     .sort((a, b) => b.count - a.count);
 }

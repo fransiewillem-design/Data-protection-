@@ -387,6 +387,8 @@ function breachRow(b, state) {
 // how many mails — never subject lines or message text.
 // Stored names are language-neutral apart from this one marker, translated on display.
 export const nameOf = b => String(b.name || '').replace(/ \(impersonated\)$/, L(' (impersonated)', ' (nagemaakt)'));
+// "LuckyGem · also as Koko.bet, Mr. Punter" for senders that rotate names.
+export const akaOf = b => b.aka?.length ? L('also as ', 'ook als ') + b.aka.join(', ') : '';
 
 export function upsertSender(sn) {
   const state = store.get();
@@ -417,6 +419,9 @@ export function upsertSender(sn) {
     trust: sn.trust || 'unknown',
     trustWhy: sn.trustWhy || '',
     risk: sn.risk || '',
+    // Other names the same sender used: one spam operation often rotates
+    // brands (four "casinos" from one domain), and the user should see that.
+    aka: (sn.names || []).filter(n => n && n !== base).slice(0, 5),
     providerSpam: !!sn.providerSpam,
     linkDomains: (sn.linkDomains || []).slice(0, 10),
     replyToHosts: (sn.replyToHosts || []).slice(0, 3),
@@ -1053,8 +1058,10 @@ export function unsafeReason(b) {
   const R = {
     gambling: L('gambling advertising', 'gokreclame'),
     crypto: L('crypto or get-rich pitch', 'crypto- of snel-rijk-reclame'),
+    pharma: L('pharmacy spam', 'medicijnspam'),
+    impersonation: L('pretends to be an official organisation', 'doet zich voor als een officiële instantie'),
     prize: L('fake prize', 'nepprijs'),
-    adult: L('adult or pharma spam', 'seks- of medicijnspam'),
+    adult: L('adult spam', 'seksspam'),
     phishing: L('account scare (phishing)', 'accountdreiging (phishing)')
   };
   if (b.risk) return R[b.risk] || b.risk;
@@ -1124,7 +1131,7 @@ export function unsubscribe(state) {
 
   const list = (items, extra = () => '') => `<div class="list">${items.map(b => `
     <div class="pick" style="cursor:default;flex-wrap:wrap">
-      <span class="pick-name">${esc(nameOf(b))}</span>
+      <span class="pick-name">${esc(nameOf(b))}${akaOf(b) ? `<span class="aka">${esc(akaOf(b))}</span>` : ''}</span>
       <span class="pick-meta mono">${esc(extra(b) || b.site || '')}</span>
     </div>`).join('')}</div>`;
 

@@ -63,14 +63,16 @@ receiving mail server recorded (`Authentication-Results`, `Received-SPF`, spam s
 | Failed authentication, with an "unsubscribe" link | Block; the link is flagged as a tracker, never clicked |
 | Failed authentication, no link | Block |
 | Passed authentication, but rated high-confidence spam by the mail provider (Microsoft SCL 9, `CAT:HSPM`/`PHSH`, `X-Spam-Flag: YES`) | Block |
-| Passed authentication, but advertising gambling, crypto get-rich schemes, fake prizes or adult/pharma spam | Block — a casino that owns its domain passes SPF, DKIM and DMARC perfectly |
+| Passed authentication, but advertising gambling, crypto get-rich schemes, fake prizes, pharmacy or adult spam | Block — a casino that owns its domain passes SPF, DKIM and DMARC perfectly |
+| A name claiming a trusted organisation (Belastingdienst, overheid, DigiD, ING, Rabobank, PostNL, DHL, KPN, PayPal…) sent from a domain that is not theirs | Block — the check vouches for the domain, and the domain is not the one claimed |
 | No authentication result either way | Neither — listed as "could not verify", so it is not blocked or written to by mistake |
 
 Passing the sender check proves who sent a message, not that it is wanted, so content counts too. Each
 category needs two hits, with a strong pattern ("free spins", "casino", "you have won") counting double,
 so a single ordinary word never trips it: Albert Heijn's "Bonus" offers and a bank's "your account is
 blocked" notice stay real companies (account-scare wording only counts against unverified senders). Only
-the category is stored, never the text.
+the category is stored, never the text. One spam operation often rotates brand names on a single domain
+(four "casinos" from one sender); every name it used is shown with it.
 
 Block rules never use the From domain of forged mail: it is either made up or a real company's borrowed
 for the scam. A sender that passed the check owns its domain, so for an unsafe verified sender the
