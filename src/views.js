@@ -1298,8 +1298,8 @@ export function blockPanel(bl, client) {
   };
 
   return steps[client] + sharedNote + `
-    <p class="small muted" style="margin-top:10px">${L('New variants keep coming: these operations change domains constantly. Scan your junk again in a few weeks and update the rules — the list grows each time. If one address gets nothing but this, it is burned; retiring it beats any filter.',
-      'Er blijven nieuwe varianten komen: deze partijen wisselen voortdurend van domein. Scan over een paar weken je ongewenste mail opnieuw en werk de regels bij — de lijst groeit elke keer. Krijgt één adres alleen nog dit soort mail, dan is het verbrand; dat adres opheffen werkt beter dan elk filter.')}</p>`;
+    <p class="small muted" style="margin-top:10px">${L('New variants keep coming: these operations change domains constantly. Scan your junk again in a few weeks and update the rules — the list grows each time. If one address gets little else, see <b>Your addresses</b> on Home.',
+      'Er blijven nieuwe varianten komen: deze partijen wisselen voortdurend van domein. Scan over een paar weken je ongewenste mail opnieuw en werk de regels bij — de lijst groeit elke keer. Krijgt één adres weinig anders meer, kijk dan bij <b>Je adressen</b> op Home.')}</p>`;
 }
 
 export function blockText(state, fmt) {
@@ -1828,11 +1828,11 @@ export function about() {
       <li><b>Unsubscribe</b> from real companies, in one go where they support it.</li>
       <li><b>Block scams</b> — and other unsafe mail such as gambling spam, never a real company.</li>
       <li><b>Delete your data</b>: letters under the GDPR, sent from your own mail app, with reminders and a complaint to the regulator when a company ignores you.</li>
-      <li><b>Advise on your addresses</b>: which one is burned and how to retire it.</li>`, `
+      <li><b>Advise on your addresses</b>: which one gets mostly spam, and whether to keep or retire it.</li>`, `
       <li><b>Uitschrijven</b> bij echte bedrijven, in één keer waar ze dat ondersteunen.</li>
       <li><b>Oplichting blokkeren</b> — en andere onveilige mail zoals gokspam, nooit een echt bedrijf.</li>
       <li><b>Je gegevens laten wissen</b>: brieven op grond van de AVG, verstuurd vanuit je eigen mailapp, met herinneringen en een klacht bij de toezichthouder als een bedrijf je negeert.</li>
-      <li><b>Advies over je adressen</b>: welk adres verbrand is en hoe je het opheft.</li>`)}</ul>`)}
+      <li><b>Advies over je adressen</b>: welk adres vooral spam krijgt, en of je het houdt of opheft.</li>`)}</ul>`)}
 
   <h2 class="legal-title" id="privacy">${L('Privacy statement', 'Privacyverklaring')}</h2>
   <p class="small muted">${L(`Last updated ${UPDATED.en}.`, `Laatst bijgewerkt op ${UPDATED.nl}.`)}</p>

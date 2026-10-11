@@ -14,6 +14,7 @@ const EMPTY = {
   aliases: [],    // { id, alias, service, createdAt, status, spamSeen }
   custom: [],     // user-added brokers, same shape as data/brokers.json entries
   hibpKey: '',
+  addressAnswers: {}, // address -> 'keep' | 'retire': the user's answer on Home
   uiLang: ''      // '' = follow the browser; 'en' | 'nl' once chosen
 };
 

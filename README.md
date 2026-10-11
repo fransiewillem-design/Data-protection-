@@ -42,16 +42,22 @@ Drop mail in and Home sorts it into four cards, each with one number and one but
 | **Unsubscribe** | One-click unsubscribe for *verified* senders; senders that could not be verified are named, never bulk-clicked |
 | **Block scams** | One import for your mail app that blocks every sender that failed the sender check, via its reused link sites and reply addresses |
 | **Delete my data** | Opens the letters for companies that genuinely hold your data |
-| **Your addresses** | Per-address advice from what the scan found (below) |
+| **Your addresses** | Which address gets mostly spam, and one question to decide whether to keep or retire it (below) |
 
-**Burned addresses.** For every address the scanned mail reached, Home measures how much of it was scam or
-spam and which real senders still depend on it. An address with repeated scams and no real senders is
-**burned**: filters chase new domains indefinitely, while an address that no longer exists cannot be sold
-again, so the advice is to retire it, with provider-specific steps (Microsoft alias or account, iCloud
-Hide My Email, Gmail filter). An address under heavy attack that real senders still use is **under
-attack**: the advice is to move those named senders to a fresh address first, then retire it — or keep it
-for people and stop using it for sign-ups. Thresholds: at least two scams, and none (burned) or at least
-half (under attack) of its mail.
+**Your addresses.** Every mail says which address it was sent to, so Home can count, per address, how
+much of the scanned mail was spam or scams and which real companies in the scan also use it. An address
+with at least two unsafe mails making up at least half of its mail is shown as **mostly spam**. That is
+all the app can honestly say: the scan is usually a junk folder, and the friends, bank and shops that
+rely on an address write to the inbox, which the app never sees. So it asks one question — *do people
+or companies you need still use this address?* — and the answer decides the advice:
+
+- **No, I can let it go** → move any real company it saw first, then provider-specific steps to retire
+  the address (Microsoft alias or account, iCloud Hide My Email, Gmail filter), with a warning that
+  password resets go to it.
+- **Yes, I still need it** → keep it and make it quieter: block the scams, stop giving it out, use a
+  separate address per new sign-up.
+
+The answer is remembered and can be changed.
 
 **Who gets blocked, and who only gets an unsubscribe.** Each scanned sender is classified from what the
 receiving mail server recorded (`Authentication-Results`, `Received-SPF`, spam score):

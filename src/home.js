@@ -23,8 +23,8 @@ const icon = k => `<svg viewBox="0 0 24 24" width="22" height="22" fill="none" s
 // ---- address health --------------------------------------------------------
 //
 // For each address the scanned mail reached: how much of it was scam or spam,
-// and which real senders still depend on it. An address that only ever gets
-// scams is burned — no filter keeps up, and retiring it ends the stream.
+// and which real senders in the scan still use it. The user decides whether to
+// keep or retire it; the app only knows what was dropped in.
 
 export function addressHealth(state) {
   const by = new Map();
@@ -42,12 +42,13 @@ export function addressHealth(state) {
     // safe to retire, nor count as evidence that it is overrun.
     else if (c !== 'unclear') h.real.push(t.name);
   }
-  const rank = { burned: 0, strained: 1, ok: 2 };
+  // One soft grade. The scan is usually a junk folder, which says nothing about
+  // the friends, bank or shops that use an address from the inbox, so the app
+  // reports what it saw and asks the user rather than declaring it "burned".
   return [...by.values()].map(h => ({
     ...h,
-    verdict: h.scam >= 2 && h.real.length === 0 ? 'burned'
-           : h.scam >= 2 && h.scam / h.total >= 0.5 ? 'strained' : 'ok'
-  })).sort((a, b) => rank[a.verdict] - rank[b.verdict] || b.scam - a.scam);
+    verdict: h.scam >= 2 && h.scam / h.total >= 0.5 ? 'spammy' : 'ok'
+  })).sort((a, b) => (a.verdict === 'ok') - (b.verdict === 'ok') || b.scam - a.scam);
 }
 
 function retireSteps(addr) {
@@ -78,58 +79,69 @@ function retireSteps(addr) {
 function addressPanel(state) {
   const health = addressHealth(state);
   if (!health.length) return '';
+  const answers = state.addressAnswers || {};
+  const change = a => `<button class="link-btn" data-action="addr-answer" data-addr="${esc(a)}" data-answer="">${L('Change my answer', 'Antwoord wijzigen')}</button>`;
   return `
   <section class="card panel" id="addr-panel">
     <div class="row between"><h2>${L('Your addresses', 'Je adressen')}</h2>
       <button class="link-btn" data-action="panel-close">${L('Close', 'Sluiten')}</button></div>
-    <p class="small muted" style="margin-top:-4px">${L('Based on the mail you have scanned so far.', 'Op basis van de mail die je tot nu toe hebt gescand.')}</p>
+    <p class="small muted" style="margin-top:-4px">${L(
+      'Based only on the mail you dropped in — usually your junk folder. Mail from people you know is in your inbox, so HoopUp cannot see who else relies on an address. That is why it asks.',
+      'Alleen gebaseerd op de mail die je erin sleepte — meestal je map Ongewenst. Mail van mensen die je kent staat in je inbox, dus HoopUp kan niet zien wie een adres nog meer gebruikt. Daarom vraagt hij het je.')}</p>
     ${health.map(h => {
       const pct = Math.round(100 * h.scam / Math.max(h.total, 1));
-      const pill = {
-        burned: ['overdue', L('Burned', 'Verbrand')],
-        strained: ['escalated', L('Under attack', 'Onder vuur')],
-        ok: ['done', L('Fine', 'In orde')]
-      }[h.verdict];
+      const a = h.address;
       const names = h.real.map(esc).join(', ');
-      const one = h.real.length === 1;
-      let body = '';
-      if (h.verdict === 'burned') body = `
-        <p>${L(`<b>${h.scam} of ${h.total}</b> mails were scams or spam, and nothing legitimate reaches it.
-        This address is burned. Filters chase new domains forever; an address that no longer exists
-        cannot be sold again. <b>Retire it.</b>`,
-        `<b>${h.scam} van de ${h.total}</b> mails waren oplichting of spam, en er komt niets legitiems meer op binnen.
-        Dit adres is verbrand. Filters lopen eindeloos achter nieuwe domeinen aan; een adres dat niet meer bestaat
-        kan niet opnieuw verkocht worden. <b>Hef het op.</b>`)}</p>
-        <ol class="small">${retireSteps(h.address).map(x => `<li>${x}</li>`).join('')}</ol>`;
-      if (h.verdict === 'strained') body = `
-        <p>${L(`<b>${h.scam} of ${h.total}</b> mails were scams or spam — but ${one ? 'a real sender still uses' : `${h.real.length} real senders still use`}
-        it: ${names}. Don't retire it yet.`,
-        `<b>${h.scam} van de ${h.total}</b> mails waren oplichting of spam — maar ${one ? 'een echte afzender gebruikt' : `${h.real.length} echte afzenders gebruiken`}
-        het nog: ${names}. Hef het nog niet op.`)}</p>
-        <ol class="small">
-          <li>${L(`Make a fresh address for ${one ? 'that sender' : 'those senders'} —
-          one per company, so a leak names the leaker (<a href="#/aliases">Aliases</a>).`,
-          `Maak een nieuw adres voor ${one ? 'die afzender' : 'die afzenders'} —
-          één per bedrijf, zodat een lek de lekker verraadt (<a href="#/aliases">Aliassen</a>).`)}</li>
-          <li>${L(`Change your address with ${names}.`, `Wijzig je adres bij ${names}.`)}</li>
-          <li>${L(`Then retire this one — or, if friends and family use it, keep it for them and stop
-          using it for sign-ups.`,
-          `Hef daarna dit adres op — of, als vrienden en familie het gebruiken, houd het voor hen en gebruik
-          het niet meer voor aanmeldingen.`)}</li>
-        </ol>`;
-      if (h.verdict === 'ok') body = `<p class="small muted">${h.total} ${plural(h.total, 'mail', 'mails', 'mail', 'mails')},
-        ${h.scam ? L(`${h.scam} of them spam — not enough to act on`, `waarvan ${h.scam} spam — te weinig om iets mee te doen`)
-                 : L('none of them scams', 'geen oplichting')}.</p>`;
+      const seen = L(`In what you scanned, <b>${h.scam} of ${h.total}</b> mails to this address were spam or scams.`,
+                     `In wat je scande, waren <b>${h.scam} van de ${h.total}</b> mails aan dit adres spam of oplichting.`)
+        + (h.real.length ? ' ' + L(`Real companies that also use it: ${names}.`, `Echte bedrijven die het ook gebruiken: ${names}.`) : '');
+      let body;
+      if (h.verdict === 'ok') {
+        body = `<p class="small muted">${h.total} ${plural(h.total, 'mail', 'mails', 'mail', 'mails')}, ${h.scam
+          ? L(`${h.scam} of them spam — nothing to act on`, `waarvan ${h.scam} spam — niets om iets mee te doen`)
+          : L('no spam', 'geen spam')}.</p>`;
+      } else if (answers[a] === 'retire') {
+        body = `<p>${seen}</p>
+          <p><b>${L('You can let it go. To retire it:', 'Je kunt het missen. Zo hef je het op:')}</b></p>
+          <ol class="small">${[
+            ...(h.real.length ? [L(`First give ${names} a new address, so you keep getting their mail.`,
+                                   `Geef eerst ${names} een nieuw adres, zodat hun mail blijft komen.`)] : []),
+            ...retireSteps(a)
+          ].map(x => `<li>${x}</li>`).join('')}</ol>
+          <p class="small muted">${L('Before you do, check that no account you need still logs in with it — password resets go to this address.',
+            'Controleer eerst of er geen account dat je nodig hebt nog met dit adres inlogt — wachtwoordherstel gaat naar dit adres.')} ${change(a)}</p>`;
+      } else if (answers[a] === 'keep') {
+        body = `<p>${seen}</p>
+          <p><b>${L('Keep it, and make it quieter:', 'Houd het, en maak het rustiger:')}</b></p>
+          <ol class="small">
+            <li>${L('Block the scams with one import — the <b>Block scams</b> card on Home.', 'Blokkeer de oplichting met één import — de kaart <b>Oplichting blokkeren</b> op Home.')}</li>
+            <li>${L('Stop giving this address out. Use a separate address for every new sign-up, so the next leak shows who leaked it (<a href="#/aliases">Aliases</a>).',
+                    'Geef dit adres niet meer uit. Gebruik voor elke nieuwe aanmelding een apart adres, zodat het volgende lek laat zien wie lekte (<a href="#/aliases">Aliassen</a>).')}</li>
+            ${h.real.length ? `<li>${L(`When convenient, move ${names} to their own address too.`, `Verhuis ${names} als het uitkomt ook naar een eigen adres.`)}</li>` : ''}
+          </ol>
+          <p class="small muted">${change(a)}</p>`;
+      } else {
+        body = `<p>${seen}</p>
+          <p><b>${L('Do people or companies you need still use this address?', 'Gebruiken mensen of bedrijven die je nodig hebt dit adres nog?')}</b></p>
+          <div class="row">
+            <button data-action="addr-answer" data-addr="${esc(a)}" data-answer="keep">${L('Yes, I still need it', 'Ja, ik heb het nog nodig')}</button>
+            <button data-action="addr-answer" data-addr="${esc(a)}" data-answer="retire">${L('No, I can let it go', 'Nee, ik kan het missen')}</button>
+          </div>`;
+      }
+      const pill = h.verdict === 'ok' ? ['done', L('Fine', 'In orde')] : ['escalated', L('Mostly spam', 'Vooral spam')];
       return `
       <div class="addr addr-${h.verdict}">
-        <div class="addr-head"><span class="mono">${esc(h.address)}</span>
+        <div class="addr-head"><span class="mono">${esc(a)}</span>
           <span class="pill ${pill[0]}">${pill[1]}</span></div>
-        <div class="meter" title="${pct}% ${L('scam or spam', 'oplichting of spam')}"><span style="width:${pct}%"></span></div>
+        <div class="meter" title="${pct}% ${L('spam or scams', 'spam of oplichting')}"><span style="width:${pct}%"></span></div>
         ${body}
       </div>`;
     }).join('')}
   </section>`;
 }
+
+// Re-open the panel after an answer re-renders the page.
+let reopenAddr = false;
 
 // ---- the page ----------------------------------------------------------------
 
@@ -208,7 +220,7 @@ export function home(state) {
   const followUps = work.reminders.length + work.complaints.length;
   const suspect = [...work.send, ...work.forms].filter(t => relationOf(t, store.getRequest(t.id)) === 'none').length;
   const flagged = addressHealth(state).filter(h => h.verdict !== 'ok');
-  const worst = flagged[0];
+  const open = flagged.filter(h => !(state.addressAnswers || {})[h.address]);
   const mails = mail.reduce((n, t) => n + (t.mailCount || 1), 0);
 
   const card = c => `
@@ -243,11 +255,11 @@ export function home(state) {
       ? L(`Block list exported ${esc(state.blockExport.at)}. Nothing new since.`, `Blokkeerlijst geëxporteerd op ${esc(state.blockExport.at)}. Sindsdien niets nieuws.`)
       : L('No scams found. Real companies are never blocked — only unsubscribed.', 'Geen oplichting gevonden. Echte bedrijven worden nooit geblokkeerd — alleen uitgeschreven.');
 
-  const addrText = worst
-    ? `<span class="mono">${esc(worst.address)}</span> ${worst.verdict === 'burned'
-        ? L('is burned — retire it.', 'is verbrand — hef het op.')
-        : L('is under attack.', 'ligt onder vuur.')}${flagged.length > 1
-        ? L(` ${flagged.length - 1} more ${flagged.length === 2 ? 'needs' : 'need'} attention.`, ` Nog ${flagged.length - 1} ${flagged.length === 2 ? 'vraagt' : 'vragen'} aandacht.`) : ''}`
+  const addrText = open.length
+    ? `<span class="mono">${esc(open[0].address)}</span> ${L('gets mostly spam. One question decides what to do.', 'krijgt vooral spam. Eén vraag bepaalt wat je doet.')}${open.length > 1
+        ? L(` ${open.length - 1} more to check.`, ` Nog ${open.length - 1} te bekijken.`) : ''}`
+    : flagged.length
+    ? L('You decided for every address that gets mostly spam.', 'Je hebt een besluit genomen voor elk adres dat vooral spam krijgt.')
     : L('No address is overrun with spam.', 'Geen enkel adres wordt overspoeld met spam.');
 
   return `
@@ -295,10 +307,11 @@ export function home(state) {
       href: work.send.length ? '#/delete?send=1' : '#/delete',
       done: companies.length ? L('All asked', 'Alles verstuurd') : L('Nothing yet', 'Nog niets') })}
 
-    ${card({ icon: 'addr', n: flagged.length, tone: worst?.verdict === 'burned' ? 'tone-bad' : '',
+    ${card({ icon: 'addr', n: open.length,
       title: L('Your addresses', 'Je adressen'),
       text: addrText,
-      cta: L('See what to do', 'Bekijk wat je kunt doen'), action: 'home-addr', done: L('All fine', 'Alles in orde') })}
+      cta: L('Take a look', 'Bekijk het'), action: 'home-addr',
+      done: flagged.length ? `<button class="link-btn" data-action="home-addr">${L('Review', 'Bekijken')}</button>` : L('All fine', 'Alles in orde') })}
   </div>
 
   ${unclear ? `<p class="small muted">${L(
@@ -363,6 +376,7 @@ export function mountHome(root, state, rerender) {
 
   const panel = root.querySelector('#panel');
   const show = html => { panel.innerHTML = html; panel.scrollIntoView({ behavior: 'smooth', block: 'start' }); };
+  if (reopenAddr && panel) { reopenAddr = false; panel.innerHTML = addressPanel(store.get()); }
 
   root.addEventListener('click', e => {
     const btn = e.target.closest('[data-action]');
@@ -382,6 +396,12 @@ export function mountHome(root, state, rerender) {
     }
     if (act === 'home-block') show(blockAllCard(now, { closable: true }));
     if (act === 'home-addr') show(addressPanel(now));
+    if (act === 'addr-answer') {
+      const { addr, answer } = btn.dataset;
+      store.update(s => { s.addressAnswers = { ...(s.addressAnswers || {}), [addr]: answer || undefined }; });
+      reopenAddr = true;
+      rerender();
+    }
     if (act === 'panel-close') { panel.innerHTML = ''; rerender(); }
   });
 }
