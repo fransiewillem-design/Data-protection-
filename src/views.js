@@ -7,7 +7,7 @@ import { allBreaches, breachesForAccount, pwnedPasswordCount } from './hibp.js';
 import { L, plural, lang } from './i18n.js';
 import { buildBlockList, asLinkList, asReplyList, asGmailXml, asGmailQueries, asSieve, asAppleScript, asPowerShell, guessClient } from './blocklist.js';
 import { isPersonalDomain, cleanHost, nameMatchesDomain } from './mailscan.js';
-import { contactFor, CHECKED } from './contacts.js';
+import { contactFor, CHECKED, lookupAvailable, lookupContact } from './contacts.js';
 
 export const esc = s => String(s ?? '').replace(/[&<>"']/g,
   c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
@@ -16,6 +16,8 @@ export const esc = s => String(s ?? '').replace(/[&<>"']/g,
 // entries can arrive from an imported backup file. Only ever emit http(s) hrefs:
 // a script URL here would run with access to everything in localStorage.
 export function safeUrl(u) {
+  // An empty value is no link at all, not "this page".
+  if (!String(u ?? '').trim()) return '';
   try {
     const parsed = new URL(String(u ?? ''), location.href);
     return ['http:', 'https:'].includes(parsed.protocol) ? parsed.href : '';
@@ -551,6 +553,8 @@ export function brokers(state, catalog, params) {
   }
 
   const sent = mine.filter(b => ['sent', 'ack', 'escalated'].includes(store.getRequest(b.id).status)).length;
+  // Letters about to go to a guessed address that has not been looked up yet.
+  const guessed = work.send.filter(b => b.source === 'mail' && b.site && !b.lookup && contactFor(b, store.getRequest(b.id)).source === 'guess');
   const overdue = targets.filter(b => store.isOverdue(b, store.getRequest(b.id))).length;
 
   return `
@@ -569,6 +573,14 @@ export function brokers(state, catalog, params) {
     <div><b>${mine.length}</b><span>${L('from your evidence', 'uit je eigen mail')}</span></div>
     <div><b>${sent}</b><span>${L('requests sent', 'verzoeken verstuurd')}</span></div>
     <div class="${overdue ? 'bad' : ''}"><b>${overdue}</b><span>${L('past deadline', 'termijn verlopen')}</span></div>
+  </div>` : ''}
+
+  ${!sendQueue && guessed.length && lookupAvailable() ? `<div class="notice">
+    <p><b>${L(`${guessed.length} ${guessed.length === 1 ? 'letter would go' : 'letters would go'} to a guessed address.`, `${guessed.length} ${guessed.length === 1 ? 'brief zou' : 'brieven zouden'} naar een geraden adres gaan.`)}</b>
+      ${L('HoopUp can look up the real privacy address on each company\'s own privacy statement.', 'HoopUp kan het echte privacyadres opzoeken in de privacyverklaring van elk bedrijf zelf.')}</p>
+    <div class="row"><button class="primary" data-action="lookup-all">${L(`Look up ${guessed.length} ${guessed.length === 1 ? 'address' : 'addresses'}`, `${guessed.length} ${guessed.length === 1 ? 'adres' : 'adressen'} opzoeken`)}</button>
+      <span class="small muted">${L('Sends only the companies\' web addresses (like webwinkel.nl) to hoopup.tech, which reads their privacy statements. Nothing about you is sent or kept.',
+        'Stuurt alleen de webadressen van de bedrijven (zoals webwinkel.nl) naar hoopup.tech, dat hun privacyverklaringen leest. Er wordt niets over jou verstuurd of bewaard.')}</span></div>
   </div>` : ''}
 
   ${sendQueue ? sendQueueCard(state) : workCard(work, params)}
@@ -728,6 +740,7 @@ function contactPill(c) {
     you: ['done', L('your address', 'door jou ingevuld')],
     mail: ['done', L('from their own mail', 'uit hun eigen mail')],
     list: ['done', L(`checked ${CHECKED}`, `gecontroleerd ${CHECKED}`)],
+    lookup: ['done', L(`from their privacy statement, ${c.checked}`, `uit hun privacyverklaring, ${c.checked}`)],
     guess: ['low', L('guessed', 'geraden')],
     none: ['overdue', L('no address yet', 'nog geen adres')]
   }[c.source];
@@ -746,6 +759,8 @@ function contactNote(c) {
         'Een gok op basis van hun domein. Zoek "privacy" of "functionaris gegevensbescherming" in hun privacyverklaring (meestal onderaan hun website en hun mails gelinkt), pas het hier aan en verstuur.'));
   else if (c.source === 'mail') parts.push(L(`Their own mail names this address for privacy questions.${link ? ` To double-check: ${link}.` : ''}`,
     `Hun eigen mail noemt dit adres voor privacyvragen.${link ? ` Ter controle: ${link}.` : ''}`));
+  else if (c.source === 'lookup') parts.push(L(`Found in their own privacy statement on ${c.checked}.${link ? ` ${link}` : ''}`,
+    `Gevonden in hun eigen privacyverklaring op ${c.checked}.${link ? ` ${link}` : ''}`));
   else if (c.source === 'list') parts.push(L(`Checked against their own privacy statement in ${CHECKED}.${link ? ` ${link}` : ''}`,
     `Gecontroleerd in hun eigen privacyverklaring (${CHECKED}).${link ? ` ${link}` : ''}`));
   parts.push(L('If the letter bounces, drop the bounce message in on Home: HoopUp then marks the address as wrong.',
@@ -824,6 +839,13 @@ function sendQueueCard(state) {
       <label for="send-to">${L('To', 'Aan')} ${contactPill(contact)}</label>
       <input autocomplete="off" id="send-to" value="${esc(to)}" data-id="${esc(b.id)}" spellcheck="false">
       ${contactNote(contact)}
+      ${['guess', 'none'].includes(contact.source) && b.source === 'mail' && b.site && lookupAvailable()
+        ? (b.lookup
+          ? `<p class="small muted" style="margin:4px 0 0">${L(`Not found on their website (looked on ${esc(b.lookup.checked)}): their privacy statement may only show in a browser. Use the link above.`,
+              `Niet gevonden op hun website (gekeken op ${esc(b.lookup.checked)}): hun privacyverklaring is misschien alleen in een browser te zien. Gebruik de link hierboven.`)}</p>`
+          : `<div class="row" style="margin-top:6px"><button data-action="lookup-contact" data-id="${esc(b.id)}" data-site="${esc(b.site)}">${L('Look it up on their website', 'Zoek het op hun website op')}</button>
+             <span class="small muted">${L('Sends only their web address to hoopup.tech, nothing about you.', 'Stuurt alleen hun webadres naar hoopup.tech, niets over jou.')}</span></div>`)
+        : ''}
     </div>
     <p class="small">${reveals
       ? L(`The letter reveals only <span class="mono">${esc(reveals)}</span>: what their own mail shows they already have.`,
@@ -922,10 +944,42 @@ function wireSend(root, rerender) {
     if (to && to !== recipient(lastTargets.get(e.target.dataset.id) || {})) store.setRecipient(e.target.dataset.id, to);
   });
 
-  root.addEventListener('click', e => {
+  // Looked-up addresses are saved with the company, with the date, so a letter
+  // or reminder later uses the same one and the user sees where it came from.
+  const EMAIL = /^[a-z0-9._+-]+@[a-z0-9.-]+\.[a-z]{2,}$/i;
+  const saveLookups = found => store.update(st => {
+    for (const [id, f] of found) {
+      const t = st.custom.find(c => c.id === id);
+      if (t) t.lookup = { email: EMAIL.test(f.email) ? f.email.toLowerCase() : '', url: safeUrl(f.url) ? f.url : '', checked: f.checked || store.today() };
+    }
+  });
+
+  root.addEventListener('click', async e => {
     const btn = e.target.closest('[data-action]');
     if (!btn) return;
     const act = btn.dataset.action;
+
+    if (act === 'lookup-contact' || act === 'lookup-all') {
+      const ids = act === 'lookup-contact' ? [btn.dataset.id]
+        : deleteWork([...lastTargets.values()]).send.filter(b => b.source === 'mail' && b.site && !b.lookup
+            && contactFor(b, store.getRequest(b.id)).source === 'guess').map(b => b.id);
+      const found = [];
+      btn.disabled = true;
+      for (const [i, id] of ids.entries()) {
+        const b = lastTargets.get(id);
+        if (!b?.site) continue;
+        btn.textContent = L(`Looking up ${i + 1} of ${ids.length}…`, `Opzoeken ${i + 1} van ${ids.length}…`);
+        try { found.push([id, await lookupContact(b.site)]); }
+        catch { toast(L('The look-up is not available right now. Try again later.', 'Opzoeken lukt nu even niet. Probeer het later opnieuw.')); break; }
+      }
+      if (found.length) {
+        saveLookups(found);
+        const hits = found.filter(([, f]) => EMAIL.test(f.email)).length;
+        toast(L(`Found ${hits} of ${found.length} on their own privacy statements.`, `${hits} van ${found.length} gevonden in hun eigen privacyverklaringen.`));
+      }
+      rerender();
+      return;
+    }
 
     if (act === 'send-start') {
       const w = deleteWork([...lastTargets.values()]);
@@ -2096,8 +2150,8 @@ export function about() {
     `HoopUp is een gratis, niet-commercieel project van <b>fransiewillem</b>. Vragen over privacy, of een verzoek op grond van de AVG: ${contact}.`)}</p>`)}
 
   ${sec(L('In short', 'In het kort'), `<p>${L(
-    'We have no server, no accounts, no analytics, no tracking cookies and no third-party scripts. Nothing you enter in HoopUp, and no mail you drop into it, is ever sent to us. We cannot see it, so we cannot lose it, sell it or hand it over.',
-    'We hebben geen server, geen accounts, geen statistieken, geen trackingcookies en geen scripts van derden. Niets wat je in HoopUp invult, en geen mail die je erin sleept, wordt ooit naar ons gestuurd. We kunnen het niet zien, dus we kunnen het ook niet kwijtraken, verkopen of afgeven.')}</p>`)}
+    'We keep no database and have no accounts, no analytics, no tracking cookies and no third-party scripts. Nothing you enter in HoopUp, and no mail you drop into it, is ever sent to us. We cannot see it, so we cannot lose it, sell it or hand it over.',
+    'We houden geen database bij en hebben geen accounts, geen statistieken, geen trackingcookies en geen scripts van derden. Niets wat je in HoopUp invult, en geen mail die je erin sleept, wordt ooit naar ons gestuurd. We kunnen het niet zien, dus we kunnen het ook niet kwijtraken, verkopen of afgeven.')}</p>`)}
 
   ${sec(L('What stays on your own device', 'Wat op je eigen apparaat blijft'), `
     <p>${L('Everything below is processed in your browser and stored there only (localStorage). It only leaves your device in the cases listed under the next heading, and only when you choose to.',
@@ -2120,12 +2174,14 @@ export function about() {
       <li><b>Breach and password check.</b> When you use it, your browser contacts ${ext('https://haveibeenpwned.com/Privacy', 'Have I Been Pwned')} (Australia). The breach list carries nothing about you. A password check sends only the first 5 characters of a scrambled hash of the password, never the password itself. Only if you add your own API key and check an address is that email address sent to Have I Been Pwned.</li>
       <li><b>One-click unsubscribe.</b> Your browser sends the unsubscribe request to the address the sender published. That sender already has your email address; it also sees your IP address. No cookies or other details are sent.</li>
       <li><b>Opening a link</b> (an unsubscribe page, an opt-out form, the regulator's website) works like any link: that website sees your visit. This site never sends it where you came from.</li>
+      <li><b>Looking up a privacy address</b> (only when you press <i>Look it up</i>). Your browser sends the company's web address, such as webwinkel.nl, to hoopup.tech, and nothing else. A small function there reads that company's own privacy statement and returns the address it gives. Nothing about you is sent, and we store or log nothing; the answer is kept for a week per company, so the next person asking about the same company gets it without the site being read again. ${host.short} runs the function and sees your IP address, as with any visit.</li>
       <li><b>Letters</b> open in your own mail app and are sent by you, through your own mail provider. HoopUp does not put them on your clipboard unless you press Copy, because a clipboard can sync to your other devices.</li>
       <li><b>Emailing us.</b> Mail to ${esc(CONTACT_EMAIL)} is forwarded by Cloudflare Email Routing to a Gmail mailbox (Google). We use it only to answer you, and delete it once your question is settled.</li>`, `
       <li><b>Het bezoeken van de site.</b> De site wordt gehost door ${host.name} (${host.whereNL}). Zoals elke webhost ontvangt ${host.short} je IP-adres en de bestanden die je browser laadt, en kan die voor beveiliging vastleggen. Zie de ${ext(host.policy, `privacyverklaring van ${host.short}`)}; ${host.short} neemt deel aan het EU-VS Data Privacy Framework.</li>
       <li><b>Datalek- en wachtwoordcheck.</b> Als je die gebruikt, maakt je browser contact met ${ext('https://haveibeenpwned.com/Privacy', 'Have I Been Pwned')} (Australië). De lijst met datalekken bevat niets over jou. Een wachtwoordcheck stuurt alleen de eerste 5 tekens van een versleutelde hash van het wachtwoord, nooit het wachtwoord zelf. Alleen als je een eigen API-sleutel toevoegt en een adres controleert, wordt dat e-mailadres naar Have I Been Pwned gestuurd.</li>
       <li><b>Uitschrijven met één klik.</b> Je browser stuurt het uitschrijfverzoek naar het adres dat de afzender opgaf. Die afzender heeft je e-mailadres al; hij ziet ook je IP-adres. Er worden geen cookies of andere gegevens meegestuurd.</li>
       <li><b>Een link openen</b> (een uitschrijfpagina, een afmeldformulier, de website van de toezichthouder) werkt zoals elke link: die website ziet je bezoek. Deze site stuurt niet mee waar je vandaan kwam.</li>
+      <li><b>Een privacyadres opzoeken</b> (alleen als je op <i>Zoek het op</i> drukt). Je browser stuurt het webadres van het bedrijf, zoals webwinkel.nl, naar hoopup.tech, en verder niets. Een kleine functie daar leest de privacyverklaring van dat bedrijf zelf en geeft het adres terug dat erin staat. Er wordt niets over jou verstuurd, en wij bewaren of loggen niets; het antwoord blijft een week per bedrijf bewaard, zodat wie daarna naar hetzelfde bedrijf vraagt het krijgt zonder dat de site opnieuw wordt gelezen. ${host.short} voert de functie uit en ziet je IP-adres, zoals bij elk bezoek.</li>
       <li><b>Brieven</b> openen in je eigen mailapp en worden door jou verstuurd, via je eigen mailprovider. HoopUp zet ze niet op je klembord tenzij je op Kopieer drukt, omdat een klembord naar je andere apparaten kan synchroniseren.</li>
       <li><b>Ons mailen.</b> Mail aan ${esc(CONTACT_EMAIL)} wordt door Cloudflare Email Routing doorgestuurd naar een Gmail-mailbox (Google). We gebruiken die alleen om je te antwoorden, en verwijderen hem zodra je vraag is afgehandeld.</li>`)}</ul>`)}
 

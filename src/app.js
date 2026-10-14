@@ -52,8 +52,8 @@ function renderChrome() {
     'No server, no account. Everything is stored in this browser only.',
     'Geen server, geen account. Alles staat alleen in deze browser.'));
   set('foot-local', L(
-    'Everything you type stays in this browser (<code>localStorage</code>). No account, no server, no analytics. Back it up from <a href="#/profile">Settings</a>.',
-    'Alles wat je invult blijft in deze browser (<code>localStorage</code>). Geen account, geen server, geen analytics. Maak een back-up via <a href="#/profile">Instellingen</a>.'));
+    'Everything you type stays in this browser (<code>localStorage</code>). No account, no database, no analytics. Back it up from <a href="#/profile">Settings</a>.',
+    'Alles wat je invult blijft in deze browser (<code>localStorage</code>). Geen account, geen database, geen analytics. Maak een back-up via <a href="#/profile">Instellingen</a>.'));
   set('foot-build', L('Build', 'Versie'));
   set('foot-about', L('About &amp; privacy', 'Over &amp; privacy'));
   set('foot-source', L('Source code', 'Broncode'));

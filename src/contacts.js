@@ -1,7 +1,8 @@
 // Where a company's privacy requests should go, and how sure HoopUp is of it.
 // In order: an address the user typed; one the company's own mail gives (its
 // privacy or DPO address on its own domain); one from the short list below,
-// checked against the company's own privacy statement; and only then a guess
+// checked against the company's own privacy statement; one looked up on the
+// company's privacy statement at the user's request; and only then a guess
 // (privacy@ their domain), labelled as such. An address that bounced is never
 // offered again.
 
@@ -42,8 +43,22 @@ export function contactFor(b, r = {}) {
     [r.to, 'you'],
     [b.privacyEmail, 'mail'],
     [entry?.email, 'list'],
+    [b.lookup?.email, 'lookup'],
     [b.email, guess ? 'guess' : 'catalog']
   ];
   const [email, source] = candidates.find(([e]) => e && !bounced.has(e.toLowerCase())) || ['', 'none'];
-  return { email, source, url: b.privacyUrl || entry?.url || '', bounced: [...bounced], listSource: entry?.source || '' };
+  return { email, source, url: b.privacyUrl || entry?.url || b.lookup?.url || '', bounced: [...bounced],
+           listSource: entry?.source || '', checked: b.lookup?.checked || '' };
+}
+
+// The look-up runs on hoopup.tech (functions/api/privacy-contact.js). A copy
+// served from GitHub Pages has no such function, so it does not offer it.
+export const lookupAvailable = () => !location.hostname.endsWith('github.io');
+
+// Sends one thing: the company's domain. Nothing about the user.
+export async function lookupContact(site) {
+  const res = await fetch('api/privacy-contact?domain=' + encodeURIComponent(site), { credentials: 'omit', referrerPolicy: 'no-referrer' });
+  if (!res.ok) throw new Error(String(res.status));
+  const data = await res.json();
+  return { email: String(data.email || ''), url: String(data.url || ''), checked: String(data.checked || '').slice(0, 10) };
 }

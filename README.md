@@ -3,7 +3,7 @@
 # HoopUp
 
 **Stop spam. Get your data deleted.** Unsubscribe from real companies, block scams, and make companies delete your
-data under the GDPR, all in your browser. No account, no server, no analytics: nothing you enter or
+data under the GDPR, all in your browser. No account, no database, no analytics: nothing you enter or
 drop in is ever uploaded. Available in English and Dutch.
 
 **Use it:** https://hoopup.tech
@@ -189,7 +189,8 @@ The list is a plain JSON file: edit it, or add companies through the UI.
 Your data lives in `localStorage` under the key `data-reclaim/v1` (named for the app's original name, and kept so existing users keep their data), in one browser profile. The point of
 that design: this app holds your name, date of birth, address and every email address you own. On a
 server, that file is a target, exactly the kind of target that produced the breaches this tool exists
-to clean up after. So there is no server.
+to clean up after. So no server ever holds it: the one server-side piece is a stateless function that
+looks up a company's privacy address on request, and it receives only that company's domain.
 
 **What leaves your device, exhaustively.** Each only when you click something:
 
@@ -199,16 +200,25 @@ to clean up after. So there is no server.
 | `haveibeenpwned.com/api/v3/breaches` | Nothing about you: the public breach list |
 | `api.pwnedpasswords.com/range/XXXXX` | Five characters of your password's SHA-1 hash |
 | A sender's one-click unsubscribe URL | `List-Unsubscribe=One-Click`, no cookies, no referrer (see below) |
+| `hoopup.tech/api/privacy-contact?domain=…` | Only the company's domain, when you press *Look it up*; the function reads that company's privacy statement, keeps and logs nothing, and the answer is cached a week per company |
 | Letters | Nothing from the app: they open in your own mail app, and you press Send |
 
 **Where letters go.** In order: an address you typed; the privacy or DPO address the company's own mail
 gives (privacy@, dpo@, fg@ … on its own domain); a short list checked against the companies' own privacy
-statements (`src/contacts.js`, each entry with its source); and only then a guess, `privacy@` their
-domain, labelled *guessed* with a link to their privacy statement where known. The address each letter
-went to is kept; drop the "could not be delivered" notice in on Home and that address is marked wrong,
-the request goes back on the list, and the next attempt uses the next-best address. HoopUp does not look
-addresses up on company websites itself: a browser page cannot read other sites, and doing it through a
-server would tell that server which companies you deal with.
+statements (`src/contacts.js`, each entry with its source); an address looked up on the company's own
+privacy statement when you press *Look it up* (one company, or all guessed ones at once); and only then a
+guess, `privacy@` their domain, labelled *guessed* with a link to their privacy statement where known.
+
+The look-up is `functions/api/privacy-contact.js`, a Cloudflare Pages Function on hoopup.tech. A browser
+page cannot read other websites, so this one small piece runs on the server. It receives only the
+company's domain, fetches at most eight pages of that company's own site (https only, same domain also
+after redirects, six seconds and 1.5 MB per page), prefers a DPO address over privacy@ over another address
+of theirs next to privacy wording, and returns it with the statement's URL. It stores and logs nothing; the
+answer is cached a week per domain. Privacy statements that only appear after JavaScript runs cannot be
+read this way: then the app shows the link and asks you to look.
+
+The address each letter went to is kept; drop the "could not be delivered" notice in on Home and that
+address is marked wrong, the request goes back on the list, and the next attempt uses the next-best one.
 
 **Letters reveal nothing the recipient did not already have.** A company found in your own mail is
 identified with exactly what its own mail shows it holds, and nothing from your profile: the addresses it
@@ -276,8 +286,8 @@ long-lived token granting full read access to everything, sitting in browser sto
 Dropping files in creates no credential at all: the worst case for a bug in this code is one file the
 user just chose, rather than their whole mail history. That trade is not worth a saved drag.
 
-If this is ever shared with other people, the same property is what matters most: there is no server, no
-account and no database, so whoever runs it never receives anyone's data and never becomes a controller
+If this is ever shared with other people, the same property is what matters most: there is no account and no
+database, and the one function only ever sees company domains, so whoever runs it never receives anyone's data and never becomes a controller
 of it.
 
 **What this does not protect against:**
