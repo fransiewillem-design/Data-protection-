@@ -241,6 +241,7 @@ looks up a company's privacy address on request, and it receives only that compa
 | `hoopup.tech/api/privacy-contact?domain=…` | Only the company's domain, when you press *Look it up*; the function reads that company's privacy statement, keeps and logs nothing, and the answer is cached a week per company |
 | Letters | Nothing from the app: they open in your own mail app, and you press Send |
 | Unsubscribe by email, replies to a company's answer | Nothing from the app: they open in your own mail app, and you press Send |
+| `login.microsoftonline.com`, `graph.microsoft.com` | Only when you press *Add the rules to Outlook.com*: you sign in on Microsoft's own page, and HoopUp sends the block rules (spam sites and reply addresses) to your own mailbox. It asks only for `MailboxSettings.ReadWrite` (rules live there; not your mail, not sending), gets no refresh token, keeps the permission in memory for those few requests and then drops it |
 | Calendar file, request log | Nothing: both are made on your device and saved where you choose. The calendar file holds company names and dates only; if your calendar syncs, that is your calendar's doing |
 
 **Where letters go.** In order: an address you typed; the privacy or DPO address the company's own mail
@@ -387,6 +388,24 @@ asset URL, so a browser never mixes a fresh page with stale cached modules. Both
 `/*`: two policies on one response are both enforced, and a site-wide one would strip the unsubscribe
 worker of the `connect-src https:` it exists to hold. Cloudflare serves `/unsubscribe.html` at
 `/unsubscribe`, so that rule is listed under both paths.
+
+### One-click Outlook.com rules (optional)
+
+Outlook on the web takes rule values one at a time. Microsoft's Graph API takes a list, so with a sign-in
+the whole block list goes in with one click. That needs an app registration at Microsoft, made once by
+whoever runs the site (free, no secret, no certificate):
+
+1. [entra.microsoft.com](https://entra.microsoft.com) (or portal.azure.com) → **App registrations** →
+   **New registration**. Name: *HoopUp*. Supported account types: **Personal Microsoft accounts only**.
+2. Redirect URI: platform **Single-page application (SPA)**, `https://hoopup.tech/auth.html`.
+3. **Register**, then copy the **Application (client) ID** into `MS_CLIENT_ID` in `src/config.js`.
+4. **API permissions** → Microsoft Graph → Delegated → `MailboxSettings.ReadWrite` (users consent for
+   their own mailbox; no admin consent is needed for personal accounts).
+
+The flow is OAuth 2.0 authorization code with PKCE in the browser (`src/outlook.js`), returning through
+`auth.html` with the code in the URL fragment. Earlier `HoopUp:` rules in the mailbox are replaced; the
+user's own rules are left alone and keep running first. While `MS_CLIENT_ID` is empty, the button is not
+shown and the Outlook.com steps stay manual.
 
 ### Hosting on GitHub Pages
 

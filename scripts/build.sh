@@ -14,11 +14,12 @@ SHA=$(printf '%s' "$SHA" | cut -c1-7)
 rm -rf dist
 mkdir dist
 # Only what the site serves: no README, workflows, scripts or git metadata.
-cp -R index.html unsubscribe.html manifest.webmanifest _headers LICENSE assets data src dist/
+cp -R index.html unsubscribe.html auth.html manifest.webmanifest _headers LICENSE assets data src dist/
 
 cd dist
 sed -i "s|src=\"src/app.js\"|src=\"src/app.js?v=$SHA\"|" index.html
 sed -i "s|href=\"assets/css/app.css\"|href=\"assets/css/app.css?v=$SHA\"|" index.html
+sed -i "s|src=\"src/auth-return.js\"|src=\"src/auth-return.js?v=$SHA\"|" auth.html
 sed -i "s|__BUILD__|$SHA|g" index.html
 sed -i -E "s|(from '\./[A-Za-z0-9_-]+\.js)'|\1?v=$SHA'|g" src/*.js
 sed -i "s|fetch('data/brokers.json')|fetch('data/brokers.json?v=$SHA')|" src/app.js

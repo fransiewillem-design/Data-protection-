@@ -8,6 +8,7 @@ import { matchAnswers, ownedAddresses } from './replies.js';
 import { readMailFiles } from './mailfile.js';
 import { icsFor, upcoming } from './calendar.js';
 import { csvLog } from './log.js';
+import { outlookAvailable, outlookStart, outlookFinish } from './outlook.js';
 import { allBreaches, breachesForAccount, pwnedPasswordCount } from './hibp.js';
 import { L, plural, lang } from './i18n.js';
 import { buildBlockList, asLinkList, asReplyList, asGmailXml, asGmailQueries, asSieve, asAppleScript, asPowerShell, guessClient } from './blocklist.js';
@@ -1575,6 +1576,7 @@ export function unsubscribe(state) {
            'Nog niets hier. <a href="#/">Scan je mail</a> en afzenders komen hier vanzelf.')}</p>
   </div>` : ''}
 
+  <div id="outlook-result"></div>
   <div id="unsub-queue"></div>
 
   ${group('instant', L('One click, no page to visit', 'Met één klik, zonder pagina'),
@@ -1801,9 +1803,13 @@ export function blockPanel(bl, client) {
   const scriptBtn = fmt => `<div class="row"><button class="primary" data-action="copy-block" data-fmt="${fmt}">${L('Copy script', 'Kopieer script')}</button></div>`;
 
   const steps = {
-    outlookcom: `
+    outlookcom: (outlookAvailable() ? `
+      <div class="row"><button class="primary" data-action="outlook-connect">${L('Add the rules to Outlook.com', 'Zet de regels in Outlook.com')}</button></div>
+      <p class="small">${L('You sign in on Microsoft\'s own page. HoopUp asks only to change your mailbox settings, where rules live: not to read or send your mail. It adds the rules, replaces earlier HoopUp rules, and forgets the permission straight away. They run on Microsoft\'s server, so they also work on your phone and when your computer is off.',
+        'Je logt in op de eigen pagina van Microsoft. HoopUp vraagt alleen toestemming om je mailboxinstellingen te wijzigen, waar regels staan: niet om je mail te lezen of te versturen. Het zet de regels erin, vervangt eerdere HoopUp-regels en vergeet de toestemming meteen. Ze draaien op de server van Microsoft, dus ze werken ook op je telefoon en als je computer uit staat.')}</p>
+      <details class="small"><summary>${L('Or add them by hand', 'Of zet ze er zelf in')}</summary>` : `
       <p class="small notice">${L('Outlook.com in the browser only takes one value at a time: Microsoft offers no way to paste a list. Do you read this mail in <b>Apple Mail</b> on a Mac, or in <b>Outlook on a Windows PC</b>? Choose that above: there it is one copy and one paste, and the rule works for your Outlook.com account too.',
-        'Outlook.com in de browser neemt maar één waarde tegelijk aan: Microsoft biedt geen manier om een lijst te plakken. Lees je deze mail in <b>Apple Mail</b> op een Mac, of in <b>Outlook op een Windows-pc</b>? Kies dat hierboven: daar is het één keer kopiëren en plakken, en de regel werkt ook voor je Outlook.com-account.')}</p>
+        'Outlook.com in de browser neemt maar één waarde tegelijk aan: Microsoft biedt geen manier om een lijst te plakken. Lees je deze mail in <b>Apple Mail</b> op een Mac, of in <b>Outlook op een Windows-pc</b>? Kies dat hierboven: daar is het één keer kopiëren en plakken, en de regel werkt ook voor je Outlook.com-account.')}</p>`) + `
       <ol class="small">
         ${bl.links.length ? `<li>${L('<b>Settings</b> (gear) → <b>Mail</b> → <b>Rules</b> → <b>Add new rule</b>. Name it <i>HoopUp – links</i>, condition <b>Subject or body includes</b>.',
           '<b>Instellingen</b> (tandwiel) → <b>E-mail</b> → <b>Regels</b> → <b>Nieuwe regel toevoegen</b>. Noem hem <i>HoopUp – links</i>, voorwaarde <b>Onderwerp of hoofdtekst bevat</b>.')}</li>
@@ -1817,7 +1823,7 @@ export function blockPanel(bl, client) {
           <div class="row">${next('reply', reply, 'address')}</div></li>` : ''}
       </ol>
       <p class="small muted">${L('Outlook on the web takes one value at a time, which is why the button hands them over one by one. Two rules, because inside one Outlook rule every condition has to match at once.',
-        'Outlook op het web neemt één waarde tegelijk aan, daarom geeft de knop ze een voor een. Twee regels, omdat binnen één Outlook-regel alle voorwaarden tegelijk moeten kloppen.')}</p>`,
+        'Outlook op het web neemt één waarde tegelijk aan, daarom geeft de knop ze een voor een. Twee regels, omdat binnen één Outlook-regel alle voorwaarden tegelijk moeten kloppen.')}</p>${outlookAvailable() ? '</details>' : ''}`,
     outlookwin: `
       <ol class="small">
         <li>${L('Copy the script:', 'Kopieer het script:')} ${scriptBtn('powershell')}</li>
@@ -1851,8 +1857,8 @@ export function blockPanel(bl, client) {
       </ol>
       <p class="small muted">${L('The script adds one rule to Mail (Settings → Rules), checks every condition it made, and tells you how many it added. It reads nothing and sends nothing. Mac rules run while Mail is open.',
         'Het script zet één regel in Mail (Instellingen → Regels), controleert elke voorwaarde die het maakte en meldt hoeveel het er toevoegde. Het leest niets en verstuurt niets. Regels op de Mac werken zolang Mail open is.')}
-        ${L('Is this an Outlook.com, Hotmail or Exchange account in Mail? Then also choose <b>Outlook.com / Hotmail</b> above: those rules run on the server, so they also work when your Mac is off and on your phone.',
-          'Is dit een Outlook.com-, Hotmail- of Exchange-account in Mail? Kies dan ook <b>Outlook.com / Hotmail</b> hierboven: die regels draaien op de server, dus ze werken ook als je Mac uit staat, en op je telefoon.')}</p>`,
+        ${outlookAvailable() ? L('Is this an Outlook.com or Hotmail account in Mail? Then also choose <b>Outlook.com / Hotmail</b> above: one click puts the same rules on Microsoft\'s server, so they also work when your Mac is off and on your phone.',
+          'Is dit een Outlook.com- of Hotmail-account in Mail? Kies dan ook <b>Outlook.com / Hotmail</b> hierboven: met één klik staan dezelfde regels op de server van Microsoft, dus ze werken ook als je Mac uit staat, en op je telefoon.') : ''}</p>`,
     sieve: `
       <ol class="small">
         <li>${L('Download the Sieve script below.', 'Download hieronder het Sieve-script.')}</li>
@@ -1930,6 +1936,10 @@ export function wireBlock(root, state, onChange) {
       toast(L('Marked as blocked. Next time, only new rules show up.', 'Gemarkeerd als geblokkeerd. De volgende keer verschijnen alleen nieuwe regels.'));
       if (onChange) onChange(); else redraw(btn);
     }
+    if (act === 'outlook-connect') {
+      btn.disabled = true;
+      outlookStart().catch(() => { btn.disabled = false; toast(L('Could not start the Microsoft sign-in.', 'Kon de aanmelding bij Microsoft niet starten.')); });
+    }
     if (act === 'block-toggle') { showAllRules = !showAllRules; redraw(btn); }
     if (act === 'block-reset') {
       if (!confirm(L('Forget which rules you added? Next time HoopUp shows the full list again.',
@@ -1941,9 +1951,38 @@ export function wireBlock(root, state, onChange) {
   });
 }
 
-export function mountUnsubscribe(root, state, rerender) {
+// Back from Microsoft's sign-in: add the rules, say what happened, and count
+// them as added, as the Done button would.
+async function finishOutlook(root) {
+  history.replaceState(null, '', location.pathname + location.search + '#/unsubscribe');
+  const out = root.querySelector('#outlook-result');
+  if (!out) return;
+  out.innerHTML = `<div class="notice" aria-live="polite"><p>${L('Adding the rules to Outlook.com…', 'De regels worden in Outlook.com gezet…')}</p></div>`;
+  out.scrollIntoView({ block: 'center' });
+  const r = await outlookFinish(blockView(store.get(), true).bl);
+  if (!r) { out.innerHTML = ''; return; }
+  if (r.error) {
+    out.innerHTML = `<div class="notice warn"><p><b>${r.error === 'denied'
+      ? L('Microsoft did not give permission, so nothing was changed.', 'Microsoft gaf geen toestemming, dus er is niets veranderd.')
+      : r.error === 'signin' ? L('The sign-in did not complete, so nothing was changed.', 'De aanmelding is niet afgerond, dus er is niets veranderd.')
+      : L('Outlook.com did not accept the rules, so nothing was changed.', 'Outlook.com nam de regels niet aan, dus er is niets veranderd.')}</b>
+      ${L('Try again, or add them by hand below. A work or school account may need its administrator\'s approval.', 'Probeer het opnieuw, of zet ze er hieronder zelf in. Bij een werk- of schoolaccount is soms toestemming van de beheerder nodig.')}</p></div>`;
+    return;
+  }
+  const ids = store.get().custom.filter(isBlockable).map(t => t.id);
+  showAllRules = false;
+  store.update(st => { st.blockDone = { at: store.today(), ids }; delete st.blockExport; st.mailApp = 'outlookcom'; });
+  const card = root.querySelector('.block-card');
+  if (card) card.outerHTML = blockAllCard(store.get());
+  out.innerHTML = `<div class="notice"><p><b>${L(`Done: ${r.added} ${r.added === 1 ? 'rule' : 'rules'} added to Outlook.com`, `Klaar: ${r.added} ${r.added === 1 ? 'regel' : 'regels'} in Outlook.com gezet`)}</b>
+    (${L(`${r.sites} spam sites, ${r.replies} reply addresses`, `${r.sites} spamwebsites, ${r.replies} antwoordadressen`)}). ${L('New scams go straight to Deleted Items. Anything already in Junk is junk anyway: select all there and delete it.',
+      'Nieuwe oplichtersmail gaat meteen naar Verwijderde items. Wat al in Ongewenste e-mail staat is sowieso rommel: selecteer daar alles en verwijder het.')}</p></div>`;
+}
+
+export function mountUnsubscribe(root, state, rerender, params) {
   wireBlock(root, state);
   wireQueue(root, rerender);
+  if (params?.get('outlook') === '1') finishOutlook(root);
 
   root.addEventListener('change', e => {
     const box = e.target.closest('[data-action="sel"]');
@@ -2480,6 +2519,7 @@ export function about() {
       <li><b>Opening a link</b> (an unsubscribe page, an opt-out form, the regulator's website) works like any link: that website sees your visit. This site never sends it where you came from.</li>
       <li><b>Looking up a privacy address</b> (only when you press <i>Look it up</i>). Your browser sends the company's web address, such as webwinkel.nl, to hoopup.tech, and nothing else. A small function there reads that company's own privacy statement and returns the address it gives. Nothing about you is sent, and we store or log nothing; the answer is kept for a week per company, so the next person asking about the same company gets it without the site being read again. ${host.short} runs the function and sees your IP address, as with any visit.</li>
       <li><b>Letters</b>, replies to a company's answer and unsubscribes by email open in your own mail app and are sent by you, through your own mail provider. HoopUp does not put them on your clipboard unless you press Copy, because a clipboard can sync to your other devices.</li>
+      <li><b>Adding block rules to Outlook.com</b> (only if you press it). You sign in on Microsoft's own page; HoopUp never sees your password. HoopUp asks Microsoft only for permission to change your mailbox settings, not to read or send your mail, uses it to add the rules (the spam sites and reply addresses) and forgets it straight away. Microsoft keeps the rules in your mailbox, like rules you make yourself.</li>
       <li><b>The calendar file and your log</b> are made on your device and saved where you choose. The calendar file holds company names and dates only. If you add it to a calendar that syncs (Google, iCloud, Outlook), that calendar's provider holds those names and dates.</li>
       <li><b>Emailing us.</b> Mail to ${esc(CONTACT_EMAIL)} is forwarded by Cloudflare Email Routing to a Gmail mailbox (Google). We use it only to answer you, and delete it once your question is settled.</li>`, `
       <li><b>Het bezoeken van de site.</b> De site wordt gehost door ${host.name} (${host.whereNL}). Zoals elke webhost ontvangt ${host.short} je IP-adres en de bestanden die je browser laadt, en kan die voor beveiliging vastleggen. Zie de ${ext(host.policy, `privacyverklaring van ${host.short}`)}; ${host.short} neemt deel aan het EU-VS Data Privacy Framework.</li>
@@ -2488,6 +2528,7 @@ export function about() {
       <li><b>Een link openen</b> (een uitschrijfpagina, een afmeldformulier, de website van de toezichthouder) werkt zoals elke link: die website ziet je bezoek. Deze site stuurt niet mee waar je vandaan kwam.</li>
       <li><b>Een privacyadres opzoeken</b> (alleen als je op <i>Zoek het op</i> drukt). Je browser stuurt het webadres van het bedrijf, zoals webwinkel.nl, naar hoopup.tech, en verder niets. Een kleine functie daar leest de privacyverklaring van dat bedrijf zelf en geeft het adres terug dat erin staat. Er wordt niets over jou verstuurd, en wij bewaren of loggen niets; het antwoord blijft een week per bedrijf bewaard, zodat wie daarna naar hetzelfde bedrijf vraagt het krijgt zonder dat de site opnieuw wordt gelezen. ${host.short} voert de functie uit en ziet je IP-adres, zoals bij elk bezoek.</li>
       <li><b>Brieven</b>, reacties op het antwoord van een bedrijf en afmeldingen per e-mail openen in je eigen mailapp en worden door jou verstuurd, via je eigen mailprovider. HoopUp zet ze niet op je klembord tenzij je op Kopieer drukt, omdat een klembord naar je andere apparaten kan synchroniseren.</li>
+      <li><b>Blokkeerregels in Outlook.com zetten</b> (alleen als je erop drukt). Je logt in op de eigen pagina van Microsoft; HoopUp ziet je wachtwoord nooit. HoopUp vraagt Microsoft alleen toestemming om je mailboxinstellingen te wijzigen, niet om je mail te lezen of te versturen, gebruikt die om de regels toe te voegen (de spamwebsites en antwoordadressen) en vergeet hem meteen. Microsoft bewaart de regels in je mailbox, net als regels die je zelf maakt.</li>
       <li><b>Het agendabestand en je overzicht</b> worden op je apparaat gemaakt en opgeslagen waar jij kiest. Het agendabestand bevat alleen bedrijfsnamen en datums. Zet je het in een agenda die synchroniseert (Google, iCloud, Outlook), dan heeft de aanbieder van die agenda die namen en datums.</li>
       <li><b>Ons mailen.</b> Mail aan ${esc(CONTACT_EMAIL)} wordt door Cloudflare Email Routing doorgestuurd naar een Gmail-mailbox (Google). We gebruiken die alleen om je te antwoorden, en verwijderen hem zodra je vraag is afgehandeld.</li>`)}</ul>`)}
 
