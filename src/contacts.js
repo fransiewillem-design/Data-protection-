@@ -51,11 +51,14 @@ export function contactFor(b, r = {}) {
   // the company itself writes from (its reply or customer-service address):
   // a request through a channel the company provides counts (EDPB Guidelines
   // 01/2022), so it reaches them even if the guessed address does not exist.
+  // The same goes for an address from the checked list or the look-up, which
+  // may have changed since. Only an address the company's own mail names, or
+  // one the user typed, goes without copies.
   let cc = [];
-  if (source === 'guess' || source === 'none') {
+  if (['guess', 'none', 'list', 'lookup'].includes(source)) {
     const service = (b.serviceEmails || []).filter(a => !bounced.has(a.toLowerCase()) && a.toLowerCase() !== email.toLowerCase());
     if (source === 'none' && service.length) { email = service.shift(); source = 'service'; }
-    cc = service.slice(0, 1);
+    cc = service.slice(0, 2);
   }
   return { email, cc, source, url: b.privacyUrl || entry?.url || b.lookup?.url || '', bounced: [...bounced],
            listSource: entry?.source || '', checked: b.lookup?.checked || '', postal: b.companyPostal || '' };

@@ -219,24 +219,33 @@ function bouncedTo(h, body) {
 }
 
 // Addresses the company itself uses to talk to the user: the reply address
-// of its mail, a service address in its footer, or the address it sends from.
+// of its mail, a service address in its footer, and the address it sends from.
 // A request sent to one of these reaches them through a channel they
 // provided, which the GDPR counts (EDPB Guidelines 01/2022), even when the
 // privacy address is unknown. No-reply and bulk addresses never qualify.
-const NO_REPLY = /^(no-?reply|do-?not-?reply|donotreply|noreply|mailer|bounces?|newsletters?|nieuwsbrief|news|nieuws|marketing|notifications?|notificaties|alerts?|automated|system|postmaster|mailer-daemon|campaign|promo|deals|mail)([._+-].*)?$/i;
+// Never: addresses that say nobody reads them. The guidance lets a company
+// ignore a request sent to a channel plainly not meant for messages.
+const NO_REPLY = /^(no-?reply|do-?not-?reply|donotreply|noreply|mailer|bounces?|postmaster|mailer-daemon|automated|system)([._+-].*)?$/i;
+// Weak: bulk senders. A channel the company uses, but rarely read; only used
+// when there is nothing better.
+const BULK = /^(newsletters?|nieuwsbrief|news|nieuws|marketing|notifications?|notificaties|alerts?|campaign|promo|deals|mail)([._+-].*)?$/i;
 const SERVICE_LOCAL = /^(klantenservice|service|support|contact|info|customerservice|customer[.-]?service|customercare|help|helpdesk|hallo|hello|vragen|klantcontact|care|webshop|orders?|bestellingen)$/i;
 
 export function serviceAddresses(parts, fromAddress, replyAddress, domain) {
   const brand = registrableDomain(domain).split('.')[0];
   const ours = a => { const h = String(a).split('@')[1] || ''; return !!brand && registrableDomain(h).split('.')[0] === brand; };
-  const usable = a => /^[a-z0-9._+-]+@[a-z0-9.-]+\.[a-z]{2,}$/i.test(a) && ours(a) && !NO_REPLY.test(a.split('@')[0]);
+  const valid = a => /^[a-z0-9._+-]+@[a-z0-9.-]+\.[a-z]{2,}$/i.test(a || '') && ours(a) && !NO_REPLY.test(a.split('@')[0]);
+  const strong = a => valid(a) && !BULK.test(a.split('@')[0]);
   const out = [];
-  if (usable(replyAddress)) out.push(replyAddress);
+  // In order: the reply address they set, a service address in their footer,
+  // and the address they wrote from.
+  if (strong(replyAddress)) out.push(replyAddress);
   for (const part of parts) for (const m of (part.text || '').matchAll(/([a-z0-9._+-]+)@([a-z0-9.-]+\.[a-z]{2,})/gi)) {
     const a = `${m[1]}@${m[2]}`;
-    if (SERVICE_LOCAL.test(m[1]) && usable(a)) out.push(a);
+    if (SERVICE_LOCAL.test(m[1]) && strong(a)) out.push(a);
   }
-  if (usable(fromAddress)) out.push(fromAddress);
+  if (strong(fromAddress)) out.push(fromAddress);
+  if (!out.length) for (const a of [replyAddress, fromAddress]) if (valid(a)) out.push(a);
   return [...new Set(out.map(a => a.toLowerCase()))].slice(0, 3);
 }
 

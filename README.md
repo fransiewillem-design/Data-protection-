@@ -219,9 +219,14 @@ read this way: then the app shows the link and asks you to look.
 
 **When the privacy address is unknown.** A request counts once it reaches any channel the company itself
 provides, not only its privacy address; one sent to a random or made-up address may be ignored (EDPB
-Guidelines 01/2022 on the right of access). So a guessed `privacy@` never goes alone: when the company's
-mail has a usable reply or service address on its own domain (never a no-reply), the letter goes there
-too as a copy, and if the guess bounces that address takes over. Every letter to a company also asks it to
+Guidelines 01/2022 on the right of access). (The AVG is the
+same regulation under its Dutch name.) So a privacy address HoopUp is not sure of never goes alone: a
+guess, but also one from the checked list or the look-up, which may be out of date. The letter is copied
+to up to two addresses the company's own mail comes from: the Reply-To it set, a service address in its
+footer, and the From address. No-reply addresses are never used (the guidance lets a company ignore a
+channel plainly not meant for messages); newsletter senders only when there is nothing better. If the
+guess bounces, those addresses take over. Only when the company's own mail names its privacy address, or
+you typed one, does the letter go without copies. Every letter to a company also asks it to
 forward the request to whoever handles data protection, citing the same guidance. Where no address works,
 the queue offers their contact form (copy the letter in) or post: to the company's address from its own
 mail footer, or else a KvK register search, with the letter ready to print.

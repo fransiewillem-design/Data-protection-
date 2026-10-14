@@ -876,8 +876,8 @@ function sendQueueCard(state) {
              <span class="small muted">${L('Sends only their web address to hoopup.tech, nothing about you.', 'Stuurt alleen hun webadres naar hoopup.tech, niets over jou.')}</span></div>`)
         : ''}
       ${contact.cc.length ? `<p class="small" style="margin:6px 0 0">${L(
-        `<b>Copy to</b> <code>${esc(contact.cc[0])}</code>, the address they write to you from. If the guessed address does not exist, the request still reaches them through a channel they provide, and that counts.`,
-        `<b>Kopie aan</b> <code>${esc(contact.cc[0])}</code>, het adres waarvandaan ze jou mailen. Bestaat het geraden adres niet, dan bereikt het verzoek ze toch via een kanaal dat zij aanbieden, en dat telt.`)}</p>` : ''}
+        `<b>Copy to</b> ${contact.cc.map(a => `<code>${esc(a)}</code>`).join(' and ')}: ${contact.cc.length === 1 ? 'an address' : 'addresses'} their own mail comes from. If the privacy address is wrong or out of date, the request still reaches them through a channel they provide, and under the GDPR (AVG) that counts.`,
+        `<b>Kopie aan</b> ${contact.cc.map(a => `<code>${esc(a)}</code>`).join(' en ')}: ${contact.cc.length === 1 ? 'een adres' : 'adressen'} waarvandaan hun eigen mail komt. Klopt het privacyadres niet of niet meer, dan bereikt het verzoek ze toch via een kanaal dat zij aanbieden, en volgens de AVG telt dat.`)}</p>` : ''}
       ${['guess', 'none', 'service'].includes(contact.source) ? otherRoutes(b, contact) : ''}
     </div>
     <p class="small">${reveals
