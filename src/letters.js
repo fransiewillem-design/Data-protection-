@@ -96,6 +96,15 @@ function identityBlockNL(p) {
   return lines.length ? lines.join('\n') : '[Vul je gegevens in op de pagina Instellingen]';
 }
 
+// A request counts once it reaches any channel the company itself provides,
+// not only its privacy address (EDPB Guidelines 01/2022 on the right of access).
+// Said in every letter, so one sent to customer service or to a guessed
+// address is passed on rather than ignored.
+const FORWARD_EN = `RIGHT ADDRESS
+If this message has not reached the person or team responsible for data protection, please forward it to them. A request received through any channel you provide is valid, and the time limit runs from the day you received it (EDPB Guidelines 01/2022 on the right of access).`;
+const FORWARD_NL = `JUISTE ADRES
+Is dit bericht niet terechtgekomen bij de persoon of afdeling die over gegevensbescherming gaat, stuur het dan aan hen door. Een verzoek dat via een van uw kanalen binnenkomt is geldig, en de termijn loopt vanaf de dag van ontvangst (EDPB-richtsnoeren 01/2022 over het recht op inzage).`;
+
 const ref = () => 'HU-' + Math.random().toString(36).slice(2, 7).toUpperCase();
 
 // Letters carry dates the way people write them: "11 oktober 2026".
@@ -155,6 +164,8 @@ If you do not respond within the statutory period, or refuse without a valid bas
 
 Please confirm receipt of this request.
 
+${FORWARD_EN}
+
 Yours faithfully,
 ${signature(b, p, false)}
 ${longDate(todayISO(), false)}`
@@ -199,6 +210,8 @@ Kunt u mij werkelijk niet identificeren op basis van bovenstaande gegevens, geef
 Ontvang ik geen tijdige reactie, of wijst u het verzoek zonder geldige grond af, dan dien ik een klacht in bij de Autoriteit Persoonsgegevens op grond van artikel 77 AVG.
 
 Graag ontvang ik een ontvangstbevestiging.
+
+${FORWARD_NL}
 
 Met vriendelijke groet,
 ${signature(b, p, true)}
@@ -255,6 +268,8 @@ ${isEvidenceDerived(b) ? minimalBlock(b, false) : identityBlock(p)}
 This letter is a formal reminder. I ask you to confirm within 14 days that my data has been erased, or to state the specific legal ground on which you refuse.
 
 Failure to respond is itself an infringement of Article 12(3) and (4). If I have not heard from you within 14 days, I will lodge a complaint with the supervisory authority under Article 77 GDPR and will refer to this correspondence.
+
+${FORWARD_EN}
 
 Yours faithfully,
 ${signature(b, p, false)}
@@ -314,6 +329,8 @@ ${isEvidenceDerived(b) ? minimalBlock(b, true) : identityBlockNL(p)}
 Dit is een formele herinnering. Ik verzoek u binnen 14 dagen te bevestigen dat mijn gegevens zijn gewist, of de specifieke wettelijke grond te noemen waarop u weigert.
 
 Het uitblijven van een reactie is op zichzelf een schending van artikel 12, lid 3 en 4, AVG. Heb ik binnen 14 dagen niets van u vernomen, dan dien ik een klacht in bij de Autoriteit Persoonsgegevens op grond van artikel 77 AVG en verwijs ik naar deze correspondentie.
+
+${FORWARD_NL}
 
 Met vriendelijke groet,
 ${signature(b, p, true)}
@@ -390,6 +407,8 @@ I ask you to:
 
 Please respond within one month, as Article 12(3) GDPR requires.
 
+${FORWARD_EN}
+
 Yours faithfully,
 ${signature(b, p, false)}
 ${longDate(todayISO(), false)}`
@@ -417,6 +436,8 @@ Ik verzoek u:
 4. Mij te laten weten welke persoonsgegevens u van mij bewaart, voor welk doel en hoe lang (artikel 15, lid 1, AVG).
 
 Ik verzoek u binnen één maand te reageren, zoals artikel 12, lid 3, AVG voorschrijft.
+
+${FORWARD_NL}
 
 Met vriendelijke groet,
 ${signature(b, p, true)}

@@ -217,8 +217,18 @@ of theirs next to privacy wording, and returns it with the statement's URL. It s
 answer is cached a week per domain. Privacy statements that only appear after JavaScript runs cannot be
 read this way: then the app shows the link and asks you to look.
 
-The address each letter went to is kept; drop the "could not be delivered" notice in on Home and that
-address is marked wrong, the request goes back on the list, and the next attempt uses the next-best one.
+**When the privacy address is unknown.** A request counts once it reaches any channel the company itself
+provides, not only its privacy address; one sent to a random or made-up address may be ignored (EDPB
+Guidelines 01/2022 on the right of access). So a guessed `privacy@` never goes alone: when the company's
+mail has a usable reply or service address on its own domain (never a no-reply), the letter goes there
+too as a copy, and if the guess bounces that address takes over. Every letter to a company also asks it to
+forward the request to whoever handles data protection, citing the same guidance. Where no address works,
+the queue offers their contact form (copy the letter in) or post: to the company's address from its own
+mail footer, or else a KvK register search, with the letter ready to print.
+
+The addresses each letter went to are kept; drop the "could not be delivered" notice in on Home and those
+addresses are marked wrong. If a copy still arrived, the request stands and the deadline runs; if every
+address failed, the request goes back on the list and the next attempt uses the next-best address.
 
 **Letters reveal nothing the recipient did not already have.** A company found in your own mail is
 identified with exactly what its own mail shows it holds, and nothing from your profile: the addresses it

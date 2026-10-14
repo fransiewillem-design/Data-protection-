@@ -477,9 +477,13 @@ function senderRecord(sn, owned, ownPhones = []) {
     mailCount: sn.count || 1,
     transactional: !!sn.transactional,
     nameMismatch: !!sn.nameMismatch,
-    // The privacy address and statement their own mail gives, if any.
+    // The privacy address and statement their own mail gives, if any, and the
+    // addresses and postal address the company itself uses: channels it
+    // provides, for when its privacy address is unknown.
     privacyEmail: letterable ? sn.privacyEmail || '' : '',
     privacyUrl: letterable ? sn.privacyUrl || '' : '',
+    serviceEmails: letterable ? (sn.serviceEmails || []).slice(0, 3) : [],
+    companyPostal: letterable ? sn.companyPostal || '' : '',
     notes: `Found in your own mail: ${sn.domain} sent to ${address || 'an address of yours'}. The letter deliberately tells them nothing they do not already have.`
   };
 }
@@ -512,6 +516,8 @@ export function upsertSenders(list) {
       st.custom[i] = { ...old, ...data, mailCount: Math.max(old.mailCount || 0, data.mailCount),
                        transactional: !!(old.transactional || data.transactional),
                        evidence: mergeEvidence(old.evidence, data.evidence),
+                       serviceEmails: data.serviceEmails?.length || !old.serviceEmails ? [...new Set([...(data.serviceEmails || []), ...(old.serviceEmails || [])])].slice(0, 3) : old.serviceEmails,
+                       companyPostal: data.companyPostal || old.companyPostal || '',
                        unsubscribedAt: old.unsubscribedAt };
     }
   });
@@ -734,6 +740,26 @@ const isEU = b => ['EU', 'NL', 'UK'].some(r => (b.regions || []).includes(r));
 export const recipient = (b, r = store.getRequest(b.id)) => contactFor(b, r).email;
 const REMINDER_GRACE = 14;   // days the reminder letter gives them
 
+// Without a confirmed privacy address, two routes that always work: their
+// contact form, or a letter by post to the company's own address.
+function otherRoutes(b, c) {
+  const letter = `#/letter?b=${encodeURIComponent(b.id)}`;
+  const kvk = `https://www.kvk.nl/zoeken/?source=all&q=${encodeURIComponent(nameOf(b).replace(/ \(.*\)$/, ''))}`;
+  const form = safeUrl(c.url) ? `<a href="${esc(safeUrl(c.url))}" target="_blank" rel="noopener noreferrer">${L('their privacy statement', 'hun privacyverklaring')} ↗</a>` : '';
+  return `<details class="small" style="margin-top:8px"><summary>${L('Other ways to reach them', 'Andere manieren om ze te bereiken')}</summary>
+    <ul>
+      <li>${L(`<b>Their contact form:</b> ${form ? `${form} usually links to it.` : 'on their website, often under Contact or Privacy.'} <a href="${letter}">Open the letter</a>, copy it and paste it in.`,
+              `<b>Hun contactformulier:</b> ${form ? `${form} linkt er meestal naar.` : 'op hun website, vaak onder Contact of Privacy.'} <a href="${letter}">Open de brief</a>, kopieer hem en plak hem erin.`)}</li>
+      <li>${c.postal
+        ? L(`<b>By post</b> to <span class="mono">${esc(c.postal)}</span> (from their own mail). <a href="${letter}">Open the letter</a> and print it; send it registered if you want proof that it arrived.`,
+            `<b>Per post</b> naar <span class="mono">${esc(c.postal)}</span> (uit hun eigen mail). <a href="${letter}">Open de brief</a> en druk hem af; verstuur hem aangetekend als je bewijs wilt dat hij aankwam.`)
+        : L(`<b>By post</b> to their registered address: find it in the <a href="${kvk}" target="_blank" rel="noopener noreferrer">KvK register ↗</a> (Dutch companies) or in their privacy statement. <a href="${letter}">Open the letter</a> and print it; send it registered if you want proof that it arrived.`,
+            `<b>Per post</b> naar hun vestigingsadres: zoek het op in het <a href="${kvk}" target="_blank" rel="noopener noreferrer">KvK-register ↗</a> (Nederlandse bedrijven) of in hun privacyverklaring. <a href="${letter}">Open de brief</a> en druk hem af; verstuur hem aangetekend als je bewijs wilt dat hij aankwam.`)}</li>
+    </ul>
+    <p class="muted">${L('Mark it as sent in the list below once it is on its way; the one-month deadline runs from when they receive it.', 'Markeer hem in de lijst hieronder als verstuurd zodra hij onderweg is; de termijn van een maand loopt vanaf het moment dat zij hem ontvangen.')}</p>
+  </details>`;
+}
+
 // Where the address in the To field comes from, and what to do if unsure.
 function contactPill(c) {
   const P = {
@@ -742,6 +768,7 @@ function contactPill(c) {
     list: ['done', L(`checked ${CHECKED}`, `gecontroleerd ${CHECKED}`)],
     lookup: ['done', L(`from their privacy statement, ${c.checked}`, `uit hun privacyverklaring, ${c.checked}`)],
     guess: ['low', L('guessed', 'geraden')],
+    service: ['done', L('their customer service, from their own mail', 'hun klantenservice, uit hun eigen mail')],
     none: ['overdue', L('no address yet', 'nog geen adres')]
   }[c.source];
   return P ? `<span class="pill ${P[0]}">${P[1]}</span>` : '';
@@ -759,6 +786,8 @@ function contactNote(c) {
         'Een gok op basis van hun domein. Zoek "privacy" of "functionaris gegevensbescherming" in hun privacyverklaring (meestal onderaan hun website en hun mails gelinkt), pas het hier aan en verstuur.'));
   else if (c.source === 'mail') parts.push(L(`Their own mail names this address for privacy questions.${link ? ` To double-check: ${link}.` : ''}`,
     `Hun eigen mail noemt dit adres voor privacyvragen.${link ? ` Ter controle: ${link}.` : ''}`));
+  else if (c.source === 'service') parts.push(L('Their privacy address is unknown or bounced, so this goes to the address they write to you from. A request through a channel they provide counts, and the letter asks them to pass it on to whoever handles privacy.',
+    'Hun privacyadres is onbekend of kwam terug, dus dit gaat naar het adres waarvandaan ze jou mailen. Een verzoek via een kanaal dat zij aanbieden telt, en de brief vraagt ze het door te sturen naar wie over privacy gaat.'));
   else if (c.source === 'lookup') parts.push(L(`Found in their own privacy statement on ${c.checked}.${link ? ` ${link}` : ''}`,
     `Gevonden in hun eigen privacyverklaring op ${c.checked}.${link ? ` ${link}` : ''}`));
   else if (c.source === 'list') parts.push(L(`Checked against their own privacy statement in ${CHECKED}.${link ? ` ${link}` : ''}`,
@@ -846,6 +875,10 @@ function sendQueueCard(state) {
           : `<div class="row" style="margin-top:6px"><button data-action="lookup-contact" data-id="${esc(b.id)}" data-site="${esc(b.site)}">${L('Look it up on their website', 'Zoek het op hun website op')}</button>
              <span class="small muted">${L('Sends only their web address to hoopup.tech, nothing about you.', 'Stuurt alleen hun webadres naar hoopup.tech, niets over jou.')}</span></div>`)
         : ''}
+      ${contact.cc.length ? `<p class="small" style="margin:6px 0 0">${L(
+        `<b>Copy to</b> <code>${esc(contact.cc[0])}</code>, the address they write to you from. If the guessed address does not exist, the request still reaches them through a channel they provide, and that counts.`,
+        `<b>Kopie aan</b> <code>${esc(contact.cc[0])}</code>, het adres waarvandaan ze jou mailen. Bestaat het geraden adres niet, dan bereikt het verzoek ze toch via een kanaal dat zij aanbieden, en dat telt.`)}</p>` : ''}
+      ${['guess', 'none', 'service'].includes(contact.source) ? otherRoutes(b, contact) : ''}
     </div>
     <p class="small">${reveals
       ? L(`The letter reveals only <span class="mono">${esc(reveals)}</span>: what their own mail shows they already have.`,
@@ -1011,8 +1044,12 @@ function wireSend(root, rerender) {
 
       // Must happen inside the click, before the re-render below: handing a
       // mailto: to the mail app needs the user gesture.
+      // Their own service address goes along as a copy when the privacy address
+      // is only a guess: a request through a channel they provide counts.
+      const c = contactFor(b, r);
+      const cc = to.toLowerCase() === c.email.toLowerCase() ? c.cc : [];
       const link = document.createElement('a');
-      link.href = `mailto:${encodeURIComponent(to)}?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}`;
+      link.href = `mailto:${encodeURIComponent(to)}?${cc.length ? `cc=${encodeURIComponent(cc.join(','))}&` : ''}subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}`;
       link.click();
       // Not copied automatically: a clipboard can sync to other devices (Windows
       // clipboard history, Apple's Universal Clipboard), and the letter holds
@@ -1021,7 +1058,7 @@ function wireSend(root, rerender) {
 
       // Only an address the user typed is kept as theirs; the one actually used
       // is always kept, so a bounce for it can be recognised later.
-      const extra = { ...(to !== contactFor(b, r).email ? { to } : {}), sentTo: to };
+      const extra = { ...(to !== c.email ? { to } : {}), sentTo: to, sentCc: cc };
       sendQueue.i++;
       if (sendQueue.kind === 'reminder') store.markReminder(b.id, extra);
       else store.setStatus(b.id, 'sent', extra);
@@ -2158,10 +2195,10 @@ export function about() {
       'Alles hieronder wordt in je browser verwerkt en alleen daar opgeslagen (localStorage). Het verlaat je apparaat alleen in de gevallen onder het volgende kopje, en alleen als jij dat kiest.')}</p>
     <ul>${L(`
       <li>The details you fill in under Settings: name, date of birth, email addresses, phone numbers and postal address. They are only used to fill in your letters.</li>
-      <li>From mail you drop in, per sender only: its name and any other names it used, its domain, which of your addresses it wrote to, how many mails it sent, the domains its links and reply addresses point to, its unsubscribe address, the privacy address and privacy statement link its own mail gives, and the outcome of the checks (sender check, your mail provider's spam rating, kind of content such as gambling). For a real company that may get a letter, also what its own mail shows it holds about you: the name it addresses you by, a postal address and phone number if its mail lists them as yours. Those go into your letter to that company and nowhere else. Subjects and message text are read for these checks and are not kept.</li>
+      <li>From mail you drop in, per sender only: its name and any other names it used, its domain, which of your addresses it wrote to, how many mails it sent, the domains its links and reply addresses point to, its unsubscribe address, the privacy address and privacy statement link its own mail gives, the service address and postal address it uses itself, and the outcome of the checks (sender check, your mail provider's spam rating, kind of content such as gambling). For a real company that may get a letter, also what its own mail shows it holds about you: the name it addresses you by, a postal address and phone number if its mail lists them as yours. Those go into your letter to that company and nowhere else. Subjects and message text are read for these checks and are not kept.</li>
       <li>Your progress: which companies you wrote to and when, notes, aliases, your answers about your addresses and the steps of a move you ticked off, which block rules you added, your language and mail app choice, and a breach-database API key if you add one.</li>`, `
       <li>De gegevens die je bij Instellingen invult: naam, geboortedatum, e-mailadressen, telefoonnummers en postadres. Ze worden alleen gebruikt om je brieven in te vullen.</li>
-      <li>Uit mail die je erin sleept, per afzender alleen: de naam en eventuele andere namen die hij gebruikte, het domein, naar welk adres van jou hij schreef, hoeveel mails hij stuurde, de domeinen waar zijn links en antwoordadressen naar wijzen, het uitschrijfadres, het privacyadres en de link naar de privacyverklaring die zijn eigen mail noemt, en de uitkomst van de controles (afzendercontrole, spamoordeel van je mailprovider, soort inhoud zoals gokken). Bij een echt bedrijf dat een brief kan krijgen ook wat zijn eigen mail laat zien dat het van je heeft: de naam waarmee het je aanschrijft, en een postadres en telefoonnummer als zijn mail die als de jouwe noemt. Die komen in je brief aan dat bedrijf en nergens anders. Onderwerpen en berichttekst worden voor deze controles gelezen en niet bewaard.</li>
+      <li>Uit mail die je erin sleept, per afzender alleen: de naam en eventuele andere namen die hij gebruikte, het domein, naar welk adres van jou hij schreef, hoeveel mails hij stuurde, de domeinen waar zijn links en antwoordadressen naar wijzen, het uitschrijfadres, het privacyadres en de link naar de privacyverklaring die zijn eigen mail noemt, het service- en postadres dat het zelf gebruikt, en de uitkomst van de controles (afzendercontrole, spamoordeel van je mailprovider, soort inhoud zoals gokken). Bij een echt bedrijf dat een brief kan krijgen ook wat zijn eigen mail laat zien dat het van je heeft: de naam waarmee het je aanschrijft, en een postadres en telefoonnummer als zijn mail die als de jouwe noemt. Die komen in je brief aan dat bedrijf en nergens anders. Onderwerpen en berichttekst worden voor deze controles gelezen en niet bewaard.</li>
       <li>Je voortgang: welke bedrijven je wanneer aanschreef, notities, aliassen, je antwoorden over je adressen en de stappen van een verhuizing die je afvinkte, welke blokkeerregels je toevoegde, je taal- en mailappkeuze en een API-sleutel voor de datalekdatabase als je die toevoegt.</li>`)}</ul>
     <p>${L('This storage is not encrypted: use a device and browser profile only you use. You remove it all with <a href="#/profile">Settings</a> → Erase everything, or by clearing this site\'s data in your browser. Because it is strictly necessary for the service you ask for, and contains nothing used to track you, no cookie consent is needed for it.',
       'Deze opslag is niet versleuteld: gebruik een apparaat en browserprofiel dat alleen jij gebruikt. Je wist alles via <a href="#/profile">Instellingen</a> → Alles wissen, of door de websitegegevens van deze site in je browser te wissen. Omdat de opslag strikt noodzakelijk is voor de dienst die je vraagt, en niets bevat waarmee je gevolgd wordt, is er geen cookietoestemming voor nodig.')}</p>`)}

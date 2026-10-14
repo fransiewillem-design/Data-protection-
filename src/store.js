@@ -144,27 +144,33 @@ export function setStatus(brokerId, status, extra = {}) {
 }
 
 // A delivery failure for an address a letter went to: that address is wrong.
-// The request goes back on the list without it, so the next attempt uses the
-// next-best address, or asks the user for one.
+// If every address the letter went to failed, the request goes back on the
+// list without them, so the next attempt uses the next-best address, or asks
+// the user for one. If a copy did arrive, it stands and the deadline runs.
 export function markBounced(addresses) {
-  const hit = [];
+  const hit = [], partial = [];
   update(s => {
     for (const [id, rec] of Object.entries(s.requests || {})) {
       if (!['sent', 'ack'].includes(rec.status)) continue;
       const b = s.custom.find(c => c.id === id);
-      const sent = String(rec.sentTo || rec.to || b?.email || '').toLowerCase();
-      if (!sent || !addresses.has(sent)) continue;
-      rec.bounced = [...new Set([...(rec.bounced || []), sent])];
-      if (String(rec.to || '').toLowerCase() === sent) delete rec.to;
+      // Every address the letter went to: the To and any copy.
+      const sentAll = [rec.sentTo || rec.to || b?.email || '', ...(rec.sentCc || [])].map(a => String(a).toLowerCase()).filter(Boolean);
+      const failed = sentAll.filter(a => addresses.has(a));
+      if (!failed.length) continue;
+      rec.bounced = [...new Set([...(rec.bounced || []), ...failed])];
+      rec.history = rec.history || [];
+      rec.history.push({ ts: new Date().toISOString(), event: `Bounced: ${failed.join(', ')}` });
+      // One copy still arrived: the request reached them, and the deadline runs.
+      if (sentAll.some(a => !rec.bounced.includes(a))) { partial.push(id); continue; }
+      if (rec.to && rec.bounced.includes(String(rec.to).toLowerCase())) delete rec.to;
       delete rec.sentTo;
+      delete rec.sentCc;
       rec.status = 'todo';
       rec.sentAt = '';
-      rec.history = rec.history || [];
-      rec.history.push({ ts: new Date().toISOString(), event: `Bounced: ${sent}` });
       hit.push(id);
     }
   });
-  return hit;
+  return { back: hit, partial };
 }
 
 // A follow-up does not change the status: the request is still open, and the

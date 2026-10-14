@@ -2,7 +2,7 @@
 // mailing you. Nothing is uploaded: the File is read with FileReader and every
 // line below runs on the user's own machine.
 
-import { identityFrom } from './identity.js';
+import { identityFrom, textLines } from './identity.js';
 
 const MULTI_TLD = new Set([
   'co.uk', 'org.uk', 'ac.uk', 'gov.uk', 'co.jp', 'com.au', 'net.au', 'org.au',
@@ -216,6 +216,51 @@ function bouncedTo(h, body) {
   for (const m of String(h['x-failed-recipients'] || '').matchAll(/[\w.+-]+@[\w.-]+\.\w+/g)) out.add(m[0].toLowerCase());
   for (const m of body.slice(0, 200000).matchAll(/[\w.+-]+@[\w.-]+\.[a-z]{2,}/gi)) out.add(m[0].toLowerCase());
   return [...out].slice(0, 40);
+}
+
+// Addresses the company itself uses to talk to the user: the reply address
+// of its mail, a service address in its footer, or the address it sends from.
+// A request sent to one of these reaches them through a channel they
+// provided, which the GDPR counts (EDPB Guidelines 01/2022), even when the
+// privacy address is unknown. No-reply and bulk addresses never qualify.
+const NO_REPLY = /^(no-?reply|do-?not-?reply|donotreply|noreply|mailer|bounces?|newsletters?|nieuwsbrief|news|nieuws|marketing|notifications?|notificaties|alerts?|automated|system|postmaster|mailer-daemon|campaign|promo|deals|mail)([._+-].*)?$/i;
+const SERVICE_LOCAL = /^(klantenservice|service|support|contact|info|customerservice|customer[.-]?service|customercare|help|helpdesk|hallo|hello|vragen|klantcontact|care|webshop|orders?|bestellingen)$/i;
+
+export function serviceAddresses(parts, fromAddress, replyAddress, domain) {
+  const brand = registrableDomain(domain).split('.')[0];
+  const ours = a => { const h = String(a).split('@')[1] || ''; return !!brand && registrableDomain(h).split('.')[0] === brand; };
+  const usable = a => /^[a-z0-9._+-]+@[a-z0-9.-]+\.[a-z]{2,}$/i.test(a) && ours(a) && !NO_REPLY.test(a.split('@')[0]);
+  const out = [];
+  if (usable(replyAddress)) out.push(replyAddress);
+  for (const part of parts) for (const m of (part.text || '').matchAll(/([a-z0-9._+-]+)@([a-z0-9.-]+\.[a-z]{2,})/gi)) {
+    const a = `${m[1]}@${m[2]}`;
+    if (SERVICE_LOCAL.test(m[1]) && usable(a)) out.push(a);
+  }
+  if (usable(fromAddress)) out.push(fromAddress);
+  return [...new Set(out.map(a => a.toLowerCase()))].slice(0, 3);
+}
+
+// The company's own postal address, from its footer: a street and postcode
+// close to its legal form ("B.V.", "N.V."), its Chamber of Commerce number or
+// its name. A labelled delivery address is the user's and never taken.
+export function companyPostal(lines, name, domain) {
+  const brand = registrableDomain(domain).split('.')[0];
+  const legal = /\b(b\.?v\.?|n\.?v\.?|v\.o\.f\.?|ltd|gmbh|s\.a\.|inc|kvk|chamber of commerce|handelsregister)\b/i;
+  const tail = lines.slice(-60);
+  for (let i = tail.length - 1; i > 0; i--) {
+    const pc = /\b[1-9]\d{3}\s?[A-Z]{2}\s+\p{Lu}[\p{L} .'-]{1,30}/u.exec(tail[i]);
+    if (!pc) continue;
+    const parts = tail[i].split(/,\s+|\s+[|·•]\s+/).map(x => x.trim());
+    const pcPart = parts.find(x => /\b[1-9]\d{3}\s?[A-Z]{2}\b/.test(x)) || pc[0];
+    const streetLine = parts.length > 1 ? parts[parts.indexOf(pcPart) - 1] : tail[i - 1];
+    if (!streetLine || !/^[\p{L}][\p{L} .'-]{1,40}\s\d{1,5}\s?[a-zA-Z]?(?:[-\s]\d{1,4})?$/u.test(streetLine.trim())) continue;
+    const near = tail.slice(Math.max(0, i - 4), i + 3).join(' ');
+    if (/bezorgadres|afleveradres|factuuradres|delivery address|shipping address|billing address/i.test(near)) continue;
+    if (!legal.test(near) && !near.toLowerCase().includes(brand) && !(name && near.includes(name))) continue;
+    const who = parts.length > 2 ? parts[0] : (/\b(b\.?v\.?|n\.?v\.?)\b/i.test(tail[i - 2] || '') ? tail[i - 2] : name || '');
+    return [who, streetLine.trim(), pcPart.trim()].filter(Boolean).join(', ').slice(0, 140);
+  }
+  return '';
 }
 
 // The company's own privacy contact, if its mail gives one: an address like
@@ -598,6 +643,8 @@ export function parseMessages(text, { single = false } = {}) {
       replyToHost: replyTarget(parseFrom(h['reply-to'] || '')),
       identity: identityFrom({ to: h.to, parts, recipients, brand: `${from.name} ${from.domain}` }),
       privacy: privacyContact(parts, from.domain),
+      contacts: serviceAddresses(parts, from.address, parseFrom(h['reply-to'] || '').address, from.domain),
+      companyPostal: companyPostal(textLines(parts), from.name, from.domain),
       linkDomains: collectLinkDomains(parts),
       isEsp: ESP_DOMAINS.has(from.domain),
       personal: isPersonalDomain(from.domain)
@@ -624,7 +671,7 @@ export function groupBySender(messages) {
         unsubHttp: '', unsubMailto: '', unsubFrom: '', oneClick: false,
         addresses: new Set(), recipients: new Set(), subjects: [], isEsp: m.isEsp,
         linkDomains: new Set(), replyToHosts: new Set(), risk: '', providerSpamCount: 0, names: new Set(),
-        transactional: false, privacyEmail: '', privacyUrl: '', idNames: new Set(), idPostal: new Set(), idPhones: new Set(), idEmails: new Set(), phoneSeen: new Set()
+        transactional: false, privacyEmail: '', privacyUrl: '', serviceEmails: new Set(), companyPostal: '', idNames: new Set(), idPostal: new Set(), idPhones: new Set(), idEmails: new Set(), phoneSeen: new Set()
       });
     }
     const g = map.get(key);
@@ -648,6 +695,8 @@ export function groupBySender(messages) {
     if (m.replyToHost) g.replyToHosts.add(m.replyToHost);
     if (!g.privacyEmail && m.privacy?.email) g.privacyEmail = m.privacy.email;
     if (!g.privacyUrl && m.privacy?.url) g.privacyUrl = m.privacy.url;
+    for (const a of m.contacts || []) g.serviceEmails.add(a);
+    if (!g.companyPostal && m.companyPostal) g.companyPostal = m.companyPostal;
     const id = m.identity || {};
     for (const [k, set] of [['names', g.idNames], ['postal', g.idPostal], ['phones', g.idPhones], ['emails', g.idEmails], ['phoneSeen', g.phoneSeen]])
       for (const v of id[k] || []) set.add(v);
@@ -657,7 +706,7 @@ export function groupBySender(messages) {
   return [...map.values()]
     .map(g => ({ ...g, providerSpam: g.providerSpamCount * 2 >= g.count && g.providerSpamCount > 0,
                  names: [...g.names], addresses: [...g.addresses], recipients: [...g.recipients],
-                 linkDomains: [...g.linkDomains], replyToHosts: [...g.replyToHosts],
+                 linkDomains: [...g.linkDomains], replyToHosts: [...g.replyToHosts], serviceEmails: [...g.serviceEmails].slice(0, 3),
                  nameMismatch: !g.personal && !nameMatchesDomain(g.name, [...g.addresses][0], g.domain),
                  identity: { names: [...g.idNames].slice(0, 3), postal: [...g.idPostal].slice(0, 2), phones: [...g.idPhones].slice(0, 3),
                              emails: [...g.idEmails].slice(0, 5), phoneSeen: [...g.phoneSeen].slice(0, 20) } }))

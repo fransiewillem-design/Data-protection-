@@ -34,7 +34,7 @@ const DIRECTORY = [
 
 const listed = site => DIRECTORY.find(d => d.domains.includes(String(site || '').toLowerCase()));
 
-// { email, source: 'you' | 'mail' | 'list' | 'catalog' | 'guess' | 'none', url, bounced: [] }
+// { email, cc: [], source: 'you' | 'mail' | 'list' | 'lookup' | 'catalog' | 'guess' | 'service' | 'none', url, bounced: [], postal }
 export function contactFor(b, r = {}) {
   const bounced = new Set((r.bounced || []).map(x => x.toLowerCase()));
   const entry = b.source === 'mail' ? listed(b.site) : null;
@@ -46,9 +46,19 @@ export function contactFor(b, r = {}) {
     [b.lookup?.email, 'lookup'],
     [b.email, guess ? 'guess' : 'catalog']
   ];
-  const [email, source] = candidates.find(([e]) => e && !bounced.has(e.toLowerCase())) || ['', 'none'];
-  return { email, source, url: b.privacyUrl || entry?.url || b.lookup?.url || '', bounced: [...bounced],
-           listSource: entry?.source || '', checked: b.lookup?.checked || '' };
+  let [email, source] = candidates.find(([e]) => e && !bounced.has(e.toLowerCase())) || ['', 'none'];
+  // Without a confirmed privacy address, the letter also goes to an address
+  // the company itself writes from (its reply or customer-service address):
+  // a request through a channel the company provides counts (EDPB Guidelines
+  // 01/2022), so it reaches them even if the guessed address does not exist.
+  let cc = [];
+  if (source === 'guess' || source === 'none') {
+    const service = (b.serviceEmails || []).filter(a => !bounced.has(a.toLowerCase()) && a.toLowerCase() !== email.toLowerCase());
+    if (source === 'none' && service.length) { email = service.shift(); source = 'service'; }
+    cc = service.slice(0, 1);
+  }
+  return { email, cc, source, url: b.privacyUrl || entry?.url || b.lookup?.url || '', bounced: [...bounced],
+           listSource: entry?.source || '', checked: b.lookup?.checked || '', postal: b.companyPostal || '' };
 }
 
 // The look-up runs on hoopup.tech (functions/api/privacy-contact.js). A copy
