@@ -6,6 +6,7 @@ import { L, plural } from './i18n.js';
 import { relationOf } from './letters.js';
 import { groupBySender } from './mailscan.js';
 import { readMailFiles } from './mailfile.js';
+import { moveGuide, MOVE_STEPS } from './move.js';
 import {
   esc, toast, senderClass, unsubTier, upsertSenders, runOneClickBatch,
   startUnsubQueue, wireQueue, wireBlock, blockAllCard, hostOf, nameOf, akaOf, deleteWork, unsafeReason, writable, coveredBy,
@@ -103,15 +104,13 @@ function addressPanel(state) {
           ? L(`${h.scam} of them spam, nothing to act on`, `waarvan ${h.scam} spam, geen actie nodig`)
           : L('no spam', 'geen spam')}.</p>`;
       } else if (answers[a] === 'retire') {
+        // Letters still to send to companies that know this address: they go
+        // out before the address is retired, while it can receive the replies.
+        const letters = deleteWork(state.custom.filter(writable)).send
+          .filter(t => [t.evidence?.address, ...(t.evidence?.emails || [])].includes(a)).length;
         body = `<p>${seen}</p>
-          <p><b>${L('You can let it go. To retire it:', 'Je kunt het missen. Zo hef je het op:')}</b></p>
-          <ol class="small">${[
-            ...(h.real.length ? [L(`First give ${names} a new address, so you keep getting their mail.`,
-                                   `Geef eerst ${names} een nieuw adres, zodat hun mail blijft komen.`)] : []),
-            ...retireSteps(a)
-          ].map(x => `<li>${x}</li>`).join('')}</ol>
-          <p class="small muted">${L('Before you do, check that no account you need still logs in with it: password resets go to this address.',
-            'Controleer eerst of er geen account dat je nodig hebt nog met dit adres inlogt: wachtwoordherstel gaat naar dit adres.')} ${change(a)}</p>`;
+          ${moveGuide(h, { done: (state.addressMoves || {})[a] || [], letters, retire: retireSteps(a) })}
+          <p class="small muted">${change(a)}</p>`;
       } else if (answers[a] === 'keep') {
         body = `<p>${seen}</p>
           <p><b>${L('Keep it, and make it quieter:', 'Houd het, maar maak het rustiger:')}</b></p>
@@ -121,7 +120,7 @@ function addressPanel(state) {
                     'Geef dit adres niet meer uit. Gebruik voor elke nieuwe aanmelding een apart adres, zodat het volgende lek laat zien wie lekte (<a href="#/aliases">Aliassen</a>).')}</li>
             ${h.real.length ? `<li>${L(`When convenient, move ${names} to their own address too.`, `Verhuis ${names} als het uitkomt ook naar een eigen adres.`)}</li>` : ''}
           </ol>
-          <p class="small muted">${change(a)}</p>`;
+          <p class="small muted">${change(a)} · <button class="link-btn" data-action="addr-answer" data-addr="${esc(a)}" data-answer="retire">${L('Plan a move to a new address after all', 'Toch verhuizen naar een nieuw adres')}</button></p>`;
       } else {
         body = `<p>${seen}</p>
           <p><b>${L('Do people or companies you need still use this address?', 'Gebruiken mensen of bedrijven die je nodig hebt dit adres nog?')}</b></p>
@@ -278,12 +277,19 @@ export function home(state) {
         `Geblokkeerd op ${doneAt}. Die regels dekken ook de ${blockNew.length} nieuwe ${plural(blockNew.length, '', '', 'afzender', 'afzenders')}.`)
     : L(`Blocked on ${doneAt}. Nothing new since.`, `Geblokkeerd op ${doneAt}. Sindsdien niets nieuws.`);
 
+  const moving = flagged.filter(h => (state.addressAnswers || {})[h.address] === 'retire'
+    && ((state.addressMoves || {})[h.address] || []).length < MOVE_STEPS.length);
+  const movingText = moving.length
+    ? L(`Moving away from <span class="mono">${esc(moving[0].address)}</span>: ${((state.addressMoves || {})[moving[0].address] || []).length} of ${MOVE_STEPS.length} steps done.`,
+        `Verhuizen van <span class="mono">${esc(moving[0].address)}</span>: ${((state.addressMoves || {})[moving[0].address] || []).length} van ${MOVE_STEPS.length} stappen gedaan.`)
+    : '';
   const addrText = open.length
     ? `<span class="mono">${esc(open[0].address)}</span> ${L('gets mostly spam. One question decides what to do.', 'krijgt vooral spam. Beantwoord één vraag en je weet wat je kunt doen.')}${open.length > 1
-        ? L(` ${open.length - 1} more to check.`, ` Nog ${open.length - 1} te bekijken.`) : ''}`
-    : flagged.length
-    ? L('You decided for every address that gets mostly spam.', 'Je hebt een besluit genomen voor elk adres dat vooral spam krijgt.')
-    : L('No address is overrun with spam.', 'Geen enkel adres wordt overspoeld met spam.');
+        ? L(` ${open.length - 1} more to check.`, ` Nog ${open.length - 1} te bekijken.`) : ''}${movingText ? ' ' + movingText : ''}`
+    : movingText
+    || (flagged.length
+      ? L('You decided for every address that gets mostly spam.', 'Je hebt een besluit genomen voor elk adres dat vooral spam krijgt.')
+      : L('No address is overrun with spam.', 'Geen enkel adres wordt overspoeld met spam.'));
 
   return `
   <div class="home-head">
@@ -334,7 +340,8 @@ export function home(state) {
       title: L('Your addresses', 'Je adressen'),
       text: addrText,
       cta: L('Take a look', 'Bekijken'), action: 'home-addr',
-      done: flagged.length ? `<button class="link-btn" data-action="home-addr">${L('Review', 'Bekijken')}</button>` : L('All fine', 'Alles in orde') })}
+      done: moving.length ? `<button class="link-btn" data-action="home-addr">${L('Continue', 'Verdergaan')}</button>`
+        : flagged.length ? `<button class="link-btn" data-action="home-addr">${L('Review', 'Bekijken')}</button>` : L('All fine', 'Alles in orde') })}
   </div>
 
   ${unclear ? `<p class="small muted">${L(
@@ -443,5 +450,26 @@ export function mountHome(root, state, rerender) {
       rerender();
     }
     if (act === 'panel-close') { panel.innerHTML = ''; rerender(); }
+    if (act === 'copy-text') {
+      navigator.clipboard.writeText(btn.dataset.text)
+        .then(() => { btn.classList.add('copied'); toast(L('Copied', 'Gekopieerd')); })
+        .catch(() => toast(L('Could not copy', 'Kopiëren mislukt')));
+    }
+  });
+
+  // Ticking off a step of a move: saved on this device, panel redrawn in place.
+  root.addEventListener('change', e => {
+    const box = e.target.closest('[data-action="move-step"]');
+    if (!box) return;
+    const { addr, step } = box.dataset;
+    store.update(s => {
+      const moves = s.addressMoves || (s.addressMoves = {});
+      const done = new Set(moves[addr] || []);
+      if (box.checked) done.add(step); else done.delete(step);
+      moves[addr] = MOVE_STEPS.filter(x => done.has(x));
+    });
+    const y = scrollY;
+    panel.innerHTML = addressPanel(store.get());
+    scrollTo(0, y);
   });
 }

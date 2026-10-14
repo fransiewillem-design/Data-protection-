@@ -349,8 +349,8 @@ main { max-width: 820px; }
 /* address health */
 .addr { padding: 14px 0; border-top: 1px solid var(--line); }
 .addr:first-of-type { border-top: 0; }
-.addr-head { display: flex; justify-content: space-between; align-items: center; gap: 10px; margin-bottom: 8px; }
-.addr-head .mono { font-weight: 600; }
+.addr-head { display: flex; justify-content: space-between; align-items: center; gap: 6px 10px; margin-bottom: 8px; flex-wrap: wrap; }
+.addr-head .mono { font-weight: 600; min-width: 0; overflow-wrap: anywhere; }
 .addr p { font-size: .9rem; margin: 10px 0 6px; }
 .addr ol { padding-left: 20px; margin: 4px 0 0; }
 .addr ol li { margin-bottom: 5px; }
@@ -427,3 +427,20 @@ button, .btn { border-radius: 9px; transition: border-color .12s, color .12s, fi
 .aka { display: block; font-weight: 400; font-size: .8rem; color: var(--muted); }
 .block-done { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; margin-top: 16px; padding-top: 14px; border-top: 1px solid var(--line); }
 .block-done .small { flex: 1 1 220px; }
+
+/* ===== Copy chips & the address move plan ============================== */
+.copy-chips { display: flex; flex-wrap: wrap; gap: 6px; margin: 8px 0; }
+.copy-chip { font: 500 .82rem/1.25 inherit; padding: 5px 10px; border-radius: 6px; background: var(--surface-2);
+  border: 1px solid var(--line); color: var(--text); cursor: pointer; overflow-wrap: anywhere; text-align: left; }
+.copy-chip:hover { border-color: var(--accent); }
+.copy-chip.copied { border-color: var(--ok); color: var(--muted); }
+.copy-chip.copied::after { content: ' ✓'; color: var(--ok); }
+.move-steps { list-style: none; padding: 0; margin: 12px 0; counter-reset: step; }
+.move-steps > li { counter-increment: step; border-top: 1px solid var(--line); padding: 10px 0; }
+.move-head { display: flex; align-items: flex-start; gap: 10px; cursor: pointer; margin: 0; font-size: .95rem; color: var(--text); text-transform: none; letter-spacing: normal; font-weight: 400; }
+.move-head input { width: auto; flex: none; margin-top: 3px; }
+.move-head b::before { content: counter(step) '. '; color: var(--muted); font-weight: 600; }
+.move-body { margin: 4px 0 0 28px; color: var(--text); }
+.move-body ul, .move-body ol { padding-left: 18px; margin: 6px 0; }
+.move-steps > li.is-done .move-head b { color: var(--muted); text-decoration: line-through; text-decoration-color: var(--line); }
+.move-steps > li.is-done .move-body { display: none; }

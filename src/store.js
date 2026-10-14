@@ -15,6 +15,7 @@ const EMPTY = {
   custom: [],     // user-added brokers, same shape as data/brokers.json entries
   hibpKey: '',
   addressAnswers: {}, // address -> 'keep' | 'retire': the user's answer on Home
+  addressMoves: {},   // address -> steps of the move plan ticked off
   uiLang: ''      // '' = follow the browser; 'en' | 'nl' once chosen
 };
 

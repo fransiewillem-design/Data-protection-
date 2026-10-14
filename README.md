@@ -52,9 +52,14 @@ all the app can honestly say: the scan is usually a junk folder, and the friends
 rely on an address write to the inbox, which the app never sees. So it asks one question, *do people
 or companies you need still use this address?*, and the answer decides the advice:
 
-- **No, I can let it go** → move any real company it saw first, then provider-specific steps to retire
-  the address (Microsoft alias or account, iCloud Hide My Email, Gmail filter), with a warning that
-  password resets go to it.
+- **No, I can let it go** → a nine-step plan to move to a new address without losing anything, in an
+  order where the old address keeps working until the very end: make the new address (on Outlook/Hotmail
+  and iCloud as an alias in the same account, so mail, contacts and files stay put), send the erasure
+  letters while the old address can still receive the replies, list what uses it (password manager,
+  "Sign in with…", mailbox searches, the companies in the scan), move the accounts that matter first,
+  tell people, forward for a few months (auto-reply to contacts only), keep the old mail and contacts,
+  check again after a month, and only then retire it, with a warning that password resets go to it.
+  Steps can be ticked off; Home shows the progress.
 - **Yes, I still need it** → keep it and make it quieter: block the scams, stop giving it out, use a
   separate address per new sign-up.
 
