@@ -203,12 +203,15 @@ tell application "Mail"
         delete (contents of c)
       end repeat
     end try
+    -- Every value of Mail's own terms sits in parentheses: written plainly,
+    -- "set rule type of c to header key" reads as Mail's "to header" and
+    -- does not compile.
     repeat with v in siteList
-      set c to make new rule condition at end of rule conditions of r
-      set rule type of c to message content
-      set qualifier of c to does contain value
-      set expression of c to (v as text)
-      if rule type of c is message content and qualifier of c is does contain value and expression of c is (v as text) then
+      set c to make new rule condition at end of rule conditions of r with properties {rule type:(message content), qualifier:(does contain value), expression:(v as text)}
+      if rule type of c is not (message content) then set rule type of c to (message content)
+      if qualifier of c is not (does contain value) then set qualifier of c to (does contain value)
+      if expression of c is not (v as text) then set expression of c to (v as text)
+      if rule type of c is (message content) and qualifier of c is (does contain value) and expression of c is (v as text) then
         set added to added + 1
       else
         delete c
@@ -216,12 +219,13 @@ tell application "Mail"
       end if
     end repeat
     repeat with v in replyList
-      set c to make new rule condition at end of rule conditions of r
-      set rule type of c to header key
-      set header of c to "Reply-To"
-      set qualifier of c to does contain value
-      set expression of c to (v as text)
-      if rule type of c is header key and header of c is "Reply-To" and qualifier of c is does contain value and expression of c is (v as text) then
+      set c to make new rule condition at end of rule conditions of r with properties {rule type:(header key), header:"Reply-To", qualifier:(does contain value), expression:(v as text)}
+      -- Some Mail versions drop the type or the header name on creation.
+      if rule type of c is not (header key) then set rule type of c to (header key)
+      if header of c is not "Reply-To" then set header of c to "Reply-To"
+      if qualifier of c is not (does contain value) then set qualifier of c to (does contain value)
+      if expression of c is not (v as text) then set expression of c to (v as text)
+      if rule type of c is (header key) and header of c is "Reply-To" and qualifier of c is (does contain value) and expression of c is (v as text) then
         set added to added + 1
       else
         delete c
