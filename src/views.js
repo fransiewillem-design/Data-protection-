@@ -1845,10 +1845,14 @@ export function blockPanel(bl, client) {
         <li>${L('Open <b>Script Editor</b>: press <b>⌘ Space</b>, type <i>Script Editor</i>, press Enter (choose <b>New Document</b> if asked).', 'Open <b>Scripteditor</b>: druk op <b>⌘ spatie</b>, typ <i>Scripteditor</i>, druk op Enter (kies <b>Nieuw document</b> als daarom wordt gevraagd).')}</li>
         <li>${L('Paste (<b>⌘V</b>) and click <b>▶</b> (Run). When macOS asks whether Script Editor may control Mail, click <b>OK</b>.', 'Plak (<b>⌘V</b>) en klik op <b>▶</b> (Start). Vraagt macOS of Scripteditor Mail mag bedienen, klik dan op <b>OK</b>.')}</li>
         <li>${L('To clear what is already there: in Mail, open <b>Junk</b>, select all (<b>⌘A</b>) and choose <b>Message</b> → <b>Apply Rules</b> (<b>⌥⌘L</b>).',
-          'Om op te ruimen wat er al staat: open in Mail de map <b>Ongewenst</b>, selecteer alles (<b>⌘A</b>) en kies <b>Bericht</b> → <b>Pas regels toe</b> (<b>⌥⌘L</b>).')}</li>
+          'Om op te ruimen wat er al staat: open in Mail de map <b>Ongewenst</b>, selecteer alles (<b>⌘A</b>) en kies <b>Bericht</b> → <b>Pas regels toe</b> (<b>⌥⌘L</b>).')}
+          ${L('Does Mail say a message <i>could not be moved</i> (for example <i>Invalid base64 string for MIME content</i>)? That one message is damaged, which spam often is. Click <b>OK</b> and delete it by hand; the rest are cleared.',
+            'Meldt Mail dat een bericht <i>niet kon worden verplaatst</i> (bijvoorbeeld <i>Invalid base64 string for MIME content</i>)? Dan is dat ene bericht beschadigd, wat bij spam vaak zo is. Klik op <b>OK</b> en verwijder het zelf; de rest wordt opgeruimd.')}</li>
       </ol>
       <p class="small muted">${L('The script adds one rule to Mail (Settings → Rules), checks every condition it made, and tells you how many it added. It reads nothing and sends nothing. Mac rules run while Mail is open.',
-        'Het script zet één regel in Mail (Instellingen → Regels), controleert elke voorwaarde die het maakte en meldt hoeveel het er toevoegde. Het leest niets en verstuurt niets. Regels op de Mac werken zolang Mail open is.')}</p>`,
+        'Het script zet één regel in Mail (Instellingen → Regels), controleert elke voorwaarde die het maakte en meldt hoeveel het er toevoegde. Het leest niets en verstuurt niets. Regels op de Mac werken zolang Mail open is.')}
+        ${L('Is this an Outlook.com, Hotmail or Exchange account in Mail? Then also choose <b>Outlook.com / Hotmail</b> above: those rules run on the server, so they also work when your Mac is off and on your phone.',
+          'Is dit een Outlook.com-, Hotmail- of Exchange-account in Mail? Kies dan ook <b>Outlook.com / Hotmail</b> hierboven: die regels draaien op de server, dus ze werken ook als je Mac uit staat, en op je telefoon.')}</p>`,
     sieve: `
       <ol class="small">
         <li>${L('Download the Sieve script below.', 'Download hieronder het Sieve-script.')}</li>

@@ -242,6 +242,7 @@ tell application "Mail"
     set msg to "HoopUp: rule \\"${name}\\" added with " & added & " conditions."
     if skipped > 0 then set msg to msg & " " & skipped & " could not be added; please tell HoopUp."
     set msg to msg & return & return & "Now open Junk, select all (Cmd-A) and choose Message > Apply Rules (Option-Cmd-L) to clear what is already there."
+    set msg to msg & return & return & "If Mail then says a message could not be moved (Invalid base64 string), that one message is damaged: click OK and delete it by hand."
   on error errText
     try
       delete r
