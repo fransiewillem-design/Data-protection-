@@ -338,8 +338,8 @@ export function home(state) {
   </div>
 
   ${unclear ? `<p class="small muted">${L(
-    `${unclear} ${plural(unclear, 'sender', 'senders', '', '')} could not be checked either way, so ${unclear === 1 ? 'it is' : 'they are'} neither blocked nor written to. <a href="#/unsubscribe">See which</a>.`,
-    `${unclear} ${plural(unclear, '', '', 'afzender', 'afzenders')} ${unclear === 1 ? 'kon' : 'konden'} niet gecontroleerd worden. Die blokkeren we niet en schrijven we niet aan. <a href="#/unsubscribe">Bekijk welke</a>.`)}</p>` : ''}
+    `${unclear} ${plural(unclear, 'sender', 'senders', '', '')} could not be verified, so HoopUp does not use ${unclear === 1 ? 'its' : 'their'} links and does not block or write to ${unclear === 1 ? 'it' : 'them'}. Click nothing in ${unclear === 1 ? 'that mail' : 'those mails'}. <a href="#/unsubscribe">See which</a>.`,
+    `${unclear} ${plural(unclear, '', '', 'afzender', 'afzenders')} ${unclear === 1 ? 'kon' : 'konden'} niet gecontroleerd worden. HoopUp gebruikt ${unclear === 1 ? 'zijn' : 'hun'} links niet en blokkeert of schrijft ${unclear === 1 ? 'hem' : 'ze'} niet aan. Klik nergens op in ${unclear === 1 ? 'die mail' : 'die mails'}. <a href="#/unsubscribe">Bekijk welke</a>.`)}</p>` : ''}
 
   ${people ? `<p class="small muted">${L(
     `${people} ${plural(people, 'sender', 'senders', '', '')} wrote from a personal account (Gmail, Outlook…), so there is no company to unsubscribe from or write to. Do not know ${people === 1 ? 'them' : 'one'}? Mark it as junk. <a href="#/unsubscribe">See which</a>.`,

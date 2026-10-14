@@ -1,7 +1,7 @@
 import * as store from './store.js';
 import {
   TEMPLATES, TEMPLATE_LABELS_NL, render as renderLetter, suggestedTemplate,
-  templateFor, relationOf, RELATION_ORDER, writesDutch, letterLang
+  templateFor, relationOf, RELATION_ORDER, writesDutch, letterLang, evidenceLines
 } from './letters.js';
 import { allBreaches, breachesForAccount, pwnedPasswordCount } from './hibp.js';
 import { L, plural, lang } from './i18n.js';
@@ -18,6 +18,24 @@ export function safeUrl(u) {
   try {
     const parsed = new URL(String(u ?? ''), location.href);
     return ['http:', 'https:'].includes(parsed.protocol) ? parsed.href : '';
+  } catch {
+    return '';
+  }
+}
+
+// Link shorteners hide where a link really goes.
+const SHORTENERS = /^(bit\.ly|tinyurl\.com|t\.co|goo\.gl|ow\.ly|is\.gd|buff\.ly|rebrand\.ly|cutt\.ly|shorturl\.at|rb\.gy|t\.ly|tiny\.cc|s\.id)$/i;
+
+// An unsubscribe link HoopUp is willing to use: https (RFC 8058 requires it
+// for one-click), a real domain name rather than a bare IP address, no
+// shortener, and no login details smuggled into the address. Anything else is
+// not opened or requested at all.
+export function safeUnsubUrl(u) {
+  try {
+    const p = new URL(String(u ?? ''));
+    if (p.protocol !== 'https:' || p.username || p.password) return '';
+    if (!/^[a-z0-9-]+(\.[a-z0-9-]+)*\.[a-z]{2,}$/i.test(p.hostname) || SHORTENERS.test(p.hostname)) return '';
+    return p.href;
   } catch {
     return '';
   }
@@ -105,15 +123,15 @@ export function exposure(state) {
     <p class="small muted">${L('Log the number it came from and, if the text carried a link, the domain in it. The domain is what can actually be written to; the number is the evidence that they hold you.',
       'Noteer het nummer en, als de sms een link bevatte, het domein daarin. Naar het domein kun je schrijven; het nummer is het bewijs dat ze jouw gegevens hebben.')}</p>
     <div class="row">
-      <input id="ph-number" placeholder="+31 6 12345678" style="flex:1;min-width:150px">
-      <input id="ph-domain" placeholder="${L('domain from the text (optional)', 'domein uit de sms (optioneel)')}" style="flex:1;min-width:170px">
+      <input autocomplete="off" id="ph-number" placeholder="+31 6 12345678" style="flex:1;min-width:150px">
+      <input autocomplete="off" id="ph-domain" placeholder="${L('domain from the text (optional)', 'domein uit de sms (optioneel)')}" style="flex:1;min-width:170px">
       <button data-action="add-phone">${L('Add', 'Toevoegen')}</button>
     </div>
 
     <p class="small" style="margin-top:14px"><strong>${L('Add a company by hand:', 'Voeg zelf een bedrijf toe:')}</strong></p>
     <div class="row">
-      <input id="qa-company" placeholder="${L('Company name', 'Bedrijfsnaam')}" style="flex:1;min-width:160px">
-      <input id="qa-domain" placeholder="${L('their-domain.com (optional)', 'hun-domein.nl (optioneel)')}" style="flex:1;min-width:160px">
+      <input autocomplete="off" id="qa-company" placeholder="${L('Company name', 'Bedrijfsnaam')}" style="flex:1;min-width:160px">
+      <input autocomplete="off" id="qa-domain" placeholder="${L('their-domain.com (optional)', 'hun-domein.nl (optioneel)')}" style="flex:1;min-width:160px">
       <button class="primary" data-action="quick-add">${L('Add &amp; write letter', 'Toevoegen &amp; brief schrijven')}</button>
     </div>
     <div id="qa-added" style="margin-top:10px">
@@ -156,7 +174,7 @@ export function exposure(state) {
       'Gevoelige lekken zijn verborgen in de openbare zoekfunctie. Om die te zien, bevestig je je adres via <em>Notify me</em> op die site. Dat is ook gratis, en je krijgt een seintje bij toekomstige lekken.')}</p>
 
     <div class="row" style="margin-top:12px">
-      <input id="breach-q" placeholder="${L('Or search the breach list (e.g. linkedin)', 'Of doorzoek de lijst met lekken (bijv. linkedin)')}" style="flex:1;min-width:200px">
+      <input autocomplete="off" id="breach-q" placeholder="${L('Or search the breach list (e.g. linkedin)', 'Of doorzoek de lijst met lekken (bijv. linkedin)')}" style="flex:1;min-width:200px">
       <button data-action="load-breaches">${L('Load list', 'Lijst laden')}</button>
     </div>
     <div id="breach-result" style="margin-top:12px"></div>
@@ -394,7 +412,7 @@ export const nameOf = b => String(b.name || '').replace(/ \(impersonated\)$/, L(
 // "LuckyGem · also as Koko.bet, Mr. Punter" for senders that rotate names.
 export const akaOf = b => b.aka?.length ? L('also as ', 'ook als ') + b.aka.join(', ') : '';
 
-function senderRecord(sn, owned) {
+function senderRecord(sn, owned, ownPhones = []) {
   const forged = sn.trust === 'forged';
   const personal = !!sn.personal;
   const base = sn.name && sn.name !== sn.domain ? sn.name : personal ? (sn.addresses || [])[0] || sn.key : sn.domain;
@@ -407,6 +425,22 @@ function senderRecord(sn, owned) {
   // how a per-company alias gets picked up correctly.
   const hit = (sn.recipients || []).find(r => owned.includes(r));
   const address = hit || (sn.recipients || [])[0] || (owned.length === 1 ? owned[0] : '');
+
+  // What their own mail shows about the user, for the letter to identify them
+  // with: nothing more. Kept only for senders that might get a letter; a scam
+  // or an unverified sender keeps no personal details at all.
+  const found = sn.identity || {};
+  const letterable = sn.trust === 'verified' && !sn.risk && !sn.providerSpam && !personal;
+  const lastNine = x => String(x).replace(/\D/g, '').slice(-9);
+  const evidence = !letterable ? { address } : {
+    address,
+    emails: [...new Set([address, ...(found.emails || [])].filter(Boolean))].slice(0, 5),
+    names: (found.names || []).slice(0, 3),
+    postal: (found.postal || []).slice(0, 2),
+    // Labelled as the user's in the mail, or a number from Settings that the
+    // mail contains: never a helpline that merely appears in it.
+    phones: [...new Set([...(found.phones || []), ...ownPhones.filter(ph => lastNine(ph).length === 9 && (found.phoneSeen || []).includes(lastNine(ph)))])].slice(0, 3)
+  };
 
   // Someone writing from a personal account with nothing unsafe about it (a
   // friend, in a whole-mailbox export) needs no action; it is kept small so a
@@ -422,7 +456,7 @@ function senderRecord(sn, owned) {
     optOutUrl: personal ? '' : `https://${sn.domain}`, email: personal ? '' : `privacy@${sn.domain}`,
     method: 'email', confidence: 'low',
     source: 'mail',
-    evidence: { address },
+    evidence,
     unsubUrl: sn.unsubHttp || '',
     unsubMailto: sn.unsubMailto || '',
     unsubFrom: sn.unsubFrom || '',
@@ -443,15 +477,26 @@ function senderRecord(sn, owned) {
   };
 }
 
+// A later scan adds to what earlier mail showed (an order confirmation with the
+// postal address, then a newsletter without it), but only while the sender
+// still qualifies for a letter: if it no longer does, the details are dropped.
+function mergeEvidence(a = {}, b = {}) {
+  if (!b.names) return b;
+  const both = k => [...new Set([...(b[k] || []), ...(a[k] || [])])];
+  return { address: b.address || a.address, emails: both('emails').slice(0, 5), names: both('names').slice(0, 3),
+           postal: both('postal').slice(0, 2), phones: both('phones').slice(0, 3) };
+}
+
 // Saves a whole scan in one write: one save, and at most one warning if the
 // browser's storage is full, however many senders the mailbox had.
 export function upsertSenders(list) {
   let added = 0;
   store.update(st => {
     const owned = (st.profile.emails || []).map(e => e.toLowerCase());
+    const ownPhones = st.profile.phones || [];
     const index = new Map(st.custom.map((c, i) => [c.id, i]));
     for (const sn of list) {
-      const data = senderRecord(sn, owned);
+      const data = senderRecord(sn, owned, ownPhones);
       const i = index.get(data.id);
       if (i === undefined) { index.set(data.id, st.custom.length); st.custom.push(data); added++; continue; }
       const old = st.custom[i];
@@ -459,6 +504,7 @@ export function upsertSenders(list) {
       // Counts take the larger: re-scanning the same files must not inflate them.
       st.custom[i] = { ...old, ...data, mailCount: Math.max(old.mailCount || 0, data.mailCount),
                        transactional: !!(old.transactional || data.transactional),
+                       evidence: mergeEvidence(old.evidence, data.evidence),
                        unsubscribedAt: old.unsubscribedAt };
     }
   });
@@ -524,7 +570,7 @@ export function brokers(state, catalog, params) {
 
   <div class="card">
     <div class="row">
-      <input id="target-q" placeholder="${L('Search', 'Zoeken')}" value="${esc(params.get('q') || '')}" style="flex:1;min-width:150px">
+      <input autocomplete="off" id="target-q" placeholder="${L('Search', 'Zoeken')}" value="${esc(params.get('q') || '')}" style="flex:1;min-width:150px">
       <button data-action="add-custom">${L('Add company', 'Bedrijf toevoegen')}</button>
     </div>
     <p class="small muted" style="margin:10px 0 0">
@@ -589,7 +635,7 @@ function targetRow(b, state) {
 
   const SRC = { mail: L('from your mail', 'uit je mail'), phone: L('from a call or text', 'uit een telefoontje of sms'),
                 breach: L('from a breach', 'uit een datalek'), custom: L('added by you', 'door jou toegevoegd') };
-  const reveals = b.evidence?.address || b.evidence?.phone;
+  const reveals = b.evidence ? evidenceLines(b, lang() === 'nl').map(([, v]) => v).join(' · ') : '';
   return `
   <div class="item">
     <div class="body">
@@ -609,7 +655,7 @@ function targetRow(b, state) {
         ${r.relation ? '' : `<span class="muted">${L('(our guess)', '(onze inschatting)')}</span>`}</div>
     </div>
     <div class="actions">
-      ${safeUrl(b.optOutUrl) ? `<a class="btn" href="${esc(safeUrl(b.optOutUrl))}" target="_blank" rel="noopener noreferrer">${L('Opt-out page ↗', 'Afmeldpagina ↗')}</a>` : ''}
+      ${!b.source && safeUrl(b.optOutUrl) ? `<a class="btn" href="${esc(safeUrl(b.optOutUrl))}" target="_blank" rel="noopener noreferrer">${L('Opt-out page ↗', 'Afmeldpagina ↗')}</a>` : ''}
       <a class="btn primary" href="#/letter?b=${encodeURIComponent(b.id)}">${L('Letter', 'Brief')}</a>
       <select data-action="set-status" data-id="${esc(b.id)}" style="width:auto" aria-label="${L(`Status of ${esc(b.name)}`, `Status van ${esc(b.name)}`)}">
         ${Object.keys(store.STATUSES).map(k =>
@@ -697,6 +743,7 @@ export function deleteWork(targets) {
 // without losing the user's place in the queue.
 let sendQueue = null;        // { kind: 'request' | 'reminder', ids, i }
 let lastTargets = new Map(); // id -> target, from the last render of this page
+let lastOpened = null;       // { name, body } of the letter just handed to the mail app; never stored
 
 const queueTemplate = (kind, b, profile) => templateFor(kind, b, profile, store.getRequest(b.id));
 
@@ -723,7 +770,7 @@ function sendQueueCard(state) {
   const r = store.getRequest(b.id);
   const to = recipient(b, r);
   const guessed = !r.to && b.confidence === 'low';
-  const reveals = b.evidence?.address || b.evidence?.phone;
+  const reveals = b.evidence ? evidenceLines(b, lang() === 'nl').map(([, v]) => v).join(' · ') : '';
   const next = q.ids.slice(q.i + 1, q.i + 4).map(id => lastTargets.get(id)?.name).filter(Boolean);
 
   return `
@@ -739,14 +786,14 @@ function sendQueueCard(state) {
     <div class="meter send-meter"><span style="width:${Math.round(100 * q.i / total)}%"></span></div>
     <div class="field" style="margin-top:12px">
       <label for="send-to">${L('To', 'Aan')}${guessed ? ` <span class="pill low">${L('guessed', 'geraden')}</span>` : ''}</label>
-      <input id="send-to" value="${esc(to)}" data-id="${esc(b.id)}" spellcheck="false">
+      <input autocomplete="off" id="send-to" value="${esc(to)}" data-id="${esc(b.id)}" spellcheck="false">
       ${guessed ? `<p class="small muted" style="margin:4px 0 0">${L(
         `A guess from their domain. If it bounces, look for "privacy" or "DPO" in their privacy policy, fix it here, and send again.`,
         `Een gok op basis van hun domein. Komt hij terug, zoek dan "privacy" of "functionaris gegevensbescherming" in hun privacyverklaring, pas het hier aan en verstuur opnieuw.`)}</p>` : ''}
     </div>
     <p class="small">${reveals
-      ? L(`The letter reveals only <span class="mono">${esc(reveals)}</span>: what they already have.`,
-          `De brief noemt alleen <span class="mono">${esc(reveals)}</span>: wat ze al hebben.`)
+      ? L(`The letter reveals only <span class="mono">${esc(reveals)}</span>: what their own mail shows they already have.`,
+          `De brief noemt alleen <span class="mono">${esc(reveals)}</span>: wat hun eigen mail laat zien dat ze al hebben.`)
       : L('The letter includes your name and address, so this broker can find your record.',
           'De brief bevat je naam en adres, zodat deze databroker je gegevens kan vinden.')}
       <a href="#/letter?b=${encodeURIComponent(b.id)}&t=${queueTemplate(q.kind, b, state.profile)}">${L('Read it', 'Lees de brief')}</a></p>
@@ -758,8 +805,10 @@ function sendQueueCard(state) {
       <button data-action="send-skip">${L('Skip', 'Overslaan')}</button>
     </div>
     <p class="small muted" style="margin:10px 0 0">${L(
-      'Your mail app opens with the letter filled in. Press Send there, come back, and the next one is ready. Each is marked as sent when it opens. The letter is also copied, in case your mail app cuts a long one short.',
-      'Je mailapp opent met de brief ingevuld. Druk daar op Verstuur, kom terug, en de volgende staat klaar. Elke brief wordt als verstuurd gemarkeerd zodra hij opent. De brief wordt ook gekopieerd, voor het geval je mailapp een lange brief afkapt.')}
+      'Your mail app opens with the letter filled in. Press Send there, come back, and the next one is ready. Each is marked as sent when it opens.',
+      'Je mailapp opent met de brief ingevuld. Druk daar op Verstuur, kom terug, en de volgende staat klaar. Elke brief wordt als verstuurd gemarkeerd zodra hij opent.')}
+      ${lastOpened ? `<br>${L(`Was the letter to ${esc(lastOpened.name)} cut short in your mail app?`, `Kwam de brief aan ${esc(lastOpened.name)} afgekapt aan in je mailapp?`)}
+        <button class="link-btn" data-action="send-copy">${L('Copy it', 'Kopieer hem')}</button>` : ''}
       ${next.length ? `<br>${L('Up next:', 'Hierna:')} ${next.map(esc).join(', ')}${total - q.i - 1 > next.length ? '…' : ''}` : ''}</p>
   </section>`;
 }
@@ -855,7 +904,14 @@ function wireSend(root, rerender) {
 
     if (act === 'send-close') {
       sendQueue = null;
+      lastOpened = null;
       if (/[?&]send=1/.test(location.hash)) location.hash = '#/delete'; else rerender();
+    }
+
+    if (act === 'send-copy' && lastOpened) {
+      navigator.clipboard.writeText(lastOpened.body)
+        .then(() => toast(L('Letter copied. Paste it over the shortened one.', 'Brief gekopieerd. Plak hem over de afgekapte.')))
+        .catch(() => toast(L('Could not copy. Open the letter and select it.', 'Kopiëren mislukt. Open de brief en selecteer hem.')));
     }
 
     if (act === 'send-open' && sendQueue) {
@@ -870,7 +926,10 @@ function wireSend(root, rerender) {
       const link = document.createElement('a');
       link.href = `mailto:${encodeURIComponent(to)}?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}`;
       link.click();
-      navigator.clipboard?.writeText(body).catch(() => {});
+      // Not copied automatically: a clipboard can sync to other devices (Windows
+      // clipboard history, Apple's Universal Clipboard), and the letter holds
+      // personal details. The card offers a copy if the mail app cut it short.
+      lastOpened = { name: nameOf(b), body };
 
       const extra = to !== (b.email || '') ? { to } : {};
       sendQueue.i++;
@@ -976,7 +1035,7 @@ export function runOneClickBatch(root, items, rest) {
     if (d.type === 'ready') {
       frame.contentWindow.postMessage({
         type: 'dr-unsub-batch',
-        items: items.map(t => ({ id: t.id, name: t.name, url: safeUrl(t.unsubUrl) }))
+        items: items.map(t => ({ id: t.id, name: t.name, url: safeUnsubUrl(t.unsubUrl) })).filter(t => t.url)
       }, location.origin);
     }
     if (d.type === 'progress') {
@@ -1037,7 +1096,7 @@ export function startUnsubQueue(root, list) {
   const q = root.querySelector('#unsub-queue');
   if (!q) return;
   if (!list.length) { toast(L('None of these published an unsubscribe link', 'Geen van deze gaf een uitschrijflink')); return; }
-  const urls = list.map(t => ({ id: t.id, name: t.name, url: safeUrl(t.unsubUrl) }));
+  const urls = list.map(t => ({ id: t.id, name: t.name, url: safeUnsubUrl(t.unsubUrl) })).filter(t => t.url);
   q.dataset.urls = JSON.stringify(urls);
   q.dataset.i = '0';
   renderQueue(q, urls, 0);
@@ -1079,11 +1138,15 @@ export const writable = b => !isPersonal(b) && !['spam', 'bait', 'unclear'].incl
 
 export function senderClass(b) {
   if (b.source !== 'mail') return 'company';
-  const hasLink = !!(b.unsubUrl && safeUrl(b.unsubUrl));
+  const hasLink = !!safeUnsubUrl(b.unsubUrl);
   // Unsafe: failed the sender check, rated high-confidence spam by the mail
   // provider, or selling something unsafe whoever sends it (gambling, crypto,
   // prize and adult spam). Passing the sender check only proves who sent it.
   if (unsafeReason(b)) return hasLink ? 'bait' : 'spam';
+  // A sender the check could not confirm may not be who it claims to be, so
+  // its links are never used and it is never written to: its unsubscribe link
+  // could lead straight to the spammer it is pretending not to be.
+  if (b.trust !== 'verified') return 'unclear';
   if (hasLink) return 'unsub';
   if (isPersonal(b)) return 'person';
   // A verified sender without an unsubscribe link is a real company sending
@@ -1117,7 +1180,8 @@ export function unsubTier(b) {
   if (senderClass(b) !== 'unsub') return null;
   // One-click POST only for a verified sender's own header: never fire a
   // request at an endpoint whose owner could not be confirmed.
-  return b.oneClick && b.unsubFrom === 'header' && b.trust === 'verified' ? 'instant' : 'link';
+  if (b.trust !== 'verified' || !safeUnsubUrl(b.unsubUrl)) return null;
+  return b.oneClick && b.unsubFrom === 'header' ? 'instant' : 'link';
 }
 
 let unsubPrimed = false;
@@ -1216,8 +1280,8 @@ export function unsubscribe(state) {
   ${unclear.length ? `
     <section class="card">
       <h2>${L('Could not verify', 'Niet te controleren')} <span class="count">${unclear.length}</span></h2>
-      <p class="small muted" style="max-width:60ch">${L('These carry no sender check either way and no unsubscribe link, so the app neither blocks nor writes to them. If you recognise the company, add it under <a href="#/delete">Delete data</a>. If you do not, mark it as junk in your mail app.',
-        'Bij deze afzenders ontbreekt de afzendercontrole helemaal, en er is geen uitschrijflink. Daarom blokkeren we ze niet en schrijven we ze niet aan. Ken je het bedrijf, voeg het dan toe bij <a href="#/delete">Gegevens verwijderen</a>. Ken je het niet, markeer het dan als ongewenst in je mailapp.')}</p>
+      <p class="small muted" style="max-width:60ch">${L('The sender check could not confirm who sent these. A sender that is not who it claims to be would send an unsubscribe link straight to the spammer, so HoopUp does not open their links, block them or write to them. If you recognise the company, add it yourself under <a href="#/delete">Delete data</a>. If you do not, mark the mail as junk and click nothing in it.',
+        'De afzendercontrole kon niet bevestigen wie deze mail stuurde. Een afzender die niet is wie hij zegt, stuurt een uitschrijflink die rechtstreeks naar de spammer leidt. Daarom opent HoopUp hun links niet, blokkeren we ze niet en schrijven we ze niet aan. Ken je het bedrijf, voeg het dan zelf toe bij <a href="#/delete">Gegevens verwijderen</a>. Ken je het niet, markeer de mail als ongewenst en klik nergens op.')}</p>
       ${list(unclear)}
     </section>` : ''}
 
@@ -1581,7 +1645,7 @@ export function letter(state, catalog, params) {
     <h2>${L('Notes &amp; history', 'Notities &amp; geschiedenis')}</h2>
     <div class="field">
       <label for="notes">${L('Your notes on this company', 'Jouw notities over dit bedrijf')}</label>
-      <textarea id="notes" placeholder="${L('Reference number they gave you, who replied, what they claimed…',
+      <textarea autocomplete="off" id="notes" placeholder="${L('Reference number they gave you, who replied, what they claimed…',
         'Kenmerk dat ze gaven, wie er reageerde, wat ze beweerden…')}">${esc(rec.notes || '')}</textarea>
       <button data-action="save-notes" style="margin-top:6px">${L('Save notes', 'Notities opslaan')}</button>
     </div>
@@ -1710,8 +1774,8 @@ export function email(state) {
     `Leg vast welke alias je aan welk bedrijf gaf. Komt er spam op binnen, dan weet je wie hem verkocht of
     lekte, en dat bedrijf krijgt een verwijderverzoek.`)}</p>
     <div class="row">
-      <input id="al-alias" placeholder="alias@icloud.com" style="flex:1;min-width:180px">
-      <input id="al-service" placeholder="${L('Company it was given to', 'Bedrijf dat hem kreeg')}" style="flex:1;min-width:160px">
+      <input autocomplete="off" id="al-alias" placeholder="alias@icloud.com" style="flex:1;min-width:180px">
+      <input autocomplete="off" id="al-service" placeholder="${L('Company it was given to', 'Bedrijf dat hem kreeg')}" style="flex:1;min-width:160px">
       <button class="primary" data-action="add-alias">${L('Add', 'Toevoegen')}</button>
     </div>
     ${aliases.length ? `<div style="margin-top:12px">${aliases.map(a => `
@@ -1801,9 +1865,9 @@ export function profile(state) {
   <div class="card">
     <div class="grid cols-2">
       <div class="field"><label for="fullName">${L('Full legal name', 'Volledige naam')}</label>
-        <input id="fullName" value="${esc(p.fullName)}" placeholder="${L('As companies would have it', 'Zoals bedrijven hem kennen')}"></div>
+        <input autocomplete="off" id="fullName" value="${esc(p.fullName)}" placeholder="${L('As companies would have it', 'Zoals bedrijven hem kennen')}"></div>
       <div class="field"><label for="birthDate">${L('Date of birth', 'Geboortedatum')}</label>
-        <input id="birthDate" type="date" value="${esc(p.birthDate)}"></div>
+        <input autocomplete="off" id="birthDate" type="date" value="${esc(p.birthDate)}"></div>
       <div class="field"><label for="country">${L('Country', 'Land')}</label>
         <select id="country">
           ${['NL', 'BE', 'DE', 'FR', 'ES', 'IT', 'IE', 'UK', 'US', 'other'].map(c =>
@@ -1817,12 +1881,12 @@ export function profile(state) {
         </select></div>
     </div>
     <div class="field"><label for="emails">${L('Email addresses (one per line)', 'E-mailadressen (één per regel)')}</label>
-      <textarea id="emails" style="min-height:80px" placeholder="${L('Every address you have used to sign up anywhere',
+      <textarea autocomplete="off" id="emails" style="min-height:80px" placeholder="${L('Every address you have used to sign up anywhere',
         'Elk adres waarmee je je ooit ergens hebt aangemeld')}">${esc(p.emails.join('\n'))}</textarea></div>
     <div class="field"><label for="phones">${L('Phone numbers (one per line)', 'Telefoonnummers (één per regel)')}</label>
-      <textarea id="phones" style="min-height:60px">${esc(p.phones.join('\n'))}</textarea></div>
+      <textarea autocomplete="off" id="phones" style="min-height:60px">${esc(p.phones.join('\n'))}</textarea></div>
     <div class="field"><label for="addresses">${L('Postal address', 'Postadres')}</label>
-      <textarea id="addresses" style="min-height:70px">${esc(p.addresses)}</textarea></div>
+      <textarea autocomplete="off" id="addresses" style="min-height:70px">${esc(p.addresses)}</textarea></div>
     <button class="primary" data-action="save-profile">${L('Save', 'Opslaan')}</button>
   </div>
 
@@ -1835,7 +1899,7 @@ export function profile(state) {
     <a href="#/find">wie je gegevens heeft</a>. Met een sleutel krijg je hetzelfde antwoord, alleen in deze app
     in plaats van op hun site.`)}</p>
     <div class="row">
-      <input id="hibpKey" type="password" value="${esc(state.hibpKey)}" placeholder="hibp-api-key" style="flex:1;min-width:200px">
+      <input autocomplete="off" id="hibpKey" type="password" value="${esc(state.hibpKey)}" placeholder="hibp-api-key" style="flex:1;min-width:200px">
       <button data-action="save-key">${L('Save key', 'Sleutel opslaan')}</button>
     </div>
   </div>
@@ -1983,10 +2047,10 @@ export function about() {
       'Alles hieronder wordt in je browser verwerkt en alleen daar opgeslagen (localStorage). Het verlaat je apparaat alleen in de gevallen onder het volgende kopje, en alleen als jij dat kiest.')}</p>
     <ul>${L(`
       <li>The details you fill in under Settings: name, date of birth, email addresses, phone numbers and postal address. They are only used to fill in your letters.</li>
-      <li>From mail you drop in, per sender only: its name and any other names it used, its domain, which of your addresses it wrote to, how many mails it sent, the domains its links and reply addresses point to, its unsubscribe address, and the outcome of the checks (sender check, your mail provider's spam rating, kind of content such as gambling). Subjects and message text are read for those checks and are not kept.</li>
+      <li>From mail you drop in, per sender only: its name and any other names it used, its domain, which of your addresses it wrote to, how many mails it sent, the domains its links and reply addresses point to, its unsubscribe address, and the outcome of the checks (sender check, your mail provider's spam rating, kind of content such as gambling). For a real company that may get a letter, also what its own mail shows it holds about you: the name it addresses you by, a postal address and phone number if its mail lists them as yours. Those go into your letter to that company and nowhere else. Subjects and message text are read for these checks and are not kept.</li>
       <li>Your progress: which companies you wrote to and when, notes, aliases, your answers about your addresses, which block rules you added, your language choice, and a breach-database API key if you add one.</li>`, `
       <li>De gegevens die je bij Instellingen invult: naam, geboortedatum, e-mailadressen, telefoonnummers en postadres. Ze worden alleen gebruikt om je brieven in te vullen.</li>
-      <li>Uit mail die je erin sleept, per afzender alleen: de naam en eventuele andere namen die hij gebruikte, het domein, naar welk adres van jou hij schreef, hoeveel mails hij stuurde, de domeinen waar zijn links en antwoordadressen naar wijzen, het uitschrijfadres, en de uitkomst van de controles (afzendercontrole, spamoordeel van je mailprovider, soort inhoud zoals gokken). Onderwerpen en berichttekst worden voor die controles gelezen en niet bewaard.</li>
+      <li>Uit mail die je erin sleept, per afzender alleen: de naam en eventuele andere namen die hij gebruikte, het domein, naar welk adres van jou hij schreef, hoeveel mails hij stuurde, de domeinen waar zijn links en antwoordadressen naar wijzen, het uitschrijfadres, en de uitkomst van de controles (afzendercontrole, spamoordeel van je mailprovider, soort inhoud zoals gokken). Bij een echt bedrijf dat een brief kan krijgen ook wat zijn eigen mail laat zien dat het van je heeft: de naam waarmee het je aanschrijft, en een postadres en telefoonnummer als zijn mail die als de jouwe noemt. Die komen in je brief aan dat bedrijf en nergens anders. Onderwerpen en berichttekst worden voor deze controles gelezen en niet bewaard.</li>
       <li>Je voortgang: welke bedrijven je wanneer aanschreef, notities, aliassen, je antwoorden over je adressen, welke blokkeerregels je toevoegde, je taalkeuze en een API-sleutel voor de datalekdatabase als je die toevoegt.</li>`)}</ul>
     <p>${L('This storage is not encrypted: use a device and browser profile only you use. You remove it all with <a href="#/profile">Settings</a> → Erase everything, or by clearing this site\'s data in your browser. Because it is strictly necessary for the service you ask for, and contains nothing used to track you, no cookie consent is needed for it.',
       'Deze opslag is niet versleuteld: gebruik een apparaat en browserprofiel dat alleen jij gebruikt. Je wist alles via <a href="#/profile">Instellingen</a> → Alles wissen, of door de websitegegevens van deze site in je browser te wissen. Omdat de opslag strikt noodzakelijk is voor de dienst die je vraagt, en niets bevat waarmee je gevolgd wordt, is er geen cookietoestemming voor nodig.')}</p>`)}
@@ -1999,13 +2063,13 @@ export function about() {
       <li><b>Breach and password check.</b> When you use it, your browser contacts ${ext('https://haveibeenpwned.com/Privacy', 'Have I Been Pwned')} (Australia). The breach list carries nothing about you. A password check sends only the first 5 characters of a scrambled hash of the password, never the password itself. Only if you add your own API key and check an address is that email address sent to Have I Been Pwned.</li>
       <li><b>One-click unsubscribe.</b> Your browser sends the unsubscribe request to the address the sender published. That sender already has your email address; it also sees your IP address. No cookies or other details are sent.</li>
       <li><b>Opening a link</b> (an unsubscribe page, an opt-out form, the regulator's website) works like any link: that website sees your visit. This site never sends it where you came from.</li>
-      <li><b>Letters</b> open in your own mail app and are sent by you, through your own mail provider.</li>
+      <li><b>Letters</b> open in your own mail app and are sent by you, through your own mail provider. HoopUp does not put them on your clipboard unless you press Copy, because a clipboard can sync to your other devices.</li>
       <li><b>Emailing us.</b> Mail to ${esc(CONTACT_EMAIL)} is forwarded by Cloudflare Email Routing to a Gmail mailbox (Google). We use it only to answer you, and delete it once your question is settled.</li>`, `
       <li><b>Het bezoeken van de site.</b> De site wordt gehost door ${host.name} (${host.whereNL}). Zoals elke webhost ontvangt ${host.short} je IP-adres en de bestanden die je browser laadt, en kan die voor beveiliging vastleggen. Zie de ${ext(host.policy, `privacyverklaring van ${host.short}`)}; ${host.short} neemt deel aan het EU-VS Data Privacy Framework.</li>
       <li><b>Datalek- en wachtwoordcheck.</b> Als je die gebruikt, maakt je browser contact met ${ext('https://haveibeenpwned.com/Privacy', 'Have I Been Pwned')} (Australië). De lijst met datalekken bevat niets over jou. Een wachtwoordcheck stuurt alleen de eerste 5 tekens van een versleutelde hash van het wachtwoord, nooit het wachtwoord zelf. Alleen als je een eigen API-sleutel toevoegt en een adres controleert, wordt dat e-mailadres naar Have I Been Pwned gestuurd.</li>
       <li><b>Uitschrijven met één klik.</b> Je browser stuurt het uitschrijfverzoek naar het adres dat de afzender opgaf. Die afzender heeft je e-mailadres al; hij ziet ook je IP-adres. Er worden geen cookies of andere gegevens meegestuurd.</li>
       <li><b>Een link openen</b> (een uitschrijfpagina, een afmeldformulier, de website van de toezichthouder) werkt zoals elke link: die website ziet je bezoek. Deze site stuurt niet mee waar je vandaan kwam.</li>
-      <li><b>Brieven</b> openen in je eigen mailapp en worden door jou verstuurd, via je eigen mailprovider.</li>
+      <li><b>Brieven</b> openen in je eigen mailapp en worden door jou verstuurd, via je eigen mailprovider. HoopUp zet ze niet op je klembord tenzij je op Kopieer drukt, omdat een klembord naar je andere apparaten kan synchroniseren.</li>
       <li><b>Ons mailen.</b> Mail aan ${esc(CONTACT_EMAIL)} wordt door Cloudflare Email Routing doorgestuurd naar een Gmail-mailbox (Google). We gebruiken die alleen om je te antwoorden, en verwijderen hem zodra je vraag is afgehandeld.</li>`)}</ul>`)}
 
   ${sec(L('Sharing, sale and legal requests', 'Delen, verkoop en vorderingen'), `<p>${L(

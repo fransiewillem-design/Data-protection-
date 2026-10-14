@@ -20,26 +20,52 @@ export function isEvidenceDerived(b) {
   return !!(b.evidence && (b.evidence.address || b.evidence.phone));
 }
 
-function minimalBlock(b, nl) {
+// Exactly what the company's own mail showed about the user, as labelled lines.
+// Each value is cleaned to one line, so text taken from a mail cannot add
+// lines of its own to the letter.
+export function evidenceLines(b, nl) {
   const e = b.evidence || {};
-  let id;
-  if (e.address) id = nl ? `E-mailadres: ${e.address}` : `Email address: ${e.address}`;
-  else if (e.phone) id = nl ? `Telefoonnummer: ${e.phone}` : `Phone number: ${e.phone}`;
-  else id = nl
-    ? 'E-mailadres: [vul het adres in waarop u hun bericht ontving]'
-    : 'Email address: [fill in the address their message reached you on]';
+  const one = v => String(v || '').replace(/[\r\n\t]+/g, ' ').replace(/\s{2,}/g, ' ').trim().slice(0, 120);
+  const list = arr => [...new Set((arr || []).map(one).filter(Boolean))];
+  const emails = list([e.address, ...(e.emails || [])]);
+  const lines = [];
+  const names = list(e.names);
+  if (names.length) lines.push([nl ? 'Naam waarmee u mij aanschrijft' : 'Name you address me by', names.join(', ')]);
+  if (emails.length) lines.push([nl ? (emails.length > 1 ? 'E-mailadressen' : 'E-mailadres') : (emails.length > 1 ? 'Email addresses' : 'Email address'), emails.join(', ')]);
+  const postal = list(e.postal);
+  if (postal.length) lines.push([nl ? 'Postadres' : 'Postal address', postal.join('; ')]);
+  const phones = list(e.phone ? [e.phone, ...(e.phones || [])] : e.phones);
+  if (phones.length) lines.push([nl ? (phones.length > 1 ? 'Telefoonnummers' : 'Telefoonnummer') : (phones.length > 1 ? 'Phone numbers' : 'Phone number'), phones.join(', ')]);
+  return lines;
+}
+
+function minimalBlock(b, nl) {
+  const lines = evidenceLines(b, nl);
+  const id = lines.length
+    ? lines.map(([k, v]) => `${k}: ${v}`).join('\n')
+    : nl ? 'E-mailadres: [vul het adres in waarop u hun bericht ontving]'
+         : 'Email address: [fill in the address their message reached you on]';
+  const several = lines.length > 1 || /,|;/.test(lines[0]?.[1] || '');
   const why = nl
-    ? 'Dit is het enige identificatiegegeven dat ik verstrek, omdat u het aantoonbaar al van mij\nheeft (u heeft mij hierop benaderd) en het volstaat om mijn gegevens te vinden. Op grond\nvan artikel 12, lid 2, AVG moet u de uitoefening van mijn rechten faciliteren. Op grond van\nartikel 12, lid 6, mag u alleen om aanvullende gegevens vragen als u redelijke twijfel heeft\nover mijn identiteit, en dan alleen wat nodig is om die twijfel weg te nemen.'
-    : 'This is the only identifier I am providing, because it is the one you demonstrably\nalready hold (it is how you contacted me) and it is enough to locate my records.\nUnder Article 12(2) GDPR you must facilitate the exercise of my rights. Under Article\n12(6) you may ask for additional information only if you have reasonable doubts about\nmy identity, and then only what is necessary to resolve them.';
+    ? (several
+      ? 'Dit zijn de enige gegevens die ik verstrek. Het zijn precies de gegevens die uw eigen\nberichten aan mij laten zien, dus u heeft ze aantoonbaar al, en ze volstaan om mijn\ngegevens te vinden.'
+      : 'Dit is het enige identificatiegegeven dat ik verstrek, omdat u het aantoonbaar al van mij\nheeft (u heeft mij hierop benaderd) en het volstaat om mijn gegevens te vinden.')
+      + '\nOp grond van artikel 12, lid 2, AVG moet u de uitoefening van mijn rechten faciliteren.\nOp grond van artikel 12, lid 6, mag u alleen om aanvullende gegevens vragen als u redelijke\ntwijfel heeft over mijn identiteit, en dan alleen wat nodig is om die twijfel weg te nemen.'
+    : (several
+      ? 'These are the only details I am providing. They are exactly what your own messages to me\nshow, so you demonstrably hold them already, and they are enough to locate my records.'
+      : 'This is the only identifier I am providing, because it is the one you demonstrably\nalready hold (it is how you contacted me) and it is enough to locate my records.')
+      + '\nUnder Article 12(2) GDPR you must facilitate the exercise of my rights. Under Article\n12(6) you may ask for additional information only if you have reasonable doubts about\nmy identity, and then only what is necessary to resolve them.';
   return id + '\n\n' + why;
 }
 
-// Sign as the identifier they already hold, not as a person they cannot yet name.
+// Sign as they know the user: the name their mail used, if any, and the
+// identifier they hold. Never a name they did not have.
 function signature(b, p, nl) {
   if (isEvidenceDerived(b)) {
     const e = b.evidence || {};
-    return (e.address || e.phone || (nl ? '[adres]' : '[address]')) +
-      (nl ? '\n(de houder van bovengenoemd adres)' : '\n(the holder of the address above)');
+    const name = String((e.names || [])[0] || '').replace(/^(heer|mevrouw|mevr\.?|dhr\.?|meneer|mr\.?|mrs\.?|ms\.?|miss|dr\.?)\s+/i, '').trim();
+    const id = e.address || e.phone || (nl ? '[adres]' : '[address]');
+    return name ? `${name}\n${id}` : id + (nl ? '\n(de houder van bovengenoemd adres)' : '\n(the holder of the address above)');
   }
   return p.fullName || (nl ? '[naam]' : '[your name]');
 }

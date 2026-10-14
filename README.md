@@ -62,17 +62,22 @@ The answer is remembered and can be changed.
 
 **Who gets blocked, and who only gets an unsubscribe.** Each scanned sender is classified from what the
 receiving mail server recorded (`Authentication-Results`, `Received-SPF`, spam score):
+*verified* means the check vouched for the From domain itself: DMARC pass, Microsoft's `compauth=pass`, or an
+SPF/DKIM pass for that same domain. A scammer can pass SPF and DKIM for a domain of their own while
+borrowing a brand in From, so a pass for another domain does not count. Only the topmost
+`Authentication-Results` is read (the one the user's own provider added); copies further down came with
+the message and could be written by the sender.
 
 | Sender | Offered |
 | --- | --- |
-| Verified, with an unsubscribe link | Unsubscribe, and an erasure letter |
+| Verified, with an unsubscribe link | Unsubscribe, and an erasure letter. The link is used only if it is `https`, on a real domain name (no bare IP address, no link shortener) and carries no login details |
 | Verified, no unsubscribe link (an order confirmation, a bank) | An erasure letter only: never a block |
 | Failed authentication, with an "unsubscribe" link | Block; the link is flagged as a tracker, never clicked |
 | Failed authentication, no link | Block |
 | Passed authentication, but rated high-confidence spam by the mail provider (Microsoft SCL 9, `CAT:HSPM`/`PHSH`, `X-Spam-Flag: YES`) | Block |
 | Passed authentication, but advertising gambling, crypto get-rich schemes, fake prizes, pharmacy or adult spam, or an advance-fee scam (the widow, the next of kin, the business proposal) | Block: a casino that owns its domain passes SPF, DKIM and DMARC perfectly |
 | A name claiming a trusted organisation (Belastingdienst, overheid, DigiD, ING, Rabobank, PostNL, DHL, KPN, PayPal…) sent from a domain that is not theirs | Block: the check vouches for the domain, and the domain is not the one claimed |
-| No authentication result either way | Neither: listed as "could not verify", so it is not blocked or written to by mistake |
+| No authentication result, or a pass only for another domain than the one in From | Neither: listed as "could not verify". Its unsubscribe link is never used, since a sender that is not who it claims to be sends a link to the spammer; it is not blocked or written to either |
 | Sent from a personal account on a free mail service (Gmail, Hotmail, iCloud, Ziggo…) | Neither: there is no company to write to, and the provider is never blocked. Grouped per address, not per provider; if the content is a scam, it is blocked by its exact reply address and its links |
 
 Passing the sender check proves who sent a message, not that it is wanted, so content counts too. Each
@@ -92,8 +97,9 @@ excluded from every rule.
 
 - **Send all requests**: a queue that opens each company's letter as a filled-in draft in your own
   mail app (`mailto:`). You press Send there; the next one is ready when you come back. Each is marked
-  sent as it opens, which starts its deadline. The letter is also copied to the clipboard, because some
-  mail apps cut off a long `mailto:` body. A guessed `privacy@` address is flagged and can be corrected
+  sent as it opens, which starts its deadline. If a mail app cuts off a long `mailto:` body, a *Copy it*
+  link puts that letter on the clipboard; nothing is copied without asking, since a clipboard can sync to
+  other devices (Windows clipboard history, Apple's Universal Clipboard). A guessed `privacy@` address is flagged and can be corrected
   in the queue; the correction is kept for reminders.
 - **No answer in time**: when the month is up, the same queue sends a reminder giving 14 more days.
 - **Ready for a complaint**: still silent 14 days after the reminder, or refused: the complaint to the
@@ -190,13 +196,17 @@ to clean up after. So there is no server.
 | A sender's one-click unsubscribe URL | `List-Unsubscribe=One-Click`, no cookies, no referrer (see below) |
 | Letters | Nothing from the app: they open in your own mail app, and you press Send |
 
-**Letters reveal nothing the recipient did not already have.** A target found in your own mail or SMS has
-demonstrably got exactly one identifier: the address or number it contacted you on. Its letter cites that
-and nothing else (no name, no date of birth, no postal address, no other addresses) and says why,
-citing Article 12(2) (the controller must facilitate the request) and 12(6) (it may ask for more only
-with reasonable doubt about your identity, and only what is necessary). The signature and the subject line are the identifier too, since signing your real
-name would hand over exactly what the body withheld. This matters most for the letters that go to
-criminals: a scammer who mails you learns nothing from your reply.
+**Letters reveal nothing the recipient did not already have.** A company found in your own mail is
+identified with exactly what its own mail shows it holds, and nothing from your profile: the addresses it
+wrote to (and any "this mail was sent to …" in its footer), the name it addresses you by (the To line, the
+greeting, a labelled address block), and a postal address or phone number only where its mail lists them
+as yours ("Bezorgadres", "Delivery address", "your phone number"), or a number from Settings that its
+mail contains. Its own address, helpline and generic greetings ("Dear customer") are never taken. The
+letter says why, citing Article 12(2) (the controller must facilitate the request) and 12(6) (it may ask
+for more only with reasonable doubt about your identity, and only what is necessary). The signature uses
+only the name and address the company already had. Scams and unverified senders get no letter, and none
+of these details are kept for them. A number logged from a call or text gets a letter citing only that
+number.
 
 Fail-closed, in two senses. Anything sourced from the user's own evidence (scanned mail, a logged
 number, a breach they appeared in, a company they typed in) is minimal even when the recipient address

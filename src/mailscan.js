@@ -2,6 +2,8 @@
 // mailing you. Nothing is uploaded: the File is read with FileReader and every
 // line below runs on the user's own machine.
 
+import { identityFrom } from './identity.js';
+
 const MULTI_TLD = new Set([
   'co.uk', 'org.uk', 'ac.uk', 'gov.uk', 'co.jp', 'com.au', 'net.au', 'org.au',
   'com.br', 'co.nz', 'co.za', 'com.mx', 'co.in', 'com.tr', 'com.cn', 'com.sg'
@@ -41,14 +43,21 @@ export function parseHeaders(block) {
   const lines = block.split(/\r?\n/);
   let current = null;
   for (const line of lines) {
-    if (/^[ \t]/.test(line) && current) {
-      headers[current] += ' ' + line.trim();
+    if (/^[ \t]/.test(line)) {
+      // A folded line belongs to the header above it, and only if that one
+      // was kept: otherwise a later duplicate (say, a sender-written
+      // Authentication-Results claiming "dmarc=pass") would be glued onto
+      // the genuine first one.
+      if (current) headers[current] += ' ' + line.trim();
     } else {
       const m = line.match(/^([A-Za-z0-9-]+):\s*(.*)$/);
-      if (!m) continue;
-      current = m[1].toLowerCase();
-      // Keep the first occurrence; later duplicates are usually trace headers.
-      if (!(current in headers)) headers[current] = m[2];
+      if (!m) { current = null; continue; }
+      const name = m[1].toLowerCase();
+      // Keep the first occurrence: the topmost header is the one the user's
+      // own mail provider added last. Anything below it came with the message.
+      if (name in headers) { current = null; continue; }
+      current = name;
+      headers[name] = m[2];
     }
   }
   return headers;
@@ -251,17 +260,45 @@ export function findUnsubInBody(parts) {
 
 // --- sender authentication -------------------------------------------------
 
+// Each result in the receiving server's Authentication-Results, with the
+// domain it speaks for: "dkim=pass header.d=zalando.com". A pass only counts
+// for the From domain when it is about that domain.
+function authResults(ar) {
+  const out = [];
+  for (const part of ar.split(';')) {
+    const m = /\b(spf|dkim|dmarc|compauth)\s*=\s*([a-z]+)/i.exec(part);
+    if (!m) continue;
+    const prop = k => ((new RegExp('\\b' + k + '\\s*=\\s*"?([^\\s;"()]+)', 'i').exec(part) || [])[1] || '');
+    const method = m[1].toLowerCase();
+    let domain = '';
+    if (method === 'dkim') domain = prop('header\\.d') || prop('header\\.i').replace(/^.*@/, '');
+    if (method === 'spf') domain = prop('smtp\\.mailfrom').replace(/^.*@/, '') || prop('smtp\\.helo');
+    if (method === 'dmarc') domain = prop('header\\.from');
+    out.push({ method, result: m[2].toLowerCase(), domain: domain.toLowerCase() });
+  }
+  return out;
+}
+
 export function parseAuth(h) {
-  const ar = (h['authentication-results'] || '') + ' ' + (h['received-spf'] || '');
-  const pick = k => (new RegExp(k + '\\s*=\\s*([a-z]+)', 'i').exec(ar) || [])[1]?.toLowerCase() || '';
-  let spf = pick('spf');
-  if (!spf) { const r = /^\s*(pass|fail|softfail|neutral|none)/i.exec(h['received-spf'] || ''); spf = r ? r[1].toLowerCase() : ''; }
+  const ar = h['authentication-results'] || '';
+  const results = authResults(ar);
+  // Received-SPF: "pass (...) ... envelope-from=x@y.com;" when there is no
+  // Authentication-Results to say it.
+  const rs = h['received-spf'] || '';
+  const rsResult = (/^\s*(pass|fail|softfail|neutral|none)/i.exec(rs) || [])[1];
+  if (rsResult && !results.some(r => r.method === 'spf')) {
+    const env = (/envelope-from\s*=\s*"?([^\s;"]+)/i.exec(rs) || /domain of \S*?@?([a-z0-9.-]+\.[a-z]{2,})/i.exec(rs) || [])[1] || '';
+    results.push({ method: 'spf', result: rsResult.toLowerCase(), domain: env.replace(/^.*@/, '').toLowerCase() });
+  }
+  const first = method => results.find(r => r.method === method)?.result || '';
   const scl = parseInt((h['x-ms-exchange-organization-scl'] || '').trim(), 10);
   const forefront = (h['x-forefront-antispam-report'] || '') + ';' + (h['x-forefront-antispam-report-untrusted'] || '');
   return {
-    spf, dkim: pick('dkim'), dmarc: pick('dmarc'),
+    results,
+    spf: first('spf'), dkim: first('dkim'), dmarc: first('dmarc'),
     scl: Number.isFinite(scl) ? scl : null,
-    compauthFail: /compauth=fail/i.test(ar),
+    compauthFail: first('compauth') === 'fail',
+    compauthPass: first('compauth') === 'pass',
     // The receiving provider's own verdict. Only the high-confidence grades
     // count: ordinary junk (Microsoft SCL 5) also catches real newsletters.
     providerSpam: (Number.isFinite(scl) && scl >= 9) ||
@@ -381,8 +418,20 @@ export function contentRisk({ subject = '', name = '', domain = '', parts = [], 
 export function senderTrust(domain, auth) {
   if (!/\.[a-z]{2,}$/i.test(domain || '')) return { trust: 'forged', why: 'the sender domain is not a real domain' };
   if (auth.dmarc === 'fail' || auth.compauthFail) return { trust: 'forged', why: 'the sender failed authentication' };
-  if (auth.spf === 'pass' || auth.dkim === 'pass') return { trust: 'verified', why: 'the sending server is authorised by the domain' };
-  if (['fail', 'softfail'].includes(auth.spf)) return { trust: 'forged', why: 'the sending server is not authorised by the domain it claims' };
+  // Verified means the check vouched for THIS domain. A scammer can pass SPF
+  // and DKIM for a domain of their own while putting someone else's in From;
+  // a pass only counts when it is about the From domain (DMARC alignment).
+  const own = registrableDomain(domain);
+  const about = r => r.domain ? registrableDomain(r.domain) === own : r.method === 'dmarc';
+  const results = auth.results || [];
+  if (results.some(r => r.method === 'dmarc' && r.result === 'pass' && about(r)) || auth.compauthPass)
+    return { trust: 'verified', why: 'the domain passed DMARC' };
+  if (results.some(r => (r.method === 'dkim' || r.method === 'spf') && r.result === 'pass' && r.domain && about(r)))
+    return { trust: 'verified', why: 'the sending server is authorised by the domain' };
+  if (['fail', 'softfail'].includes(auth.spf) && !results.some(r => r.result === 'pass'))
+    return { trust: 'forged', why: 'the sending server is not authorised by the domain it claims' };
+  if (results.some(r => r.result === 'pass'))
+    return { trust: 'unknown', why: 'the check passed for a different domain than the one in From' };
   return { trust: 'unknown', why: 'the sender could not be verified' };
 }
 
@@ -442,6 +491,7 @@ export function parseMessages(text, { single = false } = {}) {
       risk: contentRisk({ subject: decodeWords(h.subject || ''), name: from.name, domain: from.domain, parts,
                           verified: senderTrust(from.domain, auth).trust === 'verified', personal: isPersonalDomain(from.domain) }),
       replyToHost: replyTarget(parseFrom(h['reply-to'] || '')),
+      identity: identityFrom({ to: h.to, parts, recipients, brand: `${from.name} ${from.domain}` }),
       linkDomains: collectLinkDomains(parts),
       isEsp: ESP_DOMAINS.has(from.domain),
       personal: isPersonalDomain(from.domain)
@@ -467,7 +517,7 @@ export function groupBySender(messages) {
         unsubHttp: '', unsubMailto: '', unsubFrom: '', oneClick: false,
         addresses: new Set(), recipients: new Set(), subjects: [], isEsp: m.isEsp,
         linkDomains: new Set(), replyToHosts: new Set(), risk: '', providerSpamCount: 0, names: new Set(),
-        transactional: false
+        transactional: false, idNames: new Set(), idPostal: new Set(), idPhones: new Set(), idEmails: new Set(), phoneSeen: new Set()
       });
     }
     const g = map.get(key);
@@ -489,12 +539,17 @@ export function groupBySender(messages) {
     for (const r of m.recipients) g.recipients.add(r);
     for (const d of m.linkDomains || []) g.linkDomains.add(d);
     if (m.replyToHost) g.replyToHosts.add(m.replyToHost);
+    const id = m.identity || {};
+    for (const [k, set] of [['names', g.idNames], ['postal', g.idPostal], ['phones', g.idPhones], ['emails', g.idEmails], ['phoneSeen', g.phoneSeen]])
+      for (const v of id[k] || []) set.add(v);
     // Prefer a human-looking display name over the bare domain.
     if ((g.name === g.domain || !g.name) && m.name) g.name = m.name;
   }
   return [...map.values()]
     .map(g => ({ ...g, providerSpam: g.providerSpamCount * 2 >= g.count && g.providerSpamCount > 0,
                  names: [...g.names], addresses: [...g.addresses], recipients: [...g.recipients],
-                 linkDomains: [...g.linkDomains], replyToHosts: [...g.replyToHosts] }))
+                 linkDomains: [...g.linkDomains], replyToHosts: [...g.replyToHosts],
+                 identity: { names: [...g.idNames].slice(0, 3), postal: [...g.idPostal].slice(0, 2), phones: [...g.idPhones].slice(0, 3),
+                             emails: [...g.idEmails].slice(0, 5), phoneSeen: [...g.phoneSeen].slice(0, 20) } }))
     .sort((a, b) => b.count - a.count);
 }
