@@ -399,8 +399,8 @@ export function mountHome(root, state, rerender) {
       // Delivery failures for letters the user sent: those addresses are wrong.
       const bounced = new Set(messages.flatMap(m => m.bounce || []));
       const { back, partial } = bounced.size ? store.markBounced(bounced) : { back: [], partial: [] };
-      if (partial.length) toast(L(`${partial.length === 1 ? 'A guessed address' : `${partial.length} guessed addresses`} did not exist, but the copy to their customer service arrived: the request stands and the deadline runs.`,
-        `${partial.length === 1 ? 'Een geraden adres bestond' : `${partial.length} geraden adressen bestonden`} niet, maar de kopie aan hun klantenservice kwam aan: het verzoek staat en de termijn loopt.`));
+      if (partial.length) toast(L(`${partial.length === 1 ? 'One address' : `${partial.length} addresses`} did not exist, but the letter reached their other addresses: the request stands and the deadline runs.`,
+        `${partial.length === 1 ? 'Eén adres bestond' : `${partial.length} adressen bestonden`} niet, maar de brief kwam aan op hun andere adressen: het verzoek staat en de termijn loopt.`));
       const mail = messages.filter(m => !m.bounce);
       if (back.length) toast(L(`${back.length} ${back.length === 1 ? 'letter' : 'letters'} bounced: the address did not exist. ${back.length === 1 ? 'It is' : 'They are'} back on your list under Delete data.`,
         `${back.length} ${back.length === 1 ? 'brief kwam' : 'brieven kwamen'} terug: het adres bestond niet. ${back.length === 1 ? 'Hij staat' : 'Ze staan'} weer op je lijst bij Gegevens verwijderen.`));

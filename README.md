@@ -224,8 +224,9 @@ same regulation under its Dutch name.) So a privacy address HoopUp is not sure o
 guess, but also one from the checked list or the look-up, which may be out of date. The letter is copied
 to up to two addresses the company's own mail comes from: the Reply-To it set, a service address in its
 footer, and the From address. No-reply addresses are never used (the guidance lets a company ignore a
-channel plainly not meant for messages); newsletter senders only when there is nothing better. If the
-guess bounces, those addresses take over. Only when the company's own mail names its privacy address, or
+channel plainly not meant for messages); newsletter senders only when there is nothing better. An address from the
+list or the look-up also gets the usual `privacy@` of their domain as a copy, in case the listed one has
+changed. If the guess bounces, the other addresses take over. Only when the company's own mail names its privacy address, or
 you typed one, does the letter go without copies. Every letter to a company also asks it to
 forward the request to whoever handles data protection, citing the same guidance. Where no address works,
 the queue offers their contact form (copy the letter in) or post: to the company's address from its own

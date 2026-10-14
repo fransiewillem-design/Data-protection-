@@ -34,7 +34,7 @@ const DIRECTORY = [
 
 const listed = site => DIRECTORY.find(d => d.domains.includes(String(site || '').toLowerCase()));
 
-// { email, cc: [], source: 'you' | 'mail' | 'list' | 'lookup' | 'catalog' | 'guess' | 'service' | 'none', url, bounced: [], postal }
+// { email, cc: [], guessCc, source: 'you' | 'mail' | 'list' | 'lookup' | 'catalog' | 'guess' | 'service' | 'none', url, bounced: [], postal }
 export function contactFor(b, r = {}) {
   const bounced = new Set((r.bounced || []).map(x => x.toLowerCase()));
   const entry = b.source === 'mail' ? listed(b.site) : null;
@@ -54,13 +54,19 @@ export function contactFor(b, r = {}) {
   // The same goes for an address from the checked list or the look-up, which
   // may have changed since. Only an address the company's own mail names, or
   // one the user typed, goes without copies.
-  let cc = [];
+  // An address from the list or the look-up also gets the usual privacy@ of
+  // their domain as a copy: if the listed address has changed, the common one
+  // may still be read. A copy that bounces costs nothing; the others arrived.
+  let cc = [], guessCc = '';
   if (['guess', 'none', 'list', 'lookup'].includes(source)) {
-    const service = (b.serviceEmails || []).filter(a => !bounced.has(a.toLowerCase()) && a.toLowerCase() !== email.toLowerCase());
+    const usable = a => a && !bounced.has(a.toLowerCase()) && a.toLowerCase() !== email.toLowerCase();
+    const service = (b.serviceEmails || []).filter(usable);
     if (source === 'none' && service.length) { email = service.shift(); source = 'service'; }
     cc = service.slice(0, 2);
+    const usual = b.source === 'mail' && b.site && !b.personal ? `privacy@${b.site}` : '';
+    if (['list', 'lookup'].includes(source) && usable(usual) && !cc.includes(usual)) { guessCc = usual; cc.push(usual); }
   }
-  return { email, cc, source, url: b.privacyUrl || entry?.url || b.lookup?.url || '', bounced: [...bounced],
+  return { email, cc, guessCc, source, url: b.privacyUrl || entry?.url || b.lookup?.url || '', bounced: [...bounced],
            listSource: entry?.source || '', checked: b.lookup?.checked || '', postal: b.companyPostal || '' };
 }
 

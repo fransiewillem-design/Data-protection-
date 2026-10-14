@@ -875,9 +875,18 @@ function sendQueueCard(state) {
           : `<div class="row" style="margin-top:6px"><button data-action="lookup-contact" data-id="${esc(b.id)}" data-site="${esc(b.site)}">${L('Look it up on their website', 'Zoek het op hun website op')}</button>
              <span class="small muted">${L('Sends only their web address to hoopup.tech, nothing about you.', 'Stuurt alleen hun webadres naar hoopup.tech, niets over jou.')}</span></div>`)
         : ''}
-      ${contact.cc.length ? `<p class="small" style="margin:6px 0 0">${L(
-        `<b>Copy to</b> ${contact.cc.map(a => `<code>${esc(a)}</code>`).join(' and ')}: ${contact.cc.length === 1 ? 'an address' : 'addresses'} their own mail comes from. If the privacy address is wrong or out of date, the request still reaches them through a channel they provide, and under the GDPR (AVG) that counts.`,
-        `<b>Kopie aan</b> ${contact.cc.map(a => `<code>${esc(a)}</code>`).join(' en ')}: ${contact.cc.length === 1 ? 'een adres' : 'adressen'} waarvandaan hun eigen mail komt. Klopt het privacyadres niet of niet meer, dan bereikt het verzoek ze toch via een kanaal dat zij aanbieden, en volgens de AVG telt dat.`)}</p>` : ''}
+      ${contact.cc.length ? (() => {
+        const own = contact.cc.filter(a => a !== contact.guessCc);
+        const code = (list, and) => list.map(a => `<code>${esc(a)}</code>`).join(and);
+        const parts = [];
+        if (own.length) parts.push(L(`${code(own, ' and ')}, ${own.length === 1 ? 'an address' : 'addresses'} their own mail comes from`,
+                                     `${code(own, ' en ')}, ${own.length === 1 ? 'een adres' : 'adressen'} waarvandaan hun eigen mail komt`));
+        if (contact.guessCc) parts.push(L(`<code>${esc(contact.guessCc)}</code>, the usual privacy address (a guess)`,
+                                          `<code>${esc(contact.guessCc)}</code>, het gebruikelijke privacyadres (een gok)`));
+        return `<p class="small" style="margin:6px 0 0">${L(`<b>Copy to</b> ${parts.join('; and ')}.`, `<b>Kopie aan</b> ${parts.join('; en ')}.`)}
+          ${L('If the privacy address is wrong or out of date, the request still reaches them through a channel they provide, and under the GDPR (AVG) that counts. A copy that bounces does no harm.',
+              'Klopt het privacyadres niet of niet meer, dan bereikt het verzoek ze toch via een kanaal dat zij aanbieden, en volgens de AVG telt dat. Een kopie die terugkomt kan geen kwaad.')}</p>`;
+      })() : ''}
       ${['guess', 'none', 'service'].includes(contact.source) ? otherRoutes(b, contact) : ''}
     </div>
     <p class="small">${reveals
