@@ -4,10 +4,11 @@
 import * as store from './store.js';
 import { L, plural } from './i18n.js';
 import { relationOf } from './letters.js';
-import { parseMessages, groupBySender } from './mailscan.js';
+import { groupBySender } from './mailscan.js';
+import { readMailFiles } from './mailfile.js';
 import {
-  esc, toast, senderClass, unsubTier, upsertSender, runOneClickBatch,
-  startUnsubQueue, wireQueue, wireBlock, blockAllCard, hostOf, nameOf, akaOf, deleteWork, unsafeReason,
+  esc, toast, senderClass, unsubTier, upsertSenders, runOneClickBatch,
+  startUnsubQueue, wireQueue, wireBlock, blockAllCard, hostOf, nameOf, akaOf, deleteWork, unsafeReason, writable, coveredBy,
   blockDoneIds, blockDoneAt, blockView, ruleCount
 } from './views.js';
 
@@ -41,7 +42,7 @@ export function addressHealth(state) {
     if (c === 'spam' || c === 'bait') h.scam += n;
     // An unverifiable sender is neither: it must not make an address look
     // safe to retire, nor count as evidence that it is overrun.
-    else if (c !== 'unclear') h.real.push(t.name);
+    else if (c !== 'unclear' && c !== 'person' && !t.personal) h.real.push(t.name);
   }
   // One soft grade. The scan is usually a junk folder, which says nothing about
   // the friends, bank or shops that use an address from the inbox, so the app
@@ -115,7 +116,7 @@ function addressPanel(state) {
         body = `<p>${seen}</p>
           <p><b>${L('Keep it, and make it quieter:', 'Houd het, maar maak het rustiger:')}</b></p>
           <ol class="small">
-            <li>${L('Block the scams with one import, using the <b>Block scams</b> card on Home.', 'Blokkeer de oplichters met één import, via de kaart <b>Oplichters blokkeren</b> op Home.')}</li>
+            <li>${L('Block the scams with the <b>Block scams</b> card on Home: one set of rules for your mail app.', 'Blokkeer de oplichters via de kaart <b>Oplichters blokkeren</b> op Home: één set regels voor je mailapp.')}</li>
             <li>${L('Stop giving this address out. Use a separate address for every new sign-up, so the next leak shows who leaked it (<a href="#/aliases">Aliases</a>).',
                     'Geef dit adres niet meer uit. Gebruik voor elke nieuwe aanmelding een apart adres, zodat het volgende lek laat zien wie lekte (<a href="#/aliases">Aliassen</a>).')}</li>
             ${h.real.length ? `<li>${L(`When convenient, move ${names} to their own address too.`, `Verhuis ${names} als het uitkomt ook naar een eigen adres.`)}</li>` : ''}
@@ -155,8 +156,8 @@ function dropZone(compact) {
                                              `<b>Sleep meer mail hierheen</b> om bij te werken, of ${pick}`)}</span>`
       : `<div class="drop-icon">${icon('drop')}</div>
          <p class="drop-title">${L('Drop your junk mail here', 'Sleep je ongewenste mail hierheen')}</p>
-         <p class="small muted">${L(`.eml or .mbox files · or ${pick}`, `.eml- of .mbox-bestanden · of ${pick}`)}</p>`}
-    <input type="file" id="files" multiple accept=".eml,.mbox,.txt,message/rfc822" hidden>
+         <p class="small muted">${L(`.eml, .msg or .mbox files · or ${pick}`, `.eml-, .msg- of .mbox-bestanden · of ${pick}`)}</p>`}
+    <input type="file" id="files" multiple accept=".eml,.msg,.mbox,.txt,message/rfc822,application/vnd.ms-outlook" hidden>
   </div>`;
 }
 
@@ -165,11 +166,13 @@ const HOWTO = () => `
     <summary>${L('How do I get the files out of my mail app?', 'Hoe haal ik de bestanden uit mijn mailapp?')}</summary>
     <ul class="small">${L(`
       <li><b>Apple Mail:</b> open Junk, <code>Cmd+A</code>, drag onto the Desktop, drop the files here.</li>
-      <li><b>Outlook:</b> select in Junk Email and drag to a Finder or Explorer window.</li>
-      <li><b>Gmail:</b> Google Takeout → Mail → drop the <code>.mbox</code> here.</li>`, `
+      <li><b>Outlook on Windows:</b> select the messages in Junk Email and drag them into a folder in File Explorer. They become <code>.msg</code> files; drop those here.</li>
+      <li><b>Outlook on a Mac:</b> select in Junk Email and drag to a Finder window.</li>
+      <li><b>Gmail:</b> Google Takeout → Mail → drop the <code>.mbox</code> here. It holds your whole mailbox, so reading takes a few minutes, all on your device.</li>`, `
       <li><b>Apple Mail:</b> open Ongewenst, <code>Cmd+A</code>, sleep naar het bureaublad en dan hierheen.</li>
-      <li><b>Outlook:</b> selecteer in Ongewenste e-mail en sleep naar een Finder- of Verkenner-venster.</li>
-      <li><b>Gmail:</b> Google Takeout → Mail → sleep de <code>.mbox</code> hierheen.</li>`)}
+      <li><b>Outlook op Windows:</b> selecteer de berichten in Ongewenste e-mail en sleep ze naar een map in Verkenner. Het worden <code>.msg</code>-bestanden; sleep die hierheen.</li>
+      <li><b>Outlook op een Mac:</b> selecteer in Ongewenste e-mail en sleep naar een Finder-venster.</li>
+      <li><b>Gmail:</b> Google Takeout → Mail → sleep de <code>.mbox</code> hierheen. Daarin staat je hele mailbox, dus het lezen duurt een paar minuten, helemaal op je apparaat.</li>`)}
     </ul>
   </details>`;
 
@@ -213,6 +216,7 @@ export function home(state) {
   const blocked = mail.filter(t => ['spam', 'bait'].includes(cls(t)));
   const bait = blocked.filter(t => cls(t) === 'bait').length;
   const unclear = mail.filter(t => cls(t) === 'unclear').length;
+  const people = mail.filter(t => cls(t) === 'person').length;
   // After the user pressed Done, only senders that need a rule they do not
   // have yet count. New senders reusing known link sites are already covered.
   const doneIds = blockDoneIds(state);
@@ -220,7 +224,9 @@ export function home(state) {
   const blockNew = blocked.filter(t => !doneIds.has(t.id));
   const newRules = doneIds.size ? ruleCount(blockView(state, false).bl) : null;
   const blockTodo = !doneIds.size ? blocked.length : newRules ? blockNew.length : 0;
-  const companies = state.custom.filter(t => !['spam', 'bait', 'unclear'].includes(cls(t)));
+  const fullRules = blockView(state, true).bl;
+  const uncovered = blocked.filter(t => !coveredBy(fullRules, t)).length;
+  const companies = state.custom.filter(writable);
   const work = deleteWork(companies);
   const toAsk = work.send.length + work.forms.length;
   const followUps = work.reminders.length + work.complaints.length;
@@ -257,8 +263,13 @@ export function home(state) {
   const blockText = !blocked.length
     ? L('No scams found. Real companies are never blocked, only unsubscribed.', 'Geen oplichters gevonden. Echte bedrijven worden nooit geblokkeerd, alleen uitgeschreven.')
     : !doneIds.size
-    ? L(`${blocked.length} ${plural(blocked.length, 'sender', 'senders', '', '')} ${blocked.length === 1 ? 'is' : 'are'} unsafe: scams or spam${bait ? `, ${bait} with fake unsubscribe links` : ''}. One import blocks them all.`,
-        `${blocked.length} ${plural(blocked.length, 'afzender', 'afzenders', 'afzender', 'afzenders')} ${blocked.length === 1 ? 'is' : 'zijn'} onveilig: oplichters of spam${bait ? `, ${bait} met nep-uitschrijflinks` : ''}. Eén import blokkeert ze allemaal.`)
+    ? L(`${blocked.length} ${plural(blocked.length, 'sender', 'senders', '', '')} ${blocked.length === 1 ? 'is' : 'are'} unsafe: scams or spam${bait ? `, ${bait} with fake unsubscribe links` : ''}.`,
+        `${blocked.length} ${plural(blocked.length, 'afzender', 'afzenders', 'afzender', 'afzenders')} ${blocked.length === 1 ? 'is' : 'zijn'} onveilig: oplichters of spam${bait ? `, ${bait} met nep-uitschrijflinks` : ''}.`)
+      + ' ' + (!uncovered ? L('One set of rules for your mail app blocks them all.', 'Eén set regels in je mailapp blokkeert ze allemaal.')
+        : uncovered < blocked.length
+        ? L(`One set of rules for your mail app blocks ${blocked.length - uncovered} of them. ${uncovered === 1 ? 'The other one' : `The other ${uncovered}`} left no link or reply address to block on: mark ${uncovered === 1 ? 'it' : 'those'} as junk.`,
+            `Eén set regels in je mailapp blokkeert er ${blocked.length - uncovered}. ${uncovered === 1 ? 'De andere liet' : `De andere ${uncovered} lieten`} geen link of antwoordadres achter om op te blokkeren: markeer ${uncovered === 1 ? 'die' : 'die'} als ongewenst.`)
+        : L('They left no link or reply address to block on: mark them as junk in your mail app.', 'Ze lieten geen link of antwoordadres achter om op te blokkeren: markeer ze als ongewenst in je mailapp.'))
     : newRules
     ? L(`${blockNew.length} new unsafe ${plural(blockNew.length, 'sender', 'senders', '', '')} since you blocked on ${doneAt}: ${newRules} new ${newRules === 1 ? 'rule' : 'rules'} to add.`,
         `${blockNew.length} nieuwe onveilige ${plural(blockNew.length, '', '', 'afzender', 'afzenders')} sinds je op ${doneAt} blokkeerde: ${newRules} ${newRules === 1 ? 'nieuwe regel' : 'nieuwe regels'} toe te voegen.`)
@@ -301,8 +312,8 @@ export function home(state) {
     ${card({ icon: 'delete', n: toAsk + followUps, tone: followUps ? 'tone-bad' : '',
       title: L('Delete my data', 'Mijn gegevens wissen'),
       text: [
-        toAsk ? L(`${toAsk} ${toAsk === 1 ? 'company holds' : 'companies hold'} your data. A legal request makes them erase it within a month.`,
-                  `${toAsk} ${toAsk === 1 ? 'bedrijf heeft' : 'bedrijven hebben'} je gegevens. Een AVG-verzoek verplicht ze die binnen een maand te wissen.`) : '',
+        toAsk ? L(`${toAsk} ${toAsk === 1 ? 'company holds' : 'companies hold'} your data. A legal request makes them erase it, and they must answer within a month.`,
+                  `${toAsk} ${toAsk === 1 ? 'bedrijf heeft' : 'bedrijven hebben'} je gegevens. Een AVG-verzoek verplicht ze die te wissen, en ze moeten binnen een maand antwoorden.`) : '',
         suspect ? L(`${suspect} with no reason to have it ${suspect === 1 ? 'goes' : 'go'} first.`,
                     `${suspect} zonder reden om ze te hebben ${suspect === 1 ? 'gaat' : 'gaan'} voor.`) : '',
         work.reminders.length ? L(`${work.reminders.length} did not answer in time. A reminder is ready.`,
@@ -330,6 +341,10 @@ export function home(state) {
     `${unclear} ${plural(unclear, 'sender', 'senders', '', '')} could not be checked either way, so ${unclear === 1 ? 'it is' : 'they are'} neither blocked nor written to. <a href="#/unsubscribe">See which</a>.`,
     `${unclear} ${plural(unclear, '', '', 'afzender', 'afzenders')} ${unclear === 1 ? 'kon' : 'konden'} niet gecontroleerd worden. Die blokkeren we niet en schrijven we niet aan. <a href="#/unsubscribe">Bekijk welke</a>.`)}</p>` : ''}
 
+  ${people ? `<p class="small muted">${L(
+    `${people} ${plural(people, 'sender', 'senders', '', '')} wrote from a personal account (Gmail, Outlook…), so there is no company to unsubscribe from or write to. Do not know ${people === 1 ? 'them' : 'one'}? Mark it as junk. <a href="#/unsubscribe">See which</a>.`,
+    `${people} ${plural(people, '', '', 'afzender', 'afzenders')} ${people === 1 ? 'schreef' : 'schreven'} vanaf een persoonlijk account (Gmail, Outlook…), dus er is geen bedrijf om je bij uit te schrijven of aan te schrijven. Ken je ${people === 1 ? 'de afzender' : 'er een'} niet? Markeer de mail als ongewenst. <a href="#/unsubscribe">Bekijk welke</a>.`)}</p>` : ''}
+
   <div id="unsub-queue"></div>
   <div id="panel"></div>
 
@@ -342,6 +357,7 @@ export function home(state) {
         const c = cls(t);
         const [p, l] = ['bait', 'spam'].includes(c) ? ['overdue', unsafeReason(t) + ' · ' + L('block', 'blokkeren')]
           : c === 'unclear' ? ['low', L('could not verify', 'niet te controleren')]
+          : c === 'person' ? ['low', L('personal address', 'persoonlijk adres')]
           : t.trust === 'verified' ? ['done', c === 'unsub' ? L('verified · unsubscribe', 'echt bedrijf · uitschrijven') : L('verified company', 'echt bedrijf')]
           : ['low', L('unverified', 'niet gecontroleerd')];
         return `<div class="pick" style="cursor:default">
@@ -351,9 +367,9 @@ export function home(state) {
       }).join('')}
     </div>
   </details>
-  <p class="small muted" style="margin-top:18px">${L(`<a href="#/find">More ways to find who has your data</a>
-  : breach records, mailbox searches, data brokers.`, `<a href="#/find">Meer manieren om te zien wie je gegevens heeft</a>
-  : datalekken, zoeken in je mailbox, databrokers.`)}</p>`;
+  <p class="small muted" style="margin-top:18px">${L(`<a href="#/find">More ways to find who has your data</a>:
+  breach records, mailbox searches, data brokers.`, `<a href="#/find">Meer manieren om te zien wie je gegevens heeft</a>:
+  datalekken, zoeken in je mailbox, databrokers.`)}</p>`;
 }
 
 export function mountHome(root, state, rerender) {
@@ -361,18 +377,30 @@ export function mountHome(root, state, rerender) {
   wireBlock(root, state, rerender);
 
   async function handleFiles(list) {
-    const files = [...list];
-    if (!files.length) return;
+    // Folders (an Apple Mail .mbox bundle) arrive as empty entries.
+    const files = [...list].filter(f => f.size > 0);
+    if (!files.length) { toast(L('Those were empty, or a folder. Drop the mail files themselves.', 'Die waren leeg, of een map. Sleep de mailbestanden zelf hierheen.')); return; }
+    const drop = root.querySelector('#drop');
+    const big = files.reduce((n, f) => n + f.size, 0) > 32 * 1024 * 1024;
     try {
-      const texts = await Promise.all(files.map(f => f.text()));
-      const messages = texts.flatMap(t => parseMessages(t));
-      if (!messages.length) { toast(L('No mail headers found. Use .eml or .mbox exports', 'Geen mailheaders gevonden. Gebruik .eml- of .mbox-bestanden')); return; }
+      if (big && drop) drop.innerHTML = `<p class="drop-title" aria-live="polite">${L('Reading your mail on this device…', 'Je mail wordt op dit apparaat gelezen…')} <span id="drop-pct">0%</span></p>
+        <p class="small muted">${L('A large export takes a few minutes. Nothing is uploaded.', 'Een grote export duurt een paar minuten. Er wordt niets geüpload.')}</p>`;
+      const messages = await readMailFiles(files, frac => {
+        const el = root.querySelector('#drop-pct');
+        if (el) el.textContent = Math.floor(frac * 100) + '%';
+      });
+      if (!messages.length) {
+        if (big) rerender();
+        toast(L('No mail found in those files. Use .eml, .msg or .mbox files.', 'Geen mail gevonden in die bestanden. Gebruik .eml-, .msg- of .mbox-bestanden.'));
+        return;
+      }
       const senders = groupBySender(messages);
-      senders.forEach(sn => upsertSender(sn));
+      upsertSenders(senders);
       rerender();
       toast(L(`${messages.length} ${plural(messages.length, 'mail', 'mails', '', '')} from ${senders.length} ${plural(senders.length, 'sender', 'senders', '', '')} sorted`,
         `${messages.length} ${plural(messages.length, '', '', 'mail', 'mails')} van ${senders.length} ${plural(senders.length, '', '', 'afzender', 'afzenders')} gesorteerd`));
     } catch (err) {
+      if (big) rerender();
       toast(L('Could not read those files: ', 'Kon die bestanden niet lezen: ') + err.message);
     }
   }

@@ -30,17 +30,18 @@ So HoopUp does the parts that work, and is honest about the rest:
 | --- | --- |
 | Unsubscribe from real companies, one click where they support it | GDPR letters that reveal only what each company already has |
 | Block scams by the sites and reply addresses they reuse | One-click-per-company sending from your own mail app |
-| Tell you which address is burned and how to retire it | Deadlines, reminders and a regulator complaint, tracked for you |
+| Tell you which address gets mostly spam, and how to retire it | Deadlines, reminders and a regulator complaint, tracked for you |
 | One alias per company, so the next leak names the leaker | Suspects first; your own providers get a narrower letter |
 
 ## How it works
 
-Drop mail in and Home sorts it into four cards, each with one number and one button:
+Drop mail in (`.eml` files, Outlook's `.msg` files, or an `.mbox` of any size: a multi-gigabyte Google Takeout is
+read in slices, on the device) and Home sorts it into four cards, each with one number and one button:
 
 | Card | What the button does |
 | --- | --- |
 | **Unsubscribe** | One-click unsubscribe for *verified* senders; senders that could not be verified are named, never bulk-clicked |
-| **Block scams** | One copy or one import for your mail app that blocks every unsafe sender via its reused link sites and reply addresses: a filter file for Gmail, a Sieve script for Fastmail and Proton, or a script you paste into Script Editor on a Mac (Apple Mail) or into PowerShell (classic Outlook). Each site and address becomes its own condition, so a message has to match only one. Press *I've added these rules* once they are in; the next batch then shows only rules you do not have yet |
+| **Block scams** | One copy or one import for your mail app that blocks unsafe senders by the link sites and reply addresses they reuse: a filter file for Gmail, a Sieve script for Fastmail and Proton, or a script you paste into Script Editor on a Mac (Apple Mail) or into PowerShell (classic Outlook). Each site and address becomes its own condition, so a message has to match only one. A sender that left neither cannot be caught by a rule, and the card says so. Press *I've added these rules* once they are in; the next batch then shows only rules you do not have yet |
 | **Delete my data** | Opens the letters for companies that genuinely hold your data |
 | **Your addresses** | Which address gets mostly spam, and one question to decide whether to keep or retire it (below) |
 
@@ -69,9 +70,10 @@ receiving mail server recorded (`Authentication-Results`, `Received-SPF`, spam s
 | Failed authentication, with an "unsubscribe" link | Block; the link is flagged as a tracker, never clicked |
 | Failed authentication, no link | Block |
 | Passed authentication, but rated high-confidence spam by the mail provider (Microsoft SCL 9, `CAT:HSPM`/`PHSH`, `X-Spam-Flag: YES`) | Block |
-| Passed authentication, but advertising gambling, crypto get-rich schemes, fake prizes, pharmacy or adult spam | Block: a casino that owns its domain passes SPF, DKIM and DMARC perfectly |
+| Passed authentication, but advertising gambling, crypto get-rich schemes, fake prizes, pharmacy or adult spam, or an advance-fee scam (the widow, the next of kin, the business proposal) | Block: a casino that owns its domain passes SPF, DKIM and DMARC perfectly |
 | A name claiming a trusted organisation (Belastingdienst, overheid, DigiD, ING, Rabobank, PostNL, DHL, KPN, PayPal…) sent from a domain that is not theirs | Block: the check vouches for the domain, and the domain is not the one claimed |
 | No authentication result either way | Neither: listed as "could not verify", so it is not blocked or written to by mistake |
+| Sent from a personal account on a free mail service (Gmail, Hotmail, iCloud, Ziggo…) | Neither: there is no company to write to, and the provider is never blocked. Grouped per address, not per provider; if the content is a scam, it is blocked by its exact reply address and its links |
 
 Passing the sender check proves who sent a message, not that it is wanted, so content counts too. Each
 category needs two hits, with a strong pattern ("free spins", "casino", "you have won") counting double,

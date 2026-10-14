@@ -69,6 +69,13 @@ export function cleanHost(h) {
   return String(h || '').toLowerCase().split(/[\s<>"'()[\],;:\\]/)[0].replace(/^\.+|\.+$/g, '');
 }
 
+// What a block rule should match for a Reply-To: the host, or, on a free mail
+// service, the exact address (one scammer on Proton is not every Proton user).
+function replyTarget(rt) {
+  if (isPersonalDomain(rt.domain) && /^[a-z0-9._+-]+@[a-z0-9.-]+$/i.test(rt.address)) return rt.address.toLowerCase();
+  return rt.host;
+}
+
 export function parseFrom(raw) {
   const value = decodeWords(raw || '');
 
@@ -295,12 +302,37 @@ const RISK = [
   { cat: 'adult',
     strong: [/\b(singles|women|vrouwen)\b.{0,25}\b(near you|in your area|bij jou in de buurt)\b/i],
     weak: [/\bsexy\b/i, /\bhookups?\b/i, /\bxxx\b/i] },
+  // Advance-fee fraud: the widow, the next of kin, the business proposal. It
+  // mostly comes from free mail addresses, which pass the sender check, so
+  // the check says nothing here. A company domain needs stronger evidence.
+  { cat: 'fraud', strictForCompanies: true,
+    strong: [/\b(business|investment|partnership) proposal\b/i, /\bnext of kin\b/i,
+             /\b(late|deceased) (husband|wife|father|client|brother)\b/i, /\b(inheritance|beneficiary|compensation) (fund|funds|claim|payment)\b/i,
+             /\bterminal (illness|cancer)\b/i, /\bATM (card|visa card)\b/i, /\bdonate\b.{0,50}\b(funds?|money|sum|fortune)\b/i],
+    weak: [/\b\d+([.,]\d+)?\s?(million|mln|miljoen)\s?(usd|us dollars|dollars|euros?|eur|gbp|pounds)?\b/i,
+           /\b(beneficiary|inheritance|erfenis|nalatenschap|widow|weduwe)\b/i, /\b(barrister|united nations|IMF|world bank)\b/i,
+           /\b(strictly )?(confidential|vertrouwelijk)\b/i, /\bdear (beloved|friend)\b|\bbeste vriend\b/i,
+           /\b(private|personal) (e-?mail|address|contact)\b/i, /\bkindly\b/i] },
   // Only applied to senders that are not verified: a real service may well
   // write that an account is suspended; a stranger saying so is phishing.
   { cat: 'phishing', unverifiedOnly: true,
     strong: [/\b(account|mailbox|cloud ?storage|storage|postvak|opslag|wachtwoord|password)\b.{0,50}\b(disabled|suspended|blocked|deactivated|locked|full|expired?|uitgeschakeld|geblokkeerd|opgeschort|vol|verlopen)\b/i],
     weak: [/\b(verify|confirm|validate|bevestig|verifieer|valideer)\b/i, /\b(urgent|immediately|within 24 hours|binnen 24 uur|direct)\b/i] }
 ];
+
+// Consumer mailbox providers. A sender on one of these is a person with an
+// account (a friend, or a scammer with a free address), never the company
+// that runs the service: it is grouped per address, not offered a letter, and
+// the provider itself is never blocked.
+const PERSONAL_MAIL = new Set([
+  'gmail.com', 'googlemail.com', 'outlook.com', 'hotmail.com', 'live.com', 'msn.com', 'icloud.com', 'me.com', 'mac.com',
+  'yahoo.com', 'ymail.com', 'rocketmail.com', 'aol.com', 'proton.me', 'protonmail.com', 'pm.me', 'tutanota.com', 'tuta.io',
+  'gmx.com', 'gmx.net', 'gmx.de', 'web.de', 'mail.com', 'zoho.com', 'yandex.com', 'yandex.ru', 'mail.ru', 'fastmail.com', 'hey.com',
+  'ziggo.nl', 'kpnmail.nl', 'kpnplanet.nl', 'planet.nl', 'home.nl', 'xs4all.nl', 'hetnet.nl', 'chello.nl', 'upcmail.nl',
+  'quicknet.nl', 'online.nl', 'tele2.nl', 'telfort.nl', 'caiway.nl', 'zeelandnet.nl', 'solcon.nl', 'telenet.be', 'skynet.be'
+]);
+export const isPersonalDomain = d => PERSONAL_MAIL.has(String(d || '').toLowerCase())
+  || /^(hotmail|live|outlook|yahoo|gmx|msn)\.(co\.)?[a-z]{2,3}$/i.test(String(d || ''));
 
 // Sender names and domains that say it outright.
 const RISKY_NAME = [
@@ -332,14 +364,14 @@ export function impersonates(name, domain) {
 const plain = html => html.replace(/<style[\s\S]*?<\/style>|<script[\s\S]*?<\/script>/gi, ' ')
   .replace(/<[^>]+>/g, ' ').replace(/&nbsp;/gi, ' ').replace(/&amp;/gi, '&').replace(/&#\d+;|&\w+;/g, ' ');
 
-export function contentRisk({ subject = '', name = '', domain = '', parts = [], verified = false }) {
+export function contentRisk({ subject = '', name = '', domain = '', parts = [], verified = false, personal = false }) {
   const text = [subject, ...parts.map(p => p.type === 'html' ? plain(p.text) : p.text)].join('\n').slice(0, 40000);
   for (const [cat, re] of RISKY_NAME) if (re.test(name) || re.test(domain)) return cat;
   if (impersonates(name, domain)) return 'impersonation';
   for (const r of RISK) {
     if (r.unverifiedOnly && verified) continue;
     const score = r.strong.filter(re => re.test(text)).length * 2 + r.weak.filter(re => re.test(text)).length;
-    if (score >= 2) return r.cat;
+    if (score >= (r.strictForCompanies && verified && !personal ? 4 : 2)) return r.cat;
   }
   return '';
 }
@@ -362,8 +394,10 @@ function splitMbox(text) {
   return parts.length ? parts : [text];
 }
 
-export function parseMessages(text) {
-  const looksLikeMbox = /^From .+\d{4}$/m.test(text.slice(0, 4000));
+// `single`: the text is known to be one message (the large-file reader has
+// already split the mailbox), so a body line starting "From " is not a split.
+export function parseMessages(text, { single = false } = {}) {
+  const looksLikeMbox = !single && /^From .+\d{4}$/m.test(text.slice(0, 4000));
   const chunks = looksLikeMbox ? splitMbox(text) : [text];
 
   return chunks.map(chunk => {
@@ -406,10 +440,11 @@ export function parseMessages(text) {
       ...senderTrust(from.domain, auth),
       providerSpam: auth.providerSpam,
       risk: contentRisk({ subject: decodeWords(h.subject || ''), name: from.name, domain: from.domain, parts,
-                          verified: senderTrust(from.domain, auth).trust === 'verified' }),
-      replyToHost: parseFrom(h['reply-to'] || '').host,
+                          verified: senderTrust(from.domain, auth).trust === 'verified', personal: isPersonalDomain(from.domain) }),
+      replyToHost: replyTarget(parseFrom(h['reply-to'] || '')),
       linkDomains: collectLinkDomains(parts),
-      isEsp: ESP_DOMAINS.has(from.domain)
+      isEsp: ESP_DOMAINS.has(from.domain),
+      personal: isPersonalDomain(from.domain)
     };
   }).filter(Boolean);
 }
@@ -422,13 +457,17 @@ export function groupBySender(messages) {
     // Forged mail is grouped apart from genuine mail on the same domain. A
     // spoofed "bol.com" must never drag the real bol.com into the spam pile:
     // the domain in a forged From line belongs to whoever is being impersonated.
-    const key = m.trust === 'forged' ? m.domain + '#forged' : m.domain;
+    // A free mail address is a person, so it is grouped per address: one
+    // "gmail.com" sender would lump a friend in with every scammer on Gmail.
+    const base = m.personal && m.address ? m.address.toLowerCase() : m.domain;
+    const key = m.trust === 'forged' ? base + '#forged' : base;
     if (!map.has(key)) {
       map.set(key, {
-        key, domain: m.domain, name: m.name || m.domain, count: 0,
+        key, domain: m.domain, personal: !!m.personal, name: m.name || m.domain, count: 0,
         unsubHttp: '', unsubMailto: '', unsubFrom: '', oneClick: false,
         addresses: new Set(), recipients: new Set(), subjects: [], isEsp: m.isEsp,
-        linkDomains: new Set(), replyToHosts: new Set(), risk: '', providerSpamCount: 0, names: new Set()
+        linkDomains: new Set(), replyToHosts: new Set(), risk: '', providerSpamCount: 0, names: new Set(),
+        transactional: false
       });
     }
     const g = map.get(key);
@@ -438,6 +477,10 @@ export function groupBySender(messages) {
     if (!g.unsubHttp && m.unsub.http) { g.unsubHttp = m.unsub.http; g.unsubFrom = m.unsubFrom; }
     if (!g.unsubMailto && m.unsub.mailto) g.unsubMailto = m.unsub.mailto;
     if (m.oneClick) g.oneClick = true;
+    // A checked message with no way to unsubscribe is an order, an invoice or
+    // an account notice: mail that only goes to customers. One is enough to
+    // know the user deals with this company, even if it also sends marketing.
+    if (m.trust === 'verified' && !m.unsub.http && !m.unsub.mailto) g.transactional = true;
     const rank = { forged: 0, unknown: 1, verified: 2 };
     if (!g.trust || rank[m.trust] < rank[g.trust]) { g.trust = m.trust; g.trustWhy = m.why; }
     if (m.risk && !g.risk) g.risk = m.risk;

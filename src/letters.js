@@ -425,8 +425,9 @@ export function guessRelation(b) {
   if (b.source === 'mail') {
     if (b.trust !== 'verified') return 'none';  // marketing from a sender that could not be checked
     // Verified mail with no unsubscribe at all is transactional (an order,
-    // an invoice, an account notice), which only goes to customers.
-    return b.unsubUrl ? 'maybe' : 'customer';
+    // an invoice, an account notice), which only goes to customers. One such
+    // message counts even when the same company also sends marketing.
+    return b.unsubUrl && !b.transactional ? 'maybe' : 'customer';
   }
   return 'maybe';
 }

@@ -2,7 +2,10 @@
 // client. Generated on the device and handed over as a file or text to import;
 // nothing is sent anywhere, and the app never touches the mailbox itself.
 
-import { registrableDomain, cleanHost } from './mailscan.js';
+import { registrableDomain, cleanHost, isPersonalDomain } from './mailscan.js';
+
+// A plain address, with nothing that could break out of a rule or a script.
+const ADDRESS = /^[a-z0-9._+-]+@[a-z0-9](?:[a-z0-9-]*[a-z0-9])?(?:\.[a-z0-9](?:[a-z0-9-]*[a-z0-9])?)+$/;
 
 // Mail services shared by many senders, legitimate ones included. Blocking one
 // of these outright would catch wanted mail, so they only ever appear as a
@@ -34,9 +37,11 @@ export function buildBlockList(targets, classOf) {
     if (t.trust !== 'verified' || !['unsub', 'company'].includes(classOf(t))) continue;
     if (t.site) safe.add(t.site);
     (t.linkDomains || []).forEach(d => safe.add(d));
-    (t.replyToHosts || []).forEach(h => safe.add(registrableDomain(cleanHost(h))));
+    (t.replyToHosts || []).forEach(h => { if (!h.includes('@')) safe.add(registrableDomain(cleanHost(h))); });
   }
-  const usable = d => isRealDomain(d) && !safe.has(d) && !SHARED_SERVICES.has(d);
+  // A free mail provider (Ziggo, GMX…) is never a target: a scammer with an
+  // address there says nothing about everyone else who has one.
+  const usable = d => isRealDomain(d) && !safe.has(d) && !SHARED_SERVICES.has(d) && !isPersonalDomain(d);
 
   // The From domain of a forged message is never blocked: it is either made up
   // (useless to block) or a real company's, borrowed for the scam (harmful to
@@ -50,9 +55,12 @@ export function buildBlockList(targets, classOf) {
     if (t.trust === 'verified' && usable(t.site)) links.add(t.site);
     // Cleaned again here for senders stored before cleanHost existed.
     for (const h of (t.replyToHosts || []).map(cleanHost).filter(Boolean)) {
+      // An exact address (a scammer on a free mail service) is narrow enough
+      // to match as is.
+      if (h.includes('@')) { if (ADDRESS.test(h)) replyTo.add(h); continue; }
       const reg = registrableDomain(h);
       if (safe.has(reg)) continue;
-      (SHARED_SERVICES.has(reg) ? sharedReplyTo : replyTo).add(h);
+      (SHARED_SERVICES.has(reg) || isPersonalDomain(reg) ? sharedReplyTo : replyTo).add(h);
     }
   }
 
@@ -152,7 +160,7 @@ export function guessClient(targets) {
 // in these lists comes from received mail, i.e. from the scammer, so only plain
 // hostnames are let through: nothing else can reach the script's syntax.
 const HOST = /^[a-z0-9](?:[a-z0-9-]*[a-z0-9])?(?:\.[a-z0-9](?:[a-z0-9-]*[a-z0-9])?)+$/;
-const hosts = arr => arr.filter(h => HOST.test(h));
+const hosts = arr => arr.filter(h => HOST.test(h) || ADDRESS.test(h));
 const scriptName = day => `HoopUp ${/^\d{4}-\d\d-\d\d$/.test(day) ? day : ''}`.trim();
 
 // Script Editor on a Mac: paste, press Run. One rule, "any condition", which

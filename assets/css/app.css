@@ -254,13 +254,15 @@ main { max-width: 820px; }
 /* ---- selectable rows ----------------------------------------------- */
 .list { border-top: 1px solid var(--line); }
 .pick {
-  display: flex; align-items: center; gap: 12px;
+  display: flex; align-items: center; gap: 12px; flex-wrap: wrap;
   padding: 9px 2px; border-bottom: 1px solid var(--line);
   cursor: pointer; margin: 0; font-size: .9rem; font-weight: 400; color: var(--text);
 }
 .pick:hover { background: var(--surface-2); }
 .pick input { width: auto; flex: none; }
-.pick-name { font-weight: 550; }
+.pick-name { font-weight: 550; min-width: 0; overflow-wrap: anywhere; }
+/* Long reasons ("rated high-confidence spam by your mail provider") wrap on narrow phones. */
+.pick .pill { white-space: normal; max-width: 100%; }
 .pick-meta { color: var(--muted); font-size: .82rem; margin-left: auto; }
 
 .link-btn {
