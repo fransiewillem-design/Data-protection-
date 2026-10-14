@@ -5,14 +5,14 @@ import {
   keptMailing, lastAnswer, REPLY_FOR, PUSHBACK, longDate
 } from './letters.js';
 import { matchAnswers, ownedAddresses } from './replies.js';
-import { readMailFiles } from './mailfile.js';
+import { readMailFiles, filesFromDrop } from './mailfile.js';
 import { icsFor, upcoming } from './calendar.js';
 import { csvLog } from './log.js';
 import { outlookAvailable, outlookStart, outlookFinish } from './outlook.js';
 import { allBreaches, breachesForAccount, pwnedPasswordCount } from './hibp.js';
 import { L, plural, lang } from './i18n.js';
 import { buildBlockList, asLinkList, asReplyList, asGmailXml, asGmailQueries, asSieve, asAppleScript, asPowerShell, guessClient } from './blocklist.js';
-import { isPersonalDomain, cleanHost, nameMatchesDomain, groupBySender } from './mailscan.js';
+import { isPersonalDomain, cleanHost, nameMatchesDomain, groupBySender, registrableDomain } from './mailscan.js';
 import { contactFor, CHECKED, lookupAvailable, lookupContact } from './contacts.js';
 
 export const esc = s => String(s ?? '').replace(/[&<>"']/g,
@@ -509,6 +509,9 @@ function senderRecord(sn, owned, ownPhones = []) {
     mailCount: sn.count || 1,
     // The last mail with an unsubscribe option: shows whether they stopped.
     lastBulkAt: sn.lastBulkAt || '',
+    // What the user did with their mail (opened, starred, replied, filed): how
+    // mail they want is told from mail they do not.
+    engaged: sn.eng ? { ...sn.eng, folder: String(sn.eng.folder || '').slice(0, 40) } : undefined,
     transactional: !!sn.transactional,
     nameMismatch: !!sn.nameMismatch,
     // The privacy address and statement their own mail gives, if any, and the
@@ -518,7 +521,7 @@ function senderRecord(sn, owned, ownPhones = []) {
     privacyUrl: letterable ? sn.privacyUrl || '' : '',
     serviceEmails: letterable ? (sn.serviceEmails || []).slice(0, 3) : [],
     companyPostal: letterable ? sn.companyPostal || '' : '',
-    notes: `Found in your own mail: ${sn.domain} sent to ${address || 'an address of yours'}. The letter deliberately tells them nothing they do not already have.`
+    notes: ''
   };
 }
 
@@ -532,6 +535,31 @@ function mergeEvidence(a = {}, b = {}) {
            postal: both('postal').slice(0, 2), phones: both('phones').slice(0, 3) };
 }
 
+// A whole mailbox can hold thousands of senders, and the browser keeps about
+// five million characters per site. So a saved sender leaves out what is
+// empty: a field that is false, blank or an empty list reads the same when it
+// is missing. Done after merging, so a value that became empty is dropped too.
+const OPTIONAL = ['impersonates', 'personal', 'unsubMailto', 'unsubFrom', 'oneClick', 'spam', 'risk', 'aka', 'providerSpam',
+  'replyToHosts', 'linkDomains', 'transactional', 'privacyEmail', 'privacyUrl', 'serviceEmails', 'companyPostal', 'lastBulkAt', 'trustWhy',
+  'notes', 'unsubUrl'];
+function compact(t) {
+  for (const k of OPTIONAL) if (t[k] === false || t[k] === '' || (Array.isArray(t[k]) && !t[k].length)) delete t[k];
+  if (t.engaged) {
+    for (const [k, v] of Object.entries(t.engaged)) if (!v) delete t.engaged[k];
+    if (!Object.keys(t.engaged).length) delete t.engaged;
+  }
+  if (t.source === 'mail' && /^Found in your own mail:/.test(t.notes || '')) delete t.notes;
+  return t;
+}
+
+// Counts take the larger, so dropping the same mailbox twice changes nothing.
+function mergeEngaged(a, b) {
+  if (!a || !b) return b || a;
+  const out = { folder: a.folder || b.folder || '', wrote: !!(a.wrote || b.wrote) };
+  for (const k of ['known', 'read', 'starred', 'replied', 'important', 'filed', 'junk']) out[k] = Math.max(a[k] || 0, b[k] || 0);
+  return out;
+}
+
 // Saves a whole scan in one write: one save, and at most one warning if the
 // browser's storage is full, however many senders the mailbox had.
 export function upsertSenders(list) {
@@ -543,7 +571,7 @@ export function upsertSenders(list) {
     for (const sn of list) {
       const data = senderRecord(sn, owned, ownPhones);
       const i = index.get(data.id);
-      if (i === undefined) { index.set(data.id, st.custom.length); st.custom.push(data); added++; continue; }
+      if (i === undefined) { index.set(data.id, st.custom.length); st.custom.push(compact(data)); added++; continue; }
       const old = st.custom[i];
       // Keep what the user did (unsubscribed, renamed); take everything else fresh.
       // Counts take the larger: re-scanning the same files must not inflate them.
@@ -553,7 +581,10 @@ export function upsertSenders(list) {
                        serviceEmails: data.serviceEmails?.length || !old.serviceEmails ? [...new Set([...(data.serviceEmails || []), ...(old.serviceEmails || [])])].slice(0, 3) : old.serviceEmails,
                        companyPostal: data.companyPostal || old.companyPostal || '',
                        lastBulkAt: [old.lastBulkAt, data.lastBulkAt].filter(Boolean).sort().at(-1) || '',
+                       engaged: mergeEngaged(old.engaged, data.engaged),
+                       keep: old.keep,
                        unsubscribedAt: old.unsubscribedAt };
+      compact(st.custom[i]);
     }
   });
   return added;
@@ -570,10 +601,26 @@ export async function ingestFiles(files, onProgress) {
   const { answers, used } = matchAnswers(messages.filter(m => !m.bounce), store.get());
   const changed = answers.length ? store.recordAnswers(answers) : [];
   // Mail the user sent (a whole-mailbox export holds it) is not a sender to
-  // sort; one forged in their name (the "I hacked you" scam) still is.
+  // sort; one forged in their name (the "I hacked you" scam) still is. In a
+  // whole mailbox, the user's own addresses are the ones most of it went to.
   const own = ownedAddresses(store.get());
-  const mail = messages.filter(m => !m.bounce && !used.has(m) && !(own.has(String(m.address).toLowerCase()) && m.trust !== 'forged'));
+  const tally = new Map();
+  for (const m of messages) for (const r of m.recipients || []) tally.set(r, (tally.get(r) || 0) + 1);
+  for (const [a, n] of tally) if (n >= Math.max(3, messages.length * 0.2)) own.add(a);
+  const mine = m => (own.has(String(m.address).toLowerCase()) && m.trust !== 'forged') || m.seen?.sent;
+  // Whoever the user writes to is someone they want to hear from.
+  const wroteTo = new Set(), wroteToSite = new Set();
+  for (const m of messages.filter(mine)) for (const r of m.recipients || []) {
+    if (own.has(r)) continue;
+    wroteTo.add(r);
+    const d = registrableDomain(r.split('@')[1] || '');
+    if (d && !isPersonalDomain(d)) wroteToSite.add(d);
+  }
+  const mail = messages.filter(m => !m.bounce && !used.has(m) && !mine(m));
   const senders = mail.length ? groupBySender(mail) : [];
+  for (const g of senders) {
+    if (g.addresses.some(a => wroteTo.has(String(a).toLowerCase())) || (!g.personal && wroteToSite.has(g.domain))) g.eng = { ...g.eng, wrote: true };
+  }
   if (senders.length) upsertSenders(senders);
   if (app && senders.length) store.update(st => { st.mailApp = app; });
   return { back, partial, answers: answers.filter(a => changed.includes(a.id)), mail, senders };
@@ -751,13 +798,17 @@ function targetRow(b, state) {
         ${['partial', 'nodata'].includes(lastAnswer(r).kind) && !(r.answeredAt >= lastAnswer(r).at) && (lastAnswer(r).kind === 'partial' || b.source === 'mail')
           ? `<a href="#/letter?b=${encodeURIComponent(b.id)}&t=${templateFor('reply', b, state.profile, r)}">${lastAnswer(r).kind === 'partial'
             ? L('Ask what they keep and why', 'Vraag wat ze bewaren en waarom') : L('Their mail reached you: ask again', 'Hun mail bereikte je: vraag het opnieuw')}</a>` : ''}</div>` : ''}
+      ${isWanted(b) && r.status === 'todo' ? `<div class="meta"><span class="pill done">${L('kept', 'gehouden')}</span>
+        ${L(`Not in the send queue: ${esc(wantedWhy(b))}. Use Letter if you want them to erase you anyway.`, `Niet in de wachtrij: ${esc(wantedWhy(b))}. Gebruik Brief als je toch gewist wilt worden.`)}</div>` : ''}
       ${keptMailing(b, r) ? `<div class="meta"><span class="pill overdue">${L('kept mailing', 'bleef mailen')}</span>
         ${keptMailing(b, r).since === 'request'
           ? L(`Marketing after your request, last on ${esc(keptMailing(b, r).last)}.`, `Reclame na je verzoek, laatst op ${esc(keptMailing(b, r).last)}.`)
           : L(`Unsubscribed ${esc(keptMailing(b, r).from)}, mail again on ${esc(keptMailing(b, r).last)}. The letter says so.`, `Uitgeschreven op ${esc(keptMailing(b, r).from)}, opnieuw mail op ${esc(keptMailing(b, r).last)}. De brief noemt dat.`)}</div>` : ''}
       <div class="meta">${b.site ? `<span class="mono">${esc(b.site)}</span>` : ''}${r.sentAt
         ? ` · ${L('sent', 'verstuurd')} ${esc(r.sentAt)}` : ''}${b.source ? '' : ` · ${esc(CATEGORIES()[b.category] || b.category)}`}</div>
-      ${b.notes && lang() === 'en' ? `<div class="meta">${esc(b.notes)}</div>` : ''}
+      ${b.source === 'mail' && !b.notes ? `<div class="meta">${L(`Found in your own mail: ${esc(b.site)} sent to ${esc(b.evidence?.address || 'an address of yours')}. The letter deliberately tells them nothing they do not already have.`,
+        `Gevonden in je eigen mail: ${esc(b.site)} stuurde naar ${esc(b.evidence?.address || 'een adres van jou')}. De brief vertelt ze bewust niets wat ze nog niet hebben.`)}</div>`
+        : b.notes && lang() === 'en' ? `<div class="meta">${esc(b.notes)}</div>` : ''}
       <div class="meta rel-pick">${L('You and them:', 'Jouw relatie:')}
         <select data-action="set-relation" data-id="${esc(b.id)}" aria-label="${L(`How you relate to ${esc(b.name)}`, `Jouw relatie met ${esc(b.name)}`)}">
           ${Object.entries(RELATIONS()).map(([k, v]) =>
@@ -797,7 +848,7 @@ export function mountBrokers(root, state, rerender) {
   if (drop) {
     ['dragenter', 'dragover'].forEach(ev => drop.addEventListener(ev, e => { e.preventDefault(); drop.classList.add('over'); }));
     ['dragleave', 'drop'].forEach(ev => drop.addEventListener(ev, e => { e.preventDefault(); drop.classList.remove('over'); }));
-    drop.addEventListener('drop', e => take(e.dataTransfer.files));
+    drop.addEventListener('drop', e => { filesFromDrop(e.dataTransfer).then(take); });
   }
   input?.addEventListener('change', () => take(input.files));
   root.addEventListener('click', e => {
@@ -930,6 +981,9 @@ export function deleteWork(targets) {
     // not replied to it yet.
     const a = lastAnswer(r);
     if (a && PUSHBACK.has(a.kind) && ['sent', 'ack'].includes(r.status) && !(r.answeredAt >= a.at)) w.answers.push(b);
+    // Mail the user wants is not queued for erasure; it can still be written
+    // to from its row.
+    if (r.status === 'todo' && isWanted(b)) continue;
     if (r.status === 'todo') {
       if (b.method === 'form' && safeUrl(b.optOutUrl)) w.forms.push(b);
       else if (recipient(b, r)) w.send.push(b);
@@ -1439,6 +1493,24 @@ function renderQueue(q, urls, i) {
 // So a forged sender's link is never offered, however legitimate it looks.
 // A sender on a free mail service (Gmail, Hotmail, Ziggo…) is a person. Older
 // saved data grouped them per provider, so a stored "gmail.com" counts too.
+// Mail the user wants, told from what they do with it: they write to the
+// sender, star or flag the mail, file it in a folder of their own, or open
+// most of it. Or they said so. Opening alone does not count for mail that
+// mostly sat in the junk folder, where people open things to see what they are.
+export function wantedWhy(b) {
+  if (b.keep === false || b.source !== 'mail') return '';
+  if (b.keep === true) return L('you chose to keep it', 'je koos ervoor dit te houden');
+  const e = b.engaged || {};
+  if (e.wrote || e.replied) return L('you write to them', 'je schrijft ze');
+  if (e.starred) return L('you star or flag their mail', 'je geeft hun mail een ster of vlag');
+  if (e.filed) return L(`you keep it in "${e.folder}"`, `je bewaart het in "${e.folder}"`);
+  if (e.known >= 2 && e.read * 2 >= e.known && !(e.junk * 2 >= (b.mailCount || 1))) return L(`you opened ${e.read} of ${e.known}`, `je opende ${e.read} van de ${e.known}`);
+  return '';
+}
+export const isWanted = b => !!wantedWhy(b);
+// Strong enough to overrule a block: the user acted on it, not just opened it.
+export const keptByUser = b => b.keep === true || (b.keep !== false && !!(b.engaged?.wrote || b.engaged?.replied || b.engaged?.starred || b.engaged?.filed));
+
 export const isPersonal = b => b.source === 'mail' && (!!b.personal || isPersonalDomain(b.site));
 
 // Senders saved before the check existed are judged on name and domain alone.
@@ -1508,12 +1580,13 @@ let unsubPrimed = false;
 export function unsubscribe(state) {
   const mail = state.custom.filter(b => b.source === 'mail');
   const tiers = { instant: [], link: [], mail: [] };
-  const spam = [], bait = [], unclear = [], people = [], unsubscribed = [];
+  const spam = [], bait = [], unclear = [], people = [], unsubscribed = [], wanted = [];
   for (const b of state.custom) {
     const t = unsubTier(b);
     const c = senderClass(b);
     // Done is done: an unsubscribed sender is listed, never offered again.
     if (t && b.unsubscribedAt) unsubscribed.push(b);
+    else if (t && isWanted(b)) wanted.push(b);
     else if (t) tiers[t].push(b);
     else if (c === 'bait') bait.push(b);
     else if (c === 'spam') spam.push(b);
@@ -1553,6 +1626,7 @@ export function unsubscribe(state) {
             <input type="checkbox" data-action="sel" data-id="${esc(b.id)}" ${selected.has(b.id) ? 'checked' : ''}>
             <span class="pick-name">${esc(nameOf(b))}</span>
             <span class="pick-meta mono">${esc(b.site || '')}</span>
+            <button class="link-btn" data-action="keep" data-id="${esc(b.id)}">${L('Keep', 'Houden')}</button>
           </label>`).join('')}
       </div>
     </section>` : '';
@@ -1593,6 +1667,19 @@ export function unsubscribe(state) {
     L('These only take an unsubscribe by email. Your mail app opens with it filled in, addressed only to their unsubscribe address: press Send, then come back for the next.',
       'Deze afzenders nemen alleen een afmelding per e-mail aan. Je mailapp opent met de mail al ingevuld, alleen gericht aan hun afmeldadres: druk op Verstuur en kom terug voor de volgende.'),
     n => L(`Email ${n || ''}`, `${n || ''} mailen`), '')}
+
+  ${wanted.length ? `
+    <section class="card">
+      <h2>${L('Mail you seem to want', 'Mail die je lijkt te willen')} <span class="count">${wanted.length}</span></h2>
+      <p class="small muted" style="max-width:62ch">${L('Kept out of every unsubscribe and every deletion letter, because of what you do with it. Changed your mind about one? Unsubscribe from it here.',
+        'Blijft buiten elke uitschrijving en elk verwijderverzoek, door wat je ermee doet. Wil je er toch vanaf? Schrijf je hier uit.')}</p>
+      <div class="list">${wanted.map(b => `
+        <div class="pick" style="cursor:default;flex-wrap:wrap">
+          <span class="pick-name">${esc(nameOf(b))}<span class="aka">${esc(wantedWhy(b))}</span></span>
+          <span class="pick-meta mono">${esc(b.site || '')}</span>
+          <button class="link-btn" data-action="unkeep" data-id="${esc(b.id)}">${L('Unsubscribe anyway', 'Toch uitschrijven')}</button>
+        </div>`).join('')}</div>
+    </section>` : ''}
 
   ${kept.length ? `
     <section class="card">
@@ -1698,7 +1785,9 @@ let blockClient = null;
 // What the user has confirmed adding to their mail app ("Done"). An older
 // "exported" record counts too: before the Done button existed, downloading
 // the list was the only signal there was.
-const isBlockable = t => ['spam', 'bait'].includes(senderClass(t));
+// Never block what the user wrote to, starred or filed, whatever it looks like.
+export const isBlockable = t => ['spam', 'bait'].includes(senderClass(t)) && !keptByUser(t);
+const blockClass = t => keptByUser(t) && ['spam', 'bait'].includes(senderClass(t)) ? 'kept' : senderClass(t);
 export const blockDoneIds = state => new Set(state.blockDone?.ids || state.blockExport?.ids || []);
 export const blockDoneAt = state => state.blockDone?.at || state.blockExport?.at || '';
 export const ruleCount = bl => bl.links.length + bl.replyTo.length + bl.sharedReplyTo.length;
@@ -1715,10 +1804,10 @@ let showAllRules = false;
 // earlier ones do not already contain: new senders often reuse the same link
 // sites, and those need nothing at all.
 export function blockView(state, all = showAllRules) {
-  const full = buildBlockList(state.custom, senderClass);
+  const full = buildBlockList(state.custom, blockClass);
   const doneIds = blockDoneIds(state);
   if (!doneIds.size || all) return { bl: full, delta: false };
-  const done = buildBlockList(state.custom.filter(t => !isBlockable(t) || doneIds.has(t.id)), senderClass);
+  const done = buildBlockList(state.custom.filter(t => !isBlockable(t) || doneIds.has(t.id)), blockClass);
   const minus = (a, b) => a.filter(x => !b.includes(x));
   return {
     delta: true,
@@ -1996,8 +2085,18 @@ export function mountUnsubscribe(root, state, rerender, params) {
     if (!btn) return;
     const act = btn.dataset.action;
 
+    if (act === 'keep' || act === 'unkeep') {
+      e.preventDefault();
+      const id = btn.dataset.id;
+      store.update(st => { const t = st.custom.find(c => c.id === id); if (t) t.keep = act === 'keep'; });
+      selected.delete(id);
+      toast(act === 'keep' ? L('Kept: it will not be unsubscribed or written to.', 'Gehouden: hier word je niet uitgeschreven en er gaat geen brief heen.')
+                           : L('Moved to the unsubscribe list. Tick it to unsubscribe.', 'Verplaatst naar de uitschrijflijst. Vink hem aan om je uit te schrijven.'));
+      rerender();
+      return;
+    }
     if (act === 'sel-group') {
-      const ids = state.custom.filter(b => unsubTier(b) === btn.dataset.group).map(b => b.id);
+      const ids = state.custom.filter(b => unsubTier(b) === btn.dataset.group && !b.unsubscribedAt && !isWanted(b)).map(b => b.id);
       const allOn = ids.every(id => selected.has(id));
       ids.forEach(id => allOn ? selected.delete(id) : selected.add(id));
       rerender();
@@ -2005,7 +2104,7 @@ export function mountUnsubscribe(root, state, rerender, params) {
     }
 
 
-    const pick = k => state.custom.filter(b => unsubTier(b) === k && selected.has(b.id));
+    const pick = k => state.custom.filter(b => unsubTier(b) === k && selected.has(b.id) && !isWanted(b));
     if (act === 'run-instant') runOneClickBatch(root, pick('instant'), []);
     if (act === 'run-link')    startUnsubQueue(root, pick('link').map(b => ({ id: b.id, name: b.name, unsubUrl: b.unsubUrl })));
     if (act === 'run-mail')    startUnsubQueue(root, pick('mail').map(b => ({ id: b.id, name: b.name, unsubMailto: b.unsubMailto })));
@@ -2501,10 +2600,10 @@ export function about() {
       'Alles hieronder wordt in je browser verwerkt en alleen daar opgeslagen (localStorage). Het verlaat je apparaat alleen in de gevallen onder het volgende kopje, en alleen als jij dat kiest.')}</p>
     <ul>${L(`
       <li>The details you fill in under Settings: name, date of birth, email addresses, phone numbers and postal address. They are only used to fill in your letters.</li>
-      <li>From mail you drop in, per sender only: its name and any other names it used, its domain, which of your addresses it wrote to, how many mails it sent, the domains its links and reply addresses point to, its unsubscribe address, the privacy address and privacy statement link its own mail gives, the service address and postal address it uses itself, the date of its last marketing mail (to see whether it stopped after you unsubscribed), and the outcome of the checks (sender check, your mail provider's spam rating, kind of content such as gambling). For a real company that may get a letter, also what its own mail shows it holds about you: the name it addresses you by, a postal address and phone number if its mail lists them as yours. Those go into your letter to that company and nowhere else. Subjects and message text are read for these checks and are not kept, with one exception: when a company answers your letter, its date, the address it came from, its subject and what HoopUp read in it (such as "wants a copy of your ID") are kept with that request, so your reply can go back to them.</li>
+      <li>From mail you drop in, per sender only: its name and any other names it used, its domain, which of your addresses it wrote to, how many mails it sent, the domains its links and reply addresses point to, its unsubscribe address, the privacy address and privacy statement link its own mail gives, the service address and postal address it uses itself, the date of its last marketing mail (to see whether it stopped after you unsubscribed), what you did with its mail (how many you opened, whether you starred, answered or filed it, and the name of that folder or label, so mail you want is never unsubscribed), and the outcome of the checks (sender check, your mail provider's spam rating, kind of content such as gambling). For a real company that may get a letter, also what its own mail shows it holds about you: the name it addresses you by, a postal address and phone number if its mail lists them as yours. Those go into your letter to that company and nowhere else. Subjects and message text are read for these checks and are not kept, with one exception: when a company answers your letter, its date, the address it came from, its subject and what HoopUp read in it (such as "wants a copy of your ID") are kept with that request, so your reply can go back to them.</li>
       <li>Your progress: which companies you wrote to and when, notes, aliases, your answers about your addresses and the steps of a move you ticked off, which block rules you added, your language and mail app choice, and a breach-database API key if you add one.</li>`, `
       <li>De gegevens die je bij Instellingen invult: naam, geboortedatum, e-mailadressen, telefoonnummers en postadres. Ze worden alleen gebruikt om je brieven in te vullen.</li>
-      <li>Uit mail die je erin sleept, per afzender alleen: de naam en eventuele andere namen die hij gebruikte, het domein, naar welk adres van jou hij schreef, hoeveel mails hij stuurde, de domeinen waar zijn links en antwoordadressen naar wijzen, het uitschrijfadres, het privacyadres en de link naar de privacyverklaring die zijn eigen mail noemt, het service- en postadres dat het zelf gebruikt, de datum van zijn laatste reclamemail (om te zien of hij stopte nadat je je uitschreef), en de uitkomst van de controles (afzendercontrole, spamoordeel van je mailprovider, soort inhoud zoals gokken). Bij een echt bedrijf dat een brief kan krijgen ook wat zijn eigen mail laat zien dat het van je heeft: de naam waarmee het je aanschrijft, en een postadres en telefoonnummer als zijn mail die als de jouwe noemt. Die komen in je brief aan dat bedrijf en nergens anders. Onderwerpen en berichttekst worden voor deze controles gelezen en niet bewaard, op één ding na: als een bedrijf je brief beantwoordt, blijven de datum, het adres waar het vandaan kwam, het onderwerp en wat HoopUp erin las (zoals "wil een kopie ID") bij dat verzoek bewaard, zodat je reactie naar hen terug kan.</li>
+      <li>Uit mail die je erin sleept, per afzender alleen: de naam en eventuele andere namen die hij gebruikte, het domein, naar welk adres van jou hij schreef, hoeveel mails hij stuurde, de domeinen waar zijn links en antwoordadressen naar wijzen, het uitschrijfadres, het privacyadres en de link naar de privacyverklaring die zijn eigen mail noemt, het service- en postadres dat het zelf gebruikt, de datum van zijn laatste reclamemail (om te zien of hij stopte nadat je je uitschreef), wat je met zijn mail deed (hoeveel je er opende, of je ze een ster gaf, beantwoordde of opborg, en de naam van die map of dat label, zodat mail die je wilt nooit wordt uitgeschreven), en de uitkomst van de controles (afzendercontrole, spamoordeel van je mailprovider, soort inhoud zoals gokken). Bij een echt bedrijf dat een brief kan krijgen ook wat zijn eigen mail laat zien dat het van je heeft: de naam waarmee het je aanschrijft, en een postadres en telefoonnummer als zijn mail die als de jouwe noemt. Die komen in je brief aan dat bedrijf en nergens anders. Onderwerpen en berichttekst worden voor deze controles gelezen en niet bewaard, op één ding na: als een bedrijf je brief beantwoordt, blijven de datum, het adres waar het vandaan kwam, het onderwerp en wat HoopUp erin las (zoals "wil een kopie ID") bij dat verzoek bewaard, zodat je reactie naar hen terug kan.</li>
       <li>Je voortgang: welke bedrijven je wanneer aanschreef, notities, aliassen, je antwoorden over je adressen en de stappen van een verhuizing die je afvinkte, welke blokkeerregels je toevoegde, je taal- en mailappkeuze en een API-sleutel voor de datalekdatabase als je die toevoegt.</li>`)}</ul>
     <p>${L('This storage is not encrypted: use a device and browser profile only you use. You remove it all with <a href="#/profile">Settings</a> → Erase everything, or by clearing this site\'s data in your browser. Because it is strictly necessary for the service you ask for, and contains nothing used to track you, no cookie consent is needed for it.',
       'Deze opslag is niet versleuteld: gebruik een apparaat en browserprofiel dat alleen jij gebruikt. Je wist alles via <a href="#/profile">Instellingen</a> → Alles wissen, of door de websitegegevens van deze site in je browser te wissen. Omdat de opslag strikt noodzakelijk is voor de dienst die je vraagt, en niets bevat waarmee je gevolgd wordt, is er geen cookietoestemming voor nodig.')}</p>`)}

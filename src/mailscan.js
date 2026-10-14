@@ -601,7 +601,7 @@ function splitMbox(text) {
 
 // `single`: the text is known to be one message (the large-file reader has
 // already split the mailbox), so a body line starting "From " is not a split.
-export function parseMessages(text, { single = false } = {}) {
+export function parseMessages(text, { single = false, folder = '' } = {}) {
   const looksLikeMbox = !single && /^From .+\d{4}$/m.test(text.slice(0, 4000));
   const chunks = looksLikeMbox ? splitMbox(text) : [text];
 
@@ -642,6 +642,7 @@ export function parseMessages(text, { single = false } = {}) {
       subject: decodeWords(h.subject || ''),
       date: h.date || '',
       at: dayOf(h.date),
+      seen: engagementOf(h, folder),
       // Possibly an answer to one of the user's letters.
       reply: replyInfo(decodeWords(h.subject || ''), lines),
       recipients,
@@ -663,6 +664,52 @@ export function parseMessages(text, { single = false } = {}) {
       personal: isPersonalDomain(from.domain)
     };
   }).filter(Boolean);
+}
+
+// --- what the user does with a sender's mail --------------------------------
+//
+// In a whole mailbox, the mail someone wants shows in what they do with it:
+// they open it, star or flag it, reply, or file it in a folder of their own.
+// Read from what the export carries: Gmail's labels (Google Takeout), the
+// Status and X-Mozilla-Status flags of mbox files (Thunderbird and others),
+// and Apple Mail's flags (added by the file reader as X-Emlx-Flags).
+
+// Gmail's own labels, in English and Dutch; anything else is the user's.
+const GMAIL_SYSTEM = new Set(['inbox', 'postvak in', 'spam', 'trash', 'prullenbak', 'sent', 'verzonden', 'drafts', 'concepten',
+  'chat', 'chats', 'important', 'belangrijk', 'starred', 'met ster', 'opened', 'geopend', 'unread', 'ongelezen', 'archived',
+  'gearchiveerd', 'all mail', 'alle e-mail', 'muted', 'genegeerd', 'scheduled', 'gepland', 'snoozed', 'gesnoozed']);
+// Folders every mail app has; a folder with any other name is the user's.
+const SYSTEM_FOLDER = /^(all mail.*|alle e-?mail.*|inbox|postvak in|junk|junk e-?mail|ongewenst|ongewenste e-?mail|spam|bulk|trash|deleted|deleted items|deleted messages|verwijderd|verwijderde items|prullenbak|sent|sent items|sent messages|verzonden|verzonden items|drafts|concepten|outbox|postvak uit|archive|archief|all mail|alle e-mail|mbox|mail|messages|notes|recovered messages)$/i;
+const JUNK_FOLDER = /^(junk|junk e-?mail|ongewenst|ongewenste e-?mail|spam|bulk)$/i;
+const SENT_FOLDER = /^(sent|sent items|sent messages|verzonden|verzonden items)$/i;
+
+export function engagementOf(h, folder = '') {
+  const labels = String(h['x-gmail-labels'] || '').split(',').map(x => x.replace(/^"|"$/g, '').trim()).filter(Boolean);
+  const has = (...names) => labels.some(l => names.includes(l.toLowerCase()));
+  const own = labels.filter(l => !GMAIL_SYSTEM.has(l.toLowerCase()) && !/^(category|categorie) /i.test(l) && !/^imap_/i.test(l));
+  let read = has('opened', 'geopend') ? true : has('unread', 'ongelezen') ? false : null;
+  let answered = false, flagged = has('starred', 'met ster');
+  // mbox: "Status: RO" (read, old), "X-Status: A" (answered), "F" (flagged).
+  if (h.status !== undefined) read = /R/.test(h.status);
+  if (/A/.test(h['x-status'] || '')) answered = true;
+  if (/F/.test(h['x-status'] || '')) flagged = true;
+  // Thunderbird: hexadecimal flags, 0x1 read, 0x2 replied, 0x4 flagged.
+  const moz = parseInt(String(h['x-mozilla-status'] || '').trim(), 16);
+  if (Number.isFinite(moz)) { read = !!(moz & 1); answered ||= !!(moz & 2); flagged ||= !!(moz & 4); }
+  // Apple Mail: bit 0 read, bit 2 answered, bit 4 flagged.
+  const emlx = parseInt(String(h['x-emlx-flags'] || '').trim(), 10);
+  if (Number.isFinite(emlx)) { read = !!(emlx & 1); answered ||= !!(emlx & 4); flagged ||= !!(emlx & 16); }
+  // A Takeout export is one file for everything; its labels say where a
+  // message lives, the file name does not.
+  const box = h['x-gmail-labels'] !== undefined ? '' : String(folder || '').trim();
+  return {
+    read, answered, flagged,
+    important: has('important', 'belangrijk'),
+    // Filed by the user: a label or folder of their own.
+    filed: own[0] || (box && !SYSTEM_FOLDER.test(box) ? box : ''),
+    junk: has('spam') || JUNK_FOLDER.test(box),
+    sent: has('sent', 'verzonden') || SENT_FOLDER.test(box)
+  };
 }
 
 // --- answers to the user's letters -------------------------------------------
@@ -750,6 +797,7 @@ export function groupBySender(messages) {
       map.set(key, {
         key, domain: m.domain, personal: !!m.personal, name: m.name || m.domain, count: 0,
         unsubHttp: '', unsubMailto: '', unsubFrom: '', oneClick: false, lastBulkAt: '',
+        eng: { known: 0, read: 0, starred: 0, replied: 0, important: 0, filed: 0, folder: '' },
         addresses: new Set(), recipients: new Set(), subjects: [], isEsp: m.isEsp,
         linkDomains: new Set(), replyToHosts: new Set(), risk: '', providerSpamCount: 0, names: new Set(),
         transactional: false, privacyEmail: '', privacyUrl: '', serviceEmails: new Set(), companyPostal: '', idNames: new Set(), idPostal: new Set(), idPhones: new Set(), idEmails: new Set(), phoneSeen: new Set()
@@ -762,6 +810,13 @@ export function groupBySender(messages) {
     if (!g.unsubHttp && m.unsub.http) { g.unsubHttp = m.unsub.http; g.unsubFrom = m.unsubFrom; }
     if (!g.unsubMailto && m.unsub.mailto) g.unsubMailto = m.unsub.mailto;
     if (m.oneClick) g.oneClick = true;
+    // What the user did with this sender's mail.
+    const e = m.seen || {};
+    if (e.read !== null && e.read !== undefined) { g.eng.known++; if (e.read) g.eng.read++; }
+    if (e.flagged) g.eng.starred++;
+    if (e.answered) g.eng.replied++;
+    if (e.important) g.eng.important++;
+    if (e.filed) { g.eng.filed++; g.eng.folder ||= e.filed.slice(0, 40); }
     // The last marketing mail: what shows whether they stopped after an
     // unsubscribe or a request.
     if (m.at && (m.unsub.http || m.unsub.mailto) && (!g.lastBulkAt || m.at > g.lastBulkAt)) g.lastBulkAt = m.at;

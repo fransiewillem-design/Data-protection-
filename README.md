@@ -35,8 +35,10 @@ So HoopUp does the parts that work, and is honest about the rest:
 
 ## How it works
 
-Drop mail in (`.eml` files, Outlook's `.msg` files, or an `.mbox` of any size: a multi-gigabyte Google Takeout is
-read in slices, on the device) and Home sorts it into four cards, each with one number and one button:
+Drop mail in (`.eml` files, Outlook's `.msg` files, Apple Mail's `.emlx` files, or an `.mbox` of any size: a
+multi-gigabyte Google Takeout is read in slices, on the device), or a whole folder: an Apple Mail *Export
+Mailbox* folder, a folder of `.msg` files, Thunderbird's folder files. Home sorts it into four cards, each with
+one number and one button:
 
 | Card | What the button does |
 | --- | --- |
@@ -44,6 +46,17 @@ read in slices, on the device) and Home sorts it into four cards, each with one 
 | **Block scams** | One copy or one import for your mail app that blocks unsafe senders by the link sites and reply addresses they reuse: a filter file for Gmail, a Sieve script for Fastmail and Proton, or a script you paste into Script Editor on a Mac (Apple Mail) or into PowerShell (classic Outlook). Each site and address becomes its own condition, so a message has to match only one. A sender that left neither cannot be caught by a rule, and the card says so. Press *I've added these rules* once they are in; the next batch then shows only rules you do not have yet |
 | **Delete my data** | Opens the letters for companies that genuinely hold your data |
 | **Your addresses** | Which address gets mostly spam, and one question to decide whether to keep or retire it (below) |
+
+**The whole mailbox, and the mail you want.** The junk folder is quick, but the whole mailbox can go in
+too, and then the app also sees what you do with each sender's mail, from what the export carries: Gmail's
+labels (*Opened*, *Starred*, your own labels, *Sent*), the `Status` and `X-Mozilla-Status` flags of mbox
+files, Apple Mail's flags in `.emlx` files, and the folder a mailbox came from. A sender counts as wanted when
+you write to them (your sent mail in the same export), star or flag their mail, file it in a folder or label
+of your own, or open at least half of it (not counted for mail that sat mostly in the junk folder). Wanted
+senders are listed apart as *Mail you seem to want*: never pre-selected or bulk-unsubscribed, never in the
+erasure queue, and never blocked if you wrote to, starred or filed them. *Keep* and *Unsubscribe anyway*
+override the guess either way. Only counts are stored, never which message was opened. A sender is saved
+without its empty fields, so a mailbox with several thousand senders still fits in the browser's storage.
 
 **Your addresses.** Every mail says which address it was sent to, so Home can count, per address, how
 much of the scanned mail was spam or scams and which real companies in the scan also use it. An address

@@ -5,8 +5,9 @@ import * as store from './store.js';
 import { L, plural } from './i18n.js';
 import { relationOf, keptMailing } from './letters.js';
 import { moveGuide, MOVE_STEPS } from './move.js';
+import { filesFromDrop, isMailFileName } from './mailfile.js';
 import {
-  esc, toast, senderClass, unsubTier, ingestFiles, ingestToasts, runOneClickBatch,
+  esc, toast, senderClass, unsubTier, ingestFiles, ingestToasts, runOneClickBatch, isWanted, wantedWhy, isBlockable,
   startUnsubQueue, wireQueue, wireBlock, blockAllCard, hostOf, nameOf, akaOf, deleteWork, unsafeReason, writable, coveredBy,
   blockDoneIds, blockDoneAt, blockView, ruleCount
 } from './views.js';
@@ -145,31 +146,37 @@ let reopenAddr = false;
 // ---- the page ----------------------------------------------------------------
 
 function dropZone(compact) {
-  const pick = `<button class="link-btn" data-action="pick">${L('choose files', 'kies bestanden')}</button>`;
+  const pick = `<button class="link-btn" data-action="pick">${L('choose files', 'kies bestanden')}</button>`
+    + ` ${L('or', 'of')} <button class="link-btn" data-action="pick-folder">${L('a folder', 'een map')}</button>`;
   return `
   <div id="drop" class="drop ${compact ? 'drop-compact' : 'drop-hero'}">
     ${compact
       ? `<span>${icon('drop')}</span><span>${L(`<b>Drop more mail</b> to update, or ${pick}`,
                                              `<b>Sleep meer mail hierheen</b> om bij te werken, of ${pick}`)}</span>`
       : `<div class="drop-icon">${icon('drop')}</div>
-         <p class="drop-title">${L('Drop your junk mail here', 'Sleep je ongewenste mail hierheen')}</p>
-         <p class="small muted">${L(`.eml, .msg or .mbox files · or ${pick}`, `.eml-, .msg- of .mbox-bestanden · of ${pick}`)}</p>`}
-    <input type="file" id="files" multiple accept=".eml,.msg,.mbox,.txt,message/rfc822,application/vnd.ms-outlook" hidden>
+         <p class="drop-title">${L('Drop your junk mail here, or your whole mailbox', 'Sleep je ongewenste mail hierheen, of je hele mailbox')}</p>
+         <p class="small muted">${L(`.eml, .msg or .mbox files, or a mailbox folder · or ${pick}`, `.eml-, .msg- of .mbox-bestanden, of een mailboxmap · of ${pick}`)}</p>`}
+    <input type="file" id="files" multiple accept=".eml,.emlx,.msg,.mbox,.txt,message/rfc822,application/vnd.ms-outlook" hidden>
+    <input type="file" id="folder" webkitdirectory multiple hidden>
   </div>`;
 }
 
 const HOWTO = () => `
   <details class="howto">
     <summary>${L('How do I get the files out of my mail app?', 'Hoe haal ik de bestanden uit mijn mailapp?')}</summary>
+    <p class="small">${L('Just the junk folder is quick. The whole mailbox also shows what you actually read: newsletters you open, star, file or answer are kept, and only the ones you ignore are offered for unsubscribing.',
+      'Alleen de map Ongewenst gaat snel. De hele mailbox laat ook zien wat je echt leest: nieuwsbrieven die je opent, een ster geeft, opbergt of beantwoordt blijven staan, en alleen wat je negeert wordt aangeboden om je voor uit te schrijven.')}</p>
     <ul class="small">${L(`
-      <li><b>Apple Mail:</b> open Junk, <code>Cmd+A</code>, drag onto the Desktop, drop the files here.</li>
-      <li><b>Outlook on Windows:</b> select the messages in Junk Email and drag them into a folder in File Explorer. They become <code>.msg</code> files; drop those here.</li>
-      <li><b>Outlook on a Mac:</b> select in Junk Email and drag to a Finder window.</li>
-      <li><b>Gmail:</b> Google Takeout → Mail → drop the <code>.mbox</code> here. It holds your whole mailbox, so reading takes a few minutes, all on your device.</li>`, `
-      <li><b>Apple Mail:</b> open Ongewenst, <code>Cmd+A</code>, sleep naar het bureaublad en dan hierheen.</li>
-      <li><b>Outlook op Windows:</b> selecteer de berichten in Ongewenste e-mail en sleep ze naar een map in Verkenner. Het worden <code>.msg</code>-bestanden; sleep die hierheen.</li>
-      <li><b>Outlook op een Mac:</b> selecteer in Ongewenste e-mail en sleep naar een Finder-venster.</li>
-      <li><b>Gmail:</b> Google Takeout → Mail → sleep de <code>.mbox</code> hierheen. Daarin staat je hele mailbox, dus het lezen duurt een paar minuten, helemaal op je apparaat.</li>`)}
+      <li><b>Apple Mail:</b> junk only: open Junk, <code>Cmd+A</code>, drag onto the Desktop, drop the files here. Whole mailbox: select a mailbox (Inbox, or several) → <b>Mailbox</b> → <b>Export Mailbox…</b> → choose a folder, then drop the exported <code>.mbox</code> folders here.</li>
+      <li><b>Gmail:</b> <a href="https://takeout.google.com" target="_blank" rel="noopener noreferrer">Google Takeout</a> → deselect all → <b>Mail</b> → export, then drop the <code>.mbox</code> here. It holds your whole mailbox with its labels, so reading takes a few minutes, all on your device.</li>
+      <li><b>Outlook on Windows:</b> select the messages (Junk, or <code>Ctrl+A</code> in Inbox) and drag them into a folder in File Explorer. They become <code>.msg</code> files; drop the folder here.</li>
+      <li><b>Outlook.com, Hotmail:</b> add the account to Apple Mail or Thunderbird and export from there.</li>
+      <li><b>Thunderbird:</b> <b>Account Settings</b> → <b>Server Settings</b> → <b>Local Directory</b> shows where your mail is stored. Each folder there is one file without an extension, like <code>Inbox</code>: drop those here.</li>`, `
+      <li><b>Apple Mail:</b> alleen ongewenst: open Ongewenst, <code>Cmd+A</code>, sleep naar het bureaublad en dan hierheen. Hele mailbox: kies een mailbox (Postvak IN, of meerdere) → <b>Mailbox</b> → <b>Exporteer mailbox…</b> → kies een map, en sleep de geëxporteerde <code>.mbox</code>-mappen hierheen.</li>
+      <li><b>Gmail:</b> <a href="https://takeout.google.com" target="_blank" rel="noopener noreferrer">Google Takeout</a> → alles deselecteren → <b>E-mail</b> → exporteren, en sleep de <code>.mbox</code> hierheen. Daarin staat je hele mailbox met labels, dus het lezen duurt een paar minuten, helemaal op je apparaat.</li>
+      <li><b>Outlook op Windows:</b> selecteer de berichten (Ongewenste e-mail, of <code>Ctrl+A</code> in Postvak IN) en sleep ze naar een map in Verkenner. Het worden <code>.msg</code>-bestanden; sleep de map hierheen.</li>
+      <li><b>Outlook.com, Hotmail:</b> voeg het account toe aan Apple Mail of Thunderbird en exporteer daarvandaan.</li>
+      <li><b>Thunderbird:</b> <b>Accountinstellingen</b> → <b>Serverinstellingen</b> → <b>Lokale map</b> toont waar je mail staat. Elke map daarin is één bestand zonder extensie, zoals <code>Inbox</code>: sleep die hierheen.</li>`)}
     </ul>
   </details>`;
 
@@ -180,8 +187,8 @@ export function home(state) {
   <section class="hero">
     <img class="hero-mark" src="assets/img/icon.svg" alt="" width="56" height="56">
     <h1>${L('Stop spam. Get your data deleted.', 'Stop spam. Laat je gegevens wissen.')}</h1>
-    <p>${L('Drop in the mail from your junk folder. HoopUp tells you what to do with each sender.',
-           'Sleep de mail uit je map Ongewenst hierheen. HoopUp vertelt je per afzender wat je ermee kunt doen.')}</p>
+    <p>${L('Drop in the mail from your junk folder, or your whole mailbox. HoopUp tells you what to do with each sender, and keeps the mail you actually read.',
+           'Sleep de mail uit je map Ongewenst hierheen, of je hele mailbox. HoopUp vertelt je per afzender wat je ermee kunt doen, en houdt de mail die je echt leest.')}</p>
     <ol class="steps">
       <li><b>${L('Unsubscribe', 'Uitschrijven')}</b><span>${L('from real companies', 'bij echte bedrijven')}</span></li>
       <li><b>${L('Block', 'Blokkeren')}</b><span>${L('scams and fake senders', 'oplichters en nepafzenders')}</span></li>
@@ -204,13 +211,16 @@ export function home(state) {
   // (headers stripped, or never authenticated) needs its warning seen first,
   // which happens on the detail page, not behind a bulk button.
   const unsub = mail.filter(t => cls(t) === 'unsub');
-  const pending = unsub.filter(t => !t.unsubscribedAt && t.trust === 'verified');
-  const unchecked = unsub.filter(t => !t.unsubscribedAt && t.trust !== 'verified');
+  // Newsletters the user reads, stars, files or answers are kept, never
+  // unsubscribed in bulk.
+  const wanted = unsub.filter(t => !t.unsubscribedAt && isWanted(t));
+  const pending = unsub.filter(t => !t.unsubscribedAt && t.trust === 'verified' && !isWanted(t));
+  const unchecked = unsub.filter(t => !t.unsubscribedAt && t.trust !== 'verified' && !isWanted(t));
   const instant = pending.filter(t => unsubTier(t) === 'instant');
   // Blocking is only for unsafe senders (forged, provider-rated high-confidence
   // spam, or gambling/crypto/prize/adult content). A real company is never
   // offered a block, only an unsubscribe and an erasure letter.
-  const blocked = mail.filter(t => ['spam', 'bait'].includes(cls(t)));
+  const blocked = mail.filter(isBlockable);
   const bait = blocked.filter(t => cls(t) === 'bait').length;
   const unclear = mail.filter(t => cls(t) === 'unclear').length;
   const people = mail.filter(t => cls(t) === 'person').length;
@@ -253,9 +263,11 @@ export function home(state) {
           `${pending.length} ${plural(pending.length, 'echt bedrijf', 'echte bedrijven', 'echt bedrijf', 'echte bedrijven')}.`)
         + (instant.length ? L(` ${instant.length} ${instant.length === 1 ? 'goes' : 'go'} in one click.`,
                               ` Waarvan ${instant.length} met één klik.`) : '')
-      : unsub.length && !unchecked.length
+      : unsub.length && !unchecked.length && !wanted.length
         ? L(`Unsubscribed from all ${unsub.length}.`, `Bij alle ${unsub.length} uitgeschreven.`)
         : L('No verified company left to unsubscribe from.', 'Geen echt bedrijf meer om je bij uit te schrijven.'))
+    + (wanted.length ? L(` ${wanted.length} you read or answer ${wanted.length === 1 ? 'is' : 'are'} kept.`,
+                         ` ${wanted.length} die je leest of beantwoordt ${wanted.length === 1 ? 'blijft' : 'blijven'} staan.`) : '')
     + (kept.length ? L(` ${kept.length} kept mailing after you unsubscribed: a letter is ready in Details.`,
                        ` ${kept.length} ${kept.length === 1 ? 'bleef' : 'bleven'} mailen nadat je je uitschreef: er staat een brief klaar bij Details.`) : '')
     + (unchecked.length ? L(` ${unchecked.length} more could not be verified. Check ${unchecked.length === 1 ? 'it' : 'them'} in Details.`,
@@ -370,6 +382,7 @@ export function home(state) {
         const [p, l] = ['bait', 'spam'].includes(c) ? ['overdue', unsafeReason(t) + ' · ' + L('block', 'blokkeren')]
           : c === 'unclear' ? ['low', L('could not verify', 'niet te controleren')]
           : c === 'person' ? ['low', L('personal address', 'persoonlijk adres')]
+          : isWanted(t) ? ['done', L('kept', 'gehouden') + ' · ' + wantedWhy(t)]
           : t.trust === 'verified' ? ['done', c === 'unsub' ? L('verified · unsubscribe', 'echt bedrijf · uitschrijven') : L('verified company', 'echt bedrijf')]
           : ['low', L('unverified', 'niet gecontroleerd')];
         return `<div class="pick" style="cursor:default">
@@ -391,7 +404,7 @@ export function mountHome(root, state, rerender) {
   async function handleFiles(list) {
     // Folders (an Apple Mail .mbox bundle) arrive as empty entries.
     const files = [...list].filter(f => f.size > 0);
-    if (!files.length) { toast(L('Those were empty, or a folder. Drop the mail files themselves.', 'Die waren leeg, of een map. Sleep de mailbestanden zelf hierheen.')); return; }
+    if (!files.length) { toast(L('No mail files in there. Drop .eml, .msg or .mbox files, or a mailbox folder.', 'Daar zaten geen mailbestanden in. Sleep .eml-, .msg- of .mbox-bestanden hierheen, of een mailboxmap.')); return; }
     const drop = root.querySelector('#drop');
     const big = files.reduce((n, f) => n + f.size, 0) > 32 * 1024 * 1024;
     try {
@@ -421,9 +434,11 @@ export function mountHome(root, state, rerender) {
   if (drop) {
     ['dragenter', 'dragover'].forEach(ev => drop.addEventListener(ev, e => { e.preventDefault(); drop.classList.add('over'); }));
     ['dragleave', 'drop'].forEach(ev => drop.addEventListener(ev, e => { e.preventDefault(); drop.classList.remove('over'); }));
-    drop.addEventListener('drop', e => handleFiles(e.dataTransfer.files));
+    drop.addEventListener('drop', e => { filesFromDrop(e.dataTransfer).then(handleFiles); });
   }
   input?.addEventListener('change', () => handleFiles(input.files));
+  const folder = root.querySelector('#folder');
+  folder?.addEventListener('change', () => handleFiles([...folder.files].filter(f => isMailFileName(f.name))));
 
   const panel = root.querySelector('#panel');
   const show = html => { panel.innerHTML = html; panel.scrollIntoView({ behavior: 'smooth', block: 'start' }); };
@@ -436,9 +451,10 @@ export function mountHome(root, state, rerender) {
     const now = store.get();
 
     if (act === 'pick') input?.click();
+    if (act === 'pick-folder') root.querySelector('#folder')?.click();
 
     if (act === 'home-unsub') {
-      const pending = now.custom.filter(t => senderClass(t) === 'unsub' && !t.unsubscribedAt && t.trust === 'verified');
+      const pending = now.custom.filter(t => senderClass(t) === 'unsub' && !t.unsubscribedAt && t.trust === 'verified' && !isWanted(t));
       const instant = pending.filter(t => unsubTier(t) === 'instant');
       const links = pending.filter(t => ['link', 'mail'].includes(unsubTier(t)));
       if (instant.length) runOneClickBatch(root, instant, links);
