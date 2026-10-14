@@ -5,8 +5,9 @@ import {
 } from './letters.js';
 import { allBreaches, breachesForAccount, pwnedPasswordCount } from './hibp.js';
 import { L, plural, lang } from './i18n.js';
-import { buildBlockList, asLinkList, asReplyList, asGmailXml, asSieve, asAppleScript, asPowerShell, guessClient } from './blocklist.js';
-import { isPersonalDomain, cleanHost } from './mailscan.js';
+import { buildBlockList, asLinkList, asReplyList, asGmailXml, asGmailQueries, asSieve, asAppleScript, asPowerShell, guessClient } from './blocklist.js';
+import { isPersonalDomain, cleanHost, nameMatchesDomain } from './mailscan.js';
+import { contactFor, CHECKED } from './contacts.js';
 
 export const esc = s => String(s ?? '').replace(/[&<>"']/g,
   c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
@@ -473,6 +474,10 @@ function senderRecord(sn, owned, ownPhones = []) {
     replyToHosts: (sn.replyToHosts || []).slice(0, 3),
     mailCount: sn.count || 1,
     transactional: !!sn.transactional,
+    nameMismatch: !!sn.nameMismatch,
+    // The privacy address and statement their own mail gives, if any.
+    privacyEmail: letterable ? sn.privacyEmail || '' : '',
+    privacyUrl: letterable ? sn.privacyUrl || '' : '',
     notes: `Found in your own mail: ${sn.domain} sent to ${address || 'an address of yours'}. The letter deliberately tells them nothing they do not already have.`
   };
 }
@@ -714,8 +719,39 @@ export function mountBrokers(root, state, rerender) {
 // page cannot send mail, and should not be able to.
 
 const isEU = b => ['EU', 'NL', 'UK'].some(r => (b.regions || []).includes(r));
-export const recipient = (b, r = store.getRequest(b.id)) => r.to || b.email || '';
+export const recipient = (b, r = store.getRequest(b.id)) => contactFor(b, r).email;
 const REMINDER_GRACE = 14;   // days the reminder letter gives them
+
+// Where the address in the To field comes from, and what to do if unsure.
+function contactPill(c) {
+  const P = {
+    you: ['done', L('your address', 'door jou ingevuld')],
+    mail: ['done', L('from their own mail', 'uit hun eigen mail')],
+    list: ['done', L(`checked ${CHECKED}`, `gecontroleerd ${CHECKED}`)],
+    guess: ['low', L('guessed', 'geraden')],
+    none: ['overdue', L('no address yet', 'nog geen adres')]
+  }[c.source];
+  return P ? `<span class="pill ${P[0]}">${P[1]}</span>` : '';
+}
+
+function contactNote(c) {
+  const link = safeUrl(c.url) ? `<a href="${esc(safeUrl(c.url))}" target="_blank" rel="noopener noreferrer">${L('their privacy statement ↗', 'hun privacyverklaring ↗')}</a>` : '';
+  const parts = [];
+  if (c.bounced.length) parts.push(L(`<b>${c.bounced.map(esc).join(', ')} bounced</b>: that address does not exist.`,
+    `<b>${c.bounced.map(esc).join(', ')} kwam terug</b>: dat adres bestaat niet.`));
+  if (c.source === 'guess' || c.source === 'none') parts.push(link
+    ? L(`A guess from their domain. Look up their privacy or DPO address in ${link}, fix it here, and send.`,
+        `Een gok op basis van hun domein. Zoek hun privacy- of FG-adres op in ${link}, pas het hier aan en verstuur.`)
+    : L('A guess from their domain. Look for "privacy" or "DPO" in their privacy statement (usually linked at the bottom of their website and their mails), fix it here, and send.',
+        'Een gok op basis van hun domein. Zoek "privacy" of "functionaris gegevensbescherming" in hun privacyverklaring (meestal onderaan hun website en hun mails gelinkt), pas het hier aan en verstuur.'));
+  else if (c.source === 'mail') parts.push(L(`Their own mail names this address for privacy questions.${link ? ` To double-check: ${link}.` : ''}`,
+    `Hun eigen mail noemt dit adres voor privacyvragen.${link ? ` Ter controle: ${link}.` : ''}`));
+  else if (c.source === 'list') parts.push(L(`Checked against their own privacy statement in ${CHECKED}.${link ? ` ${link}` : ''}`,
+    `Gecontroleerd in hun eigen privacyverklaring (${CHECKED}).${link ? ` ${link}` : ''}`));
+  parts.push(L('If the letter bounces, drop the bounce message in on Home: HoopUp then marks the address as wrong.',
+    'Komt de brief terug, sleep dat bericht dan op Home erin: HoopUp markeert het adres dan als fout.'));
+  return `<p class="small muted" style="margin:4px 0 0">${parts.join(' ')}</p>`;
+}
 
 // What each company needs next. Spam, bait and unverifiable senders never get
 // here: a letter to them confirms the address is live.
@@ -769,7 +805,7 @@ function sendQueueCard(state) {
   if (!b) { q.i++; return sendQueueCard(state); }
   const r = store.getRequest(b.id);
   const to = recipient(b, r);
-  const guessed = !r.to && b.confidence === 'low';
+  const contact = contactFor(b, r);
   const reveals = b.evidence ? evidenceLines(b, lang() === 'nl').map(([, v]) => v).join(' · ') : '';
   const next = q.ids.slice(q.i + 1, q.i + 4).map(id => lastTargets.get(id)?.name).filter(Boolean);
 
@@ -785,11 +821,9 @@ function sendQueueCard(state) {
     </div>
     <div class="meter send-meter"><span style="width:${Math.round(100 * q.i / total)}%"></span></div>
     <div class="field" style="margin-top:12px">
-      <label for="send-to">${L('To', 'Aan')}${guessed ? ` <span class="pill low">${L('guessed', 'geraden')}</span>` : ''}</label>
+      <label for="send-to">${L('To', 'Aan')} ${contactPill(contact)}</label>
       <input autocomplete="off" id="send-to" value="${esc(to)}" data-id="${esc(b.id)}" spellcheck="false">
-      ${guessed ? `<p class="small muted" style="margin:4px 0 0">${L(
-        `A guess from their domain. If it bounces, look for "privacy" or "DPO" in their privacy policy, fix it here, and send again.`,
-        `Een gok op basis van hun domein. Komt hij terug, zoek dan "privacy" of "functionaris gegevensbescherming" in hun privacyverklaring, pas het hier aan en verstuur opnieuw.`)}</p>` : ''}
+      ${contactNote(contact)}
     </div>
     <p class="small">${reveals
       ? L(`The letter reveals only <span class="mono">${esc(reveals)}</span>: what their own mail shows they already have.`,
@@ -931,7 +965,9 @@ function wireSend(root, rerender) {
       // personal details. The card offers a copy if the mail app cut it short.
       lastOpened = { name: nameOf(b), body };
 
-      const extra = to !== (b.email || '') ? { to } : {};
+      // Only an address the user typed is kept as theirs; the one actually used
+      // is always kept, so a bounce for it can be recognised later.
+      const extra = { ...(to !== contactFor(b, r).email ? { to } : {}), sentTo: to };
       sendQueue.i++;
       if (sendQueue.kind === 'reminder') store.markReminder(b.id, extra);
       else store.setStatus(b.id, 'sent', extra);
@@ -1132,6 +1168,9 @@ function renderQueue(q, urls, i) {
 // saved data grouped them per provider, so a stored "gmail.com" counts too.
 export const isPersonal = b => b.source === 'mail' && (!!b.personal || isPersonalDomain(b.site));
 
+// Senders saved before the check existed are judged on name and domain alone.
+export const nameMismatch = b => b.nameMismatch ?? !nameMatchesDomain(String(b.name || '').replace(/ \(.*\)$/, ''), '', b.site);
+
 // Senders that may get a letter: real companies, never scams, unverifiable
 // senders or people writing from a personal account.
 export const writable = b => !isPersonal(b) && !['spam', 'bait', 'unclear'].includes(senderClass(b));
@@ -1147,6 +1186,10 @@ export function senderClass(b) {
   // its links are never used and it is never written to: its unsubscribe link
   // could lead straight to the spammer it is pretending not to be.
   if (b.trust !== 'verified') return 'unclear';
+  // A name that has nothing to do with the domain ("USPS Delivery" from
+  // sdothemed.com): the check proves who owns the domain, not who they claim
+  // to be, so their links are not used and they are not written to.
+  if (!isPersonal(b) && nameMismatch(b)) return 'unclear';
   if (hasLink) return 'unsub';
   if (isPersonal(b)) return 'person';
   // A verified sender without an unsubscribe link is a real company sending
@@ -1189,11 +1232,13 @@ let unsubPrimed = false;
 export function unsubscribe(state) {
   const mail = state.custom.filter(b => b.source === 'mail');
   const tiers = { instant: [], link: [] };
-  const spam = [], bait = [], unclear = [], people = [];
+  const spam = [], bait = [], unclear = [], people = [], unsubscribed = [];
   for (const b of state.custom) {
     const t = unsubTier(b);
     const c = senderClass(b);
-    if (t) tiers[t].push(b);
+    // Done is done: an unsubscribed sender is listed, never offered again.
+    if (t && b.unsubscribedAt) unsubscribed.push(b);
+    else if (t) tiers[t].push(b);
     else if (c === 'bait') bait.push(b);
     else if (c === 'spam') spam.push(b);
     else if (c === 'unclear') unclear.push(b);
@@ -1228,9 +1273,6 @@ export function unsubscribe(state) {
           <label class="pick">
             <input type="checkbox" data-action="sel" data-id="${esc(b.id)}" ${selected.has(b.id) ? 'checked' : ''}>
             <span class="pick-name">${esc(nameOf(b))}</span>
-            ${b.trust === 'verified' ? `<span class="pill done">${L('verified sender', 'gecontroleerde afzender')}</span>`
-              : `<span class="pill low">${L('unverified, check first', 'niet gecontroleerd, kijk eerst zelf')}</span>`}
-            ${b.unsubscribedAt ? `<span class="pill">${L('unsubscribed', 'uitgeschreven')}</span>` : ''}
             <span class="pick-meta mono">${esc(b.site || '')}</span>
           </label>`).join('')}
       </div>
@@ -1267,6 +1309,14 @@ export function unsubscribe(state) {
       'Deze afzenders hebben een uitschrijflink (meestal "Uitschrijven" onderaan de mail), maar geen uitschrijving met één klik. Hun pagina\'s openen één voor één.'),
     n => L(`Open ${n || ''}`, `${n || ''} openen`), '')}
 
+  ${unsubscribed.length ? `
+    <section class="card">
+      <h2>${L('Already unsubscribed', 'Al uitgeschreven')} <span class="count">${unsubscribed.length}</span></h2>
+      <p class="small muted" style="max-width:60ch">${L('Done. Still getting mail from one after a few days? It ignored the request: send it a deletion letter under <a href="#/delete">Delete data</a>, which you can enforce.',
+        'Klaar. Krijg je na een paar dagen toch nog mail van een van deze? Dan negeerde die het verzoek: stuur een verwijderverzoek via <a href="#/delete">Gegevens verwijderen</a>, dat kun je afdwingen.')}</p>
+      ${list(unsubscribed, b => L(`unsubscribed ${b.unsubscribedAt}`, `uitgeschreven op ${b.unsubscribedAt}`))}
+    </section>` : ''}
+
   ${bait.length + spam.length ? blockAllCard(state) : ''}
 
   ${spam.length ? `
@@ -1280,9 +1330,9 @@ export function unsubscribe(state) {
   ${unclear.length ? `
     <section class="card">
       <h2>${L('Could not verify', 'Niet te controleren')} <span class="count">${unclear.length}</span></h2>
-      <p class="small muted" style="max-width:60ch">${L('The sender check could not confirm who sent these. A sender that is not who it claims to be would send an unsubscribe link straight to the spammer, so HoopUp does not open their links, block them or write to them. If you recognise the company, add it yourself under <a href="#/delete">Delete data</a>. If you do not, mark the mail as junk and click nothing in it.',
-        'De afzendercontrole kon niet bevestigen wie deze mail stuurde. Een afzender die niet is wie hij zegt, stuurt een uitschrijflink die rechtstreeks naar de spammer leidt. Daarom opent HoopUp hun links niet, blokkeren we ze niet en schrijven we ze niet aan. Ken je het bedrijf, voeg het dan zelf toe bij <a href="#/delete">Gegevens verwijderen</a>. Ken je het niet, markeer de mail als ongewenst en klik nergens op.')}</p>
-      ${list(unclear)}
+      <p class="small muted" style="max-width:60ch">${L('HoopUp cannot tell who really sent these: the sender check could not confirm it, or the name does not match the domain it came from (a "USPS" mailing from an unrelated domain). A sender that is not who it claims to be would send an unsubscribe link straight to the spammer, so HoopUp does not open their links, block them or write to them. If you recognise the company, add it yourself under <a href="#/delete">Delete data</a>. If you do not, mark the mail as junk and click nothing in it.',
+        'HoopUp kan niet zien wie deze mail echt stuurde: de afzendercontrole kon het niet bevestigen, of de naam past niet bij het domein waar de mail vandaan kwam (een "USPS" die mailt vanaf een onbekend domein). Een afzender die niet is wie hij zegt, stuurt een uitschrijflink die rechtstreeks naar de spammer leidt. Daarom opent HoopUp hun links niet, blokkeren we ze niet en schrijven we ze niet aan. Ken je het bedrijf, voeg het dan zelf toe bij <a href="#/delete">Gegevens verwijderen</a>. Ken je het niet, markeer de mail als ongewenst en klik nergens op.')}</p>
+      ${list(unclear, b => b.trust !== 'verified' ? L('not verified', 'niet gecontroleerd') + ' · ' + (b.site || '') : L(`name does not match ${b.site}`, `naam past niet bij ${b.site}`))}
     </section>` : ''}
 
   ${people.length ? `
@@ -1345,7 +1395,7 @@ export function blockView(state, all = showAllRules) {
 export function blockAllCard(state, { closable = false } = {}) {
   const view = blockView(state);
   const bl = view.bl;
-  if (!blockClient) blockClient = guessClient(state.custom.filter(isBlockable));
+  if (!blockClient) blockClient = state.mailApp || guessClient(state.custom.filter(isBlockable));
   const reply = bl.replyTo.length + bl.sharedReplyTo.length;
   const rules = bl.links.length + reply;
   const at = esc(blockDoneAt(state));
@@ -1415,6 +1465,8 @@ export function blockPanel(bl, client) {
 
   const steps = {
     outlookcom: `
+      <p class="small notice">${L('Outlook.com in the browser only takes one value at a time: Microsoft offers no way to paste a list. Do you read this mail in <b>Apple Mail</b> on a Mac, or in <b>Outlook on a Windows PC</b>? Choose that above: there it is one copy and one paste, and the rule works for your Outlook.com account too.',
+        'Outlook.com in de browser neemt maar één waarde tegelijk aan: Microsoft biedt geen manier om een lijst te plakken. Lees je deze mail in <b>Apple Mail</b> op een Mac, of in <b>Outlook op een Windows-pc</b>? Kies dat hierboven: daar is het één keer kopiëren en plakken, en de regel werkt ook voor je Outlook.com-account.')}</p>
       <ol class="small">
         ${bl.links.length ? `<li>${L('<b>Settings</b> (gear) → <b>Mail</b> → <b>Rules</b> → <b>Add new rule</b>. Name it <i>HoopUp – links</i>, condition <b>Subject or body includes</b>.',
           '<b>Instellingen</b> (tandwiel) → <b>E-mail</b> → <b>Regels</b> → <b>Nieuwe regel toevoegen</b>. Noem hem <i>HoopUp – links</i>, voorwaarde <b>Onderwerp of hoofdtekst bevat</b>.')}</li>
@@ -1446,7 +1498,10 @@ export function blockPanel(bl, client) {
                '<b>Filters importeren</b> → kies <code>hoopup-filters.xml</code> → <b>Bestand openen</b> → <b>Filters maken</b>. Vink <i>Filter ook toepassen op overeenkomende gesprekken</i> aan om wat er al staat op te ruimen.')}</li>
       </ol>
       ${reply.length ? `<p class="small muted">${L('Gmail filters cannot look at the reply address, so the file uses the link sites.', 'Gmail-filters kunnen niet naar het antwoordadres kijken, dus het bestand gebruikt de websites.')}</p>` : ''}
-      <div class="row"><button class="primary" data-action="dl-block" data-fmt="gmail" ${bl.links.length ? '' : 'disabled'}>${L('Download Gmail filters', 'Download Gmail-filters')}</button></div>`,
+      <div class="row"><button class="primary" data-action="dl-block" data-fmt="gmail" ${bl.links.length ? '' : 'disabled'}>${L('Download Gmail filters', 'Download Gmail-filters')}</button></div>
+      ${bl.links.length ? `<p class="small"><b>${L('Or without a file:', 'Of zonder bestand:')}</b> ${L('copy this, paste it into the Gmail search bar, click <b>Show search options</b> (the sliders icon) → <b>Create filter</b> → tick <b>Delete it</b> → <b>Create filter</b>. The braces mean <i>any of these</i>, so one filter covers them all.',
+        'kopieer dit, plak het in de zoekbalk van Gmail, klik op <b>Zoekopties weergeven</b> (het schuifjes-icoon) → <b>Filter maken</b> → vink <b>Verwijderen</b> aan → <b>Filter maken</b>. De accolades betekenen <i>een van deze</i>, dus één filter dekt ze allemaal.')}</p>
+      <div class="row">${asGmailQueries(bl).map((q, i, all) => `<button data-action="copy-block" data-fmt="gmailq" data-i="${i}">${all.length > 1 ? L(`Copy filter ${i + 1} of ${all.length}`, `Kopieer filter ${i + 1} van ${all.length}`) : L('Copy filter', 'Kopieer filter')}</button>`).join('')}</div>` : ''}`,
     apple: `
       <ol class="small">
         <li>${L('Copy the script:', 'Kopieer het script:')} ${scriptBtn('applescript')}</li>
@@ -1472,8 +1527,9 @@ export function blockPanel(bl, client) {
       'Er blijven nieuwe varianten komen: deze partijen wisselen voortdurend van domein. Scan over een paar weken je ongewenste mail opnieuw en werk de regels bij. De lijst groeit elke keer. Krijgt één adres weinig anders meer, kijk dan bij <b>Je adressen</b> op Home.')}</p>`;
 }
 
-export function blockText(state, fmt) {
+export function blockText(state, fmt, i = 0) {
   const bl = blockView(state).bl;
+  if (fmt === 'gmailq') return { text: asGmailQueries(bl)[i] || '', name: 'gmail-filter.txt', type: 'text/plain' };
   if (fmt === 'gmail') return { text: asGmailXml(bl), name: 'hoopup-filters.xml', type: 'application/xml' };
   if (fmt === 'sieve') return { text: asSieve(bl), name: 'hoopup.sieve', type: 'text/plain' };
   if (fmt === 'applescript') return { text: asAppleScript(bl, store.today()), name: 'hoopup.applescript', type: 'text/plain' };
@@ -1499,6 +1555,7 @@ export function wireBlock(root, state, onChange) {
   root.addEventListener('change', e => {
     if (e.target.id !== 'block-client') return;
     blockClient = e.target.value;
+    store.update(st => { st.mailApp = blockClient; });
     root.querySelector('#block-panel').innerHTML = blockPanel(blockView(store.get()).bl, blockClient);
   });
   root.addEventListener('click', e => {
@@ -1521,7 +1578,7 @@ export function wireBlock(root, state, onChange) {
       }).catch(() => toast(L('Could not copy', 'Kopiëren mislukt')));
     }
     if (act === 'copy-block') {
-      navigator.clipboard.writeText(blockText(store.get(), btn.dataset.fmt).text)
+      navigator.clipboard.writeText(blockText(store.get(), btn.dataset.fmt, Number(btn.dataset.i || 0)).text)
         .then(() => toast(['applescript', 'powershell'].includes(btn.dataset.fmt)
           ? L('Script copied. Now paste it', 'Script gekopieerd. Plak het nu') : L('Copied', 'Gekopieerd'))).catch(() => toast(L('Could not copy', 'Kopiëren mislukt')));
     }
@@ -1545,7 +1602,7 @@ export function wireBlock(root, state, onChange) {
 
 export function mountUnsubscribe(root, state, rerender) {
   wireBlock(root, state);
-  wireQueue(root);
+  wireQueue(root, rerender);
 
   root.addEventListener('change', e => {
     const box = e.target.closest('[data-action="sel"]');
@@ -1570,7 +1627,7 @@ export function mountUnsubscribe(root, state, rerender) {
 
     const pick = k => state.custom.filter(b => unsubTier(b) === k && selected.has(b.id));
     if (act === 'run-instant') runOneClickBatch(root, pick('instant'), []);
-    if (act === 'run-link')    startUnsubQueue(root, pick('link').map(b => ({ name: b.name, unsubUrl: b.unsubUrl })));
+    if (act === 'run-link')    startUnsubQueue(root, pick('link').map(b => ({ id: b.id, name: b.name, unsubUrl: b.unsubUrl })));
   });
 }
 
@@ -2047,11 +2104,11 @@ export function about() {
       'Alles hieronder wordt in je browser verwerkt en alleen daar opgeslagen (localStorage). Het verlaat je apparaat alleen in de gevallen onder het volgende kopje, en alleen als jij dat kiest.')}</p>
     <ul>${L(`
       <li>The details you fill in under Settings: name, date of birth, email addresses, phone numbers and postal address. They are only used to fill in your letters.</li>
-      <li>From mail you drop in, per sender only: its name and any other names it used, its domain, which of your addresses it wrote to, how many mails it sent, the domains its links and reply addresses point to, its unsubscribe address, and the outcome of the checks (sender check, your mail provider's spam rating, kind of content such as gambling). For a real company that may get a letter, also what its own mail shows it holds about you: the name it addresses you by, a postal address and phone number if its mail lists them as yours. Those go into your letter to that company and nowhere else. Subjects and message text are read for these checks and are not kept.</li>
-      <li>Your progress: which companies you wrote to and when, notes, aliases, your answers about your addresses and the steps of a move you ticked off, which block rules you added, your language choice, and a breach-database API key if you add one.</li>`, `
+      <li>From mail you drop in, per sender only: its name and any other names it used, its domain, which of your addresses it wrote to, how many mails it sent, the domains its links and reply addresses point to, its unsubscribe address, the privacy address and privacy statement link its own mail gives, and the outcome of the checks (sender check, your mail provider's spam rating, kind of content such as gambling). For a real company that may get a letter, also what its own mail shows it holds about you: the name it addresses you by, a postal address and phone number if its mail lists them as yours. Those go into your letter to that company and nowhere else. Subjects and message text are read for these checks and are not kept.</li>
+      <li>Your progress: which companies you wrote to and when, notes, aliases, your answers about your addresses and the steps of a move you ticked off, which block rules you added, your language and mail app choice, and a breach-database API key if you add one.</li>`, `
       <li>De gegevens die je bij Instellingen invult: naam, geboortedatum, e-mailadressen, telefoonnummers en postadres. Ze worden alleen gebruikt om je brieven in te vullen.</li>
-      <li>Uit mail die je erin sleept, per afzender alleen: de naam en eventuele andere namen die hij gebruikte, het domein, naar welk adres van jou hij schreef, hoeveel mails hij stuurde, de domeinen waar zijn links en antwoordadressen naar wijzen, het uitschrijfadres, en de uitkomst van de controles (afzendercontrole, spamoordeel van je mailprovider, soort inhoud zoals gokken). Bij een echt bedrijf dat een brief kan krijgen ook wat zijn eigen mail laat zien dat het van je heeft: de naam waarmee het je aanschrijft, en een postadres en telefoonnummer als zijn mail die als de jouwe noemt. Die komen in je brief aan dat bedrijf en nergens anders. Onderwerpen en berichttekst worden voor deze controles gelezen en niet bewaard.</li>
-      <li>Je voortgang: welke bedrijven je wanneer aanschreef, notities, aliassen, je antwoorden over je adressen en de stappen van een verhuizing die je afvinkte, welke blokkeerregels je toevoegde, je taalkeuze en een API-sleutel voor de datalekdatabase als je die toevoegt.</li>`)}</ul>
+      <li>Uit mail die je erin sleept, per afzender alleen: de naam en eventuele andere namen die hij gebruikte, het domein, naar welk adres van jou hij schreef, hoeveel mails hij stuurde, de domeinen waar zijn links en antwoordadressen naar wijzen, het uitschrijfadres, het privacyadres en de link naar de privacyverklaring die zijn eigen mail noemt, en de uitkomst van de controles (afzendercontrole, spamoordeel van je mailprovider, soort inhoud zoals gokken). Bij een echt bedrijf dat een brief kan krijgen ook wat zijn eigen mail laat zien dat het van je heeft: de naam waarmee het je aanschrijft, en een postadres en telefoonnummer als zijn mail die als de jouwe noemt. Die komen in je brief aan dat bedrijf en nergens anders. Onderwerpen en berichttekst worden voor deze controles gelezen en niet bewaard.</li>
+      <li>Je voortgang: welke bedrijven je wanneer aanschreef, notities, aliassen, je antwoorden over je adressen en de stappen van een verhuizing die je afvinkte, welke blokkeerregels je toevoegde, je taal- en mailappkeuze en een API-sleutel voor de datalekdatabase als je die toevoegt.</li>`)}</ul>
     <p>${L('This storage is not encrypted: use a device and browser profile only you use. You remove it all with <a href="#/profile">Settings</a> → Erase everything, or by clearing this site\'s data in your browser. Because it is strictly necessary for the service you ask for, and contains nothing used to track you, no cookie consent is needed for it.',
       'Deze opslag is niet versleuteld: gebruik een apparaat en browserprofiel dat alleen jij gebruikt. Je wist alles via <a href="#/profile">Instellingen</a> → Alles wissen, of door de websitegegevens van deze site in je browser te wissen. Omdat de opslag strikt noodzakelijk is voor de dienst die je vraagt, en niets bevat waarmee je gevolgd wordt, is er geen cookietoestemming voor nodig.')}</p>`)}
 
@@ -2089,11 +2146,11 @@ export function about() {
     <li>HoopUp is free and provided as is, without any guarantee. It is practical guidance, not legal advice.</li>
     <li>You send every letter and unsubscribe yourself, and you are responsible for what you send. Read each letter before you send it.</li>
     <li>Use it for your own data. Writing on behalf of someone else needs their permission.</li>
-    <li>Company contact details may be outdated or guessed; the app marks guessed ones. We cannot see whether a company really erased your data; the app tracks deadlines so you can hold them to it.</li>
+    <li>Company contact details may be outdated or guessed; the app shows where each address comes from (their own mail, a checked list, or a guess) and marks an address as wrong when a bounce is dropped in. We cannot see whether a company really erased your data; the app tracks deadlines so you can hold them to it.</li>
     <li>HoopUp is open source under the MIT licence: ${ext(REPO, 'source code')}.</li>`, `
     <li>HoopUp is gratis en wordt geleverd zoals het is, zonder enige garantie. Het is praktische uitleg, geen juridisch advies.</li>
     <li>Je verstuurt elke brief en elke uitschrijving zelf, en je bent verantwoordelijk voor wat je verstuurt. Lees elke brief voordat je hem verstuurt.</li>
     <li>Gebruik het voor je eigen gegevens. Namens iemand anders schrijven mag alleen met diens toestemming.</li>
-    <li>Contactgegevens van bedrijven kunnen verouderd of gegokt zijn; de app markeert gegokte adressen. We kunnen niet zien of een bedrijf je gegevens echt heeft gewist; de app houdt de termijnen bij zodat je ze eraan kunt houden.</li>
+    <li>Contactgegevens van bedrijven kunnen verouderd of gegokt zijn; de app laat zien waar elk adres vandaan komt (hun eigen mail, een gecontroleerde lijst of een gok) en markeert een adres als fout als je een onbestelbaar-melding erin sleept. We kunnen niet zien of een bedrijf je gegevens echt heeft gewist; de app houdt de termijnen bij zodat je ze eraan kunt houden.</li>
     <li>HoopUp is open source onder de MIT-licentie: ${ext(REPO, 'broncode')}.</li>`)}</ul>`)}`;
 }

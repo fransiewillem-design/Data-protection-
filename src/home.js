@@ -392,20 +392,27 @@ export function mountHome(root, state, rerender) {
     try {
       if (big && drop) drop.innerHTML = `<p class="drop-title" aria-live="polite">${L('Reading your mail on this device…', 'Je mail wordt op dit apparaat gelezen…')} <span id="drop-pct">0%</span></p>
         <p class="small muted">${L('A large export takes a few minutes. Nothing is uploaded.', 'Een grote export duurt een paar minuten. Er wordt niets geüpload.')}</p>`;
-      const messages = await readMailFiles(files, frac => {
+      const { messages, app } = await readMailFiles(files, frac => {
         const el = root.querySelector('#drop-pct');
         if (el) el.textContent = Math.floor(frac * 100) + '%';
       });
-      if (!messages.length) {
-        if (big) rerender();
-        toast(L('No mail found in those files. Use .eml, .msg or .mbox files.', 'Geen mail gevonden in die bestanden. Gebruik .eml-, .msg- of .mbox-bestanden.'));
+      // Delivery failures for letters the user sent: those addresses are wrong.
+      const bounced = new Set(messages.flatMap(m => m.bounce || []));
+      const back = bounced.size ? store.markBounced(bounced) : [];
+      const mail = messages.filter(m => !m.bounce);
+      if (back.length) toast(L(`${back.length} ${back.length === 1 ? 'letter' : 'letters'} bounced: the address did not exist. ${back.length === 1 ? 'It is' : 'They are'} back on your list under Delete data.`,
+        `${back.length} ${back.length === 1 ? 'brief kwam' : 'brieven kwamen'} terug: het adres bestond niet. ${back.length === 1 ? 'Hij staat' : 'Ze staan'} weer op je lijst bij Gegevens verwijderen.`));
+      if (!mail.length) {
+        rerender();
+        if (!back.length) toast(L('No mail found in those files. Use .eml, .msg or .mbox files.', 'Geen mail gevonden in die bestanden. Gebruik .eml-, .msg- of .mbox-bestanden.'));
         return;
       }
-      const senders = groupBySender(messages);
+      const senders = groupBySender(mail);
       upsertSenders(senders);
+      if (app) store.update(st => { st.mailApp = app; });
       rerender();
-      toast(L(`${messages.length} ${plural(messages.length, 'mail', 'mails', '', '')} from ${senders.length} ${plural(senders.length, 'sender', 'senders', '', '')} sorted`,
-        `${messages.length} ${plural(messages.length, '', '', 'mail', 'mails')} van ${senders.length} ${plural(senders.length, '', '', 'afzender', 'afzenders')} gesorteerd`));
+      if (!back.length) toast(L(`${mail.length} ${plural(mail.length, 'mail', 'mails', '', '')} from ${senders.length} ${plural(senders.length, 'sender', 'senders', '', '')} sorted`,
+        `${mail.length} ${plural(mail.length, '', '', 'mail', 'mails')} van ${senders.length} ${plural(senders.length, '', '', 'afzender', 'afzenders')} gesorteerd`));
     } catch (err) {
       if (big) rerender();
       toast(L('Could not read those files: ', 'Kon die bestanden niet lezen: ') + err.message);

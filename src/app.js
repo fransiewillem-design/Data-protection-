@@ -96,9 +96,10 @@ function render() {
 }
 
 store.subscribe(() => {
-  // Home and Find update their own DOM (queues, panels, fetched results) and
-  // re-render explicitly; a store write mid-queue must not wipe the progress.
-  if (!['/', '/find'].includes(current)) render();
+  // Home, Find and Unsubscribe update their own DOM (queues, panels, fetched
+  // results) and re-render explicitly; a store write mid-queue must not wipe
+  // the progress.
+  if (!['/', '/find', '/unsubscribe'].includes(current)) render();
 });
 
 addEventListener('hashchange', render);

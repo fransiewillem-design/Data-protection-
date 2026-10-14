@@ -202,6 +202,52 @@ export function collectLinkDomains(parts) {
   return [...out];
 }
 
+// Delivery failure notices, in the forms the big providers send them.
+function isBounce(h, from) {
+  return /^(mailer-?daemon|postmaster|mail-daemon)$/i.test(from.address.split('@')[0])
+    || /report-type\s*=\s*"?delivery-status/i.test(h['content-type'] || '')
+    || /^\s*(undeliverable|undelivered|delivery status notification \(failure\)|mail delivery failed|returned mail|failure notice|delivery has failed|message not delivered|onbestelbaar|niet bezorgd|kan niet worden bezorgd)\b/i.test(decodeWords(h.subject || ''));
+}
+
+// Every address the notice mentions. The app only acts on the ones it sent a
+// letter to, so a notice that quotes other addresses changes nothing.
+function bouncedTo(h, body) {
+  const out = new Set();
+  for (const m of String(h['x-failed-recipients'] || '').matchAll(/[\w.+-]+@[\w.-]+\.\w+/g)) out.add(m[0].toLowerCase());
+  for (const m of body.slice(0, 200000).matchAll(/[\w.+-]+@[\w.-]+\.[a-z]{2,}/gi)) out.add(m[0].toLowerCase());
+  return [...out].slice(0, 40);
+}
+
+// The company's own privacy contact, if its mail gives one: an address like
+// privacy@ or dpo@, and a link to its privacy statement. Only on the sender's
+// own domain (or the same brand under another country domain: zalando.de for
+// zalando.nl), so a footer link to anyone else is never taken for theirs.
+const PRIVACY_LOCAL = /^(privacy|privacyofficer|privacy[.-]officer|privacyteam|privacyvragen|privacydesk|privacy[.-]?office|dpo|fg|avg|gdpr|dataprotection|data[.-]protection|dataprotectionoffice(r)?|dataprivacy|datenschutz|gegevensbescherming|functionarisgegevensbescherming)$/i;
+const PRIVACY_LINK = /privacy|privacyverklaring|privacybeleid|privacystatement|gegevensbescherming|datenschutz|data-protection/i;
+
+export function privacyContact(parts, domain) {
+  const brand = registrableDomain(domain).split('.')[0];
+  const ours = host => !!brand && registrableDomain(host).split('.')[0] === brand;
+  let email = '', url = '';
+  for (const part of parts) {
+    const text = part.text || '';
+    if (!email) for (const m of text.matchAll(/(?:mailto:)?([a-z0-9._+-]+)@([a-z0-9.-]+\.[a-z]{2,})/gi)) {
+      if (PRIVACY_LOCAL.test(m[1]) && ours(m[2])) { email = `${m[1]}@${m[2]}`.toLowerCase(); break; }
+    }
+    if (!url && part.type === 'html') for (const m of text.matchAll(/<a\b([^>]*)>([\s\S]{0,200}?)<\/a>/gi)) {
+      const href = (/\bhref\s*=\s*["']([^"']+)["']/i.exec(m[1]) || [])[1]?.replace(/&amp;/g, '&') || '';
+      const label = m[2].replace(/<[^>]+>/g, ' ');
+      if (!PRIVACY_LINK.test(label) && !PRIVACY_LINK.test(href)) continue;
+      try {
+        const u = new URL(unwrapSafeLink(href));
+        if (u.protocol === 'https:' && ours(u.hostname) && PRIVACY_LINK.test(u.pathname + ' ' + label)) { url = u.href; break; }
+      } catch { /* not a link */ }
+    }
+    if (email && url) break;
+  }
+  return { email, url };
+}
+
 // Unsubscribe wording across the languages this is likely to meet.
 const UNSUB_WORDS =
   /unsubscrib|uitschrijv|afmeld|uitschrijf|opt[\s-]?out|abmeld|austragen|d[eé]sabonn|desinscri|desuscri|darse\s+de\s+baja|cancelar.{0,12}suscri|annulla.{0,12}iscrizione|stop.{0,10}(mail|email)|e-?mailvoorkeur|mailvoorkeur|email.{0,10}preference|subscription.{0,10}preference/i;
@@ -389,9 +435,65 @@ const OFFICIAL = [
   [/\babn ?amro\b/i, ['abnamro.nl', 'abnamro.com']], [/\bsns( bank)?\b/i, ['snsbank.nl']], [/\basn ?bank\b/i, ['asnbank.nl']],
   [/\bpostnl\b/i, ['postnl.nl', 'postnl.com']], [/\bdhl\b/i, ['dhl.com', 'dhl.nl', 'dhl.de', 'dhlparcel.nl', 'dhlecommerce.nl']],
   [/\bdpd\b/i, ['dpd.nl', 'dpd.com']], [/\bkpn\b/i, ['kpn.com', 'kpn.nl']], [/\bziggo\b/i, ['ziggo.nl', 'vodafoneziggo.nl']],
-  [/\bodido\b/i, ['odido.nl']], [/\bpaypal\b/i, ['paypal.com', 'paypal.nl', 'paypal.de']]
+  [/\bodido\b/i, ['odido.nl']], [/\bpaypal\b/i, ['paypal.com', 'paypal.nl', 'paypal.de']],
+  // Parcel carriers: the favourite costume of "your package is waiting" scams.
+  // Short all-caps names are matched case-sensitively, so "start-ups" or
+  // "bups" in a name never count as UPS.
+  [/\busps\b/i, ['usps.com', 'usps.gov']], [/\bUPS\b/, ['ups.com']], [/\bfed ?ex\b/i, ['fedex.com']],
+  [/\broyal ?mail\b/i, ['royalmail.com', 'royalmail.co.uk']], [/\bbpost\b/i, ['bpost.be']], [/\bGLS\b/, ['gls-group.eu', 'gls-group.com', 'gls-info.nl']],
+  [/\b(evri|hermes)\b/i, ['evri.com', 'hermes-europe.co.uk', 'myhermes.de']], [/\bcorreos\b/i, ['correos.es']],
+  [/\bdeutsche post\b/i, ['deutschepost.de', 'dhl.de']], [/\bla poste\b/i, ['laposte.fr', 'laposte.net']],
+  [/\bamazon\b/i, ['amazon.com', 'amazon.nl', 'amazon.de', 'amazon.co.uk', 'amazon.fr', 'amazon.es', 'amazon.it', 'amazon.be']],
+  [/\b(apple|icloud)\b/i, ['apple.com', 'icloud.com']],
+  [/\b(microsoft|office ?365|microsoft ?365)\b/i, ['microsoft.com', 'office.com', 'microsoftonline.com', 'outlook.com', 'live.com']],
+  [/\bnetflix\b/i, ['netflix.com']], [/\bspotify\b/i, ['spotify.com']], [/\bdisney\+?/i, ['disney.com', 'disneyplus.com', 'disney.nl']],
+  [/\b(google|gmail)\b/i, ['google.com', 'gmail.com', 'youtube.com']],
+  [/\b(facebook|instagram|whatsapp)\b/i, ['facebook.com', 'facebookmail.com', 'instagram.com', 'whatsapp.com', 'meta.com']],
+  [/\bbooking\.com\b/i, ['booking.com']], [/\bcoinbase\b/i, ['coinbase.com']], [/\bbinance\b/i, ['binance.com']],
+  [/\bnorton\b/i, ['norton.com', 'nortonlifelock.com', 'gen.digital']], [/\bmcafee\b/i, ['mcafee.com']],
+  [/\bgeek ?squad\b/i, ['geeksquad.com', 'bestbuy.com']], [/\bebay\b/i, ['ebay.com', 'ebay.nl', 'ebay.de', 'ebay.co.uk']],
+  [/\bmarktplaats\b/i, ['marktplaats.nl']], [/\bbol(\.com)?\b/i, ['bol.com']], [/\bcoolblue\b/i, ['coolblue.nl', 'coolblue.be']],
+  [/\balbert heijn\b/i, ['ah.nl', 'ah.be', 'albertheijn.nl']], [/\bvodafone\b/i, ['vodafone.nl', 'vodafone.com', 'vodafoneziggo.nl']],
+  [/\bt-mobile\b/i, ['t-mobile.nl', 't-mobile.com', 'odido.nl']], [/\bmastercard\b/i, ['mastercard.com', 'mastercard.nl']],
+  [/\b(american express|amex)\b/i, ['americanexpress.com', 'aexp.com']], [/\bNS\b/, ['ns.nl']], [/\bDUO\b/, ['duo.nl']],
+  [/\bCAK\b/, ['hetcak.nl']], [/\bpolitie\b/i, ['politie.nl']], [/\bIRS\b/, ['irs.gov']], [/\bHMRC\b/, ['hmrc.gov.uk', 'gov.uk']],
+  [/\bbunq\b/i, ['bunq.com']], [/\bknab\b/i, ['knab.nl']], [/\btriodos\b/i, ['triodos.nl', 'triodos.com']],
+  [/\brevolut\b/i, ['revolut.com']], [/\bkbc\b/i, ['kbc.be', 'kbc.com']], [/\bbelfius\b/i, ['belfius.be']]
 ];
 const ownedBy = (domain, allowed) => allowed.some(a => domain === a || domain.endsWith('.' + a));
+
+// Words in a sender name that say nothing about who it is.
+const NAME_FILLER = new Set(['team', 'support', 'service', 'services', 'customer', 'customers', 'klantenservice', 'info',
+  'news', 'newsletter', 'nieuws', 'nieuwsbrief', 'noreply', 'no', 'reply', 'mail', 'email', 'notification', 'notifications',
+  'alert', 'alerts', 'delivery', 'bezorging', 'order', 'orders', 'bestelling', 'account', 'accounts', 'security', 'beveiliging',
+  'the', 'de', 'het', 'een', 'van', 'from', 'via', 'and', 'en', 'your', 'je', 'jouw', 'uw', 'my', 'mijn', 'our', 'ons',
+  'official', 'online', 'store', 'shop', 'winkel', 'webshop', 'deals', 'aanbiedingen', 'update', 'updates', 'marketing',
+  'sales', 'hello', 'hallo', 'hi', 'admin', 'billing', 'invoice', 'factuur', 'payments', 'betalingen', 'member', 'members',
+  'club', 'rewards', 'loyalty', 'care', 'help', 'helpdesk', 'contact', 'office', 'bv', 'inc', 'ltd', 'gmbh', 'nv', 'llc',
+  'nl', 'be', 'com', 'net', 'org', 'group', 'groep', 'nederland', 'netherlands', 'europe', 'international', 'global']);
+
+// Whether a sender's name has anything to do with the domain it mails from.
+// "USPS Delivery" at sdothemed.com does not; "Albert Heijn" at ah.nl does
+// (initials), "Koninklijke Nederlandse Munt" at knm.nl does, "Sarah from
+// Notion" at mail.notion.so does, and so does a person whose name is in the
+// address itself (jan.devries@acme.io). Names made only of filler words
+// ("Customer Service") cannot be judged and are let through.
+export function nameMatchesDomain(name, address, domain) {
+  const norm = x => String(x || '').toLowerCase().normalize('NFKD').replace(/[̀-ͯ]/g, '');
+  const words = norm(name).split(/[^a-z0-9]+/).filter(Boolean);
+  const tokens = words.filter(w => w.length >= 2 && !NAME_FILLER.has(w));
+  if (!tokens.length) return true;
+  const host = norm(domain);
+  const label = host.split('.')[0];
+  const flat = host.replace(/[^a-z0-9]/g, '');
+  const local = norm(String(address || '').split('@')[0]).replace(/[^a-z0-9]/g, '');
+  const initials = words.filter(w => !['de', 'het', 'van', 'the', 'and', 'en'].includes(w)).map(w => w[0]).join('');
+  if (tokens.some(t => t.length >= 3 && (flat.includes(t) || local.includes(t)))) return true;
+  if (label.length >= 3 && tokens.some(t => t.includes(label))) return true;
+  if (tokens.join('').includes(label) || (label.length >= 3 && label.includes(tokens.join('')))) return true;
+  if (initials.length >= 2 && (label === initials || label.startsWith(initials))) return true;
+  return tokens.every(t => t.length < 3) && tokens.some(t => flat.includes(t));
+}
 
 export function impersonates(name, domain) {
   const d = String(domain || '').toLowerCase();
@@ -476,6 +578,9 @@ export function parseMessages(text, { single = false } = {}) {
     }
 
     return {
+      // A "could not be delivered" notice: not a sender, but news about an
+      // address the user wrote to.
+      bounce: isBounce(h, from) ? bouncedTo(h, body + '\n' + parts.map(p => p.text).join('\n')) : null,
       address: from.address,
       name: from.name,
       domain: from.domain,
@@ -492,6 +597,7 @@ export function parseMessages(text, { single = false } = {}) {
                           verified: senderTrust(from.domain, auth).trust === 'verified', personal: isPersonalDomain(from.domain) }),
       replyToHost: replyTarget(parseFrom(h['reply-to'] || '')),
       identity: identityFrom({ to: h.to, parts, recipients, brand: `${from.name} ${from.domain}` }),
+      privacy: privacyContact(parts, from.domain),
       linkDomains: collectLinkDomains(parts),
       isEsp: ESP_DOMAINS.has(from.domain),
       personal: isPersonalDomain(from.domain)
@@ -504,6 +610,7 @@ export function parseMessages(text, { single = false } = {}) {
 export function groupBySender(messages) {
   const map = new Map();
   for (const m of messages) {
+    if (m.bounce) continue;
     // Forged mail is grouped apart from genuine mail on the same domain. A
     // spoofed "bol.com" must never drag the real bol.com into the spam pile:
     // the domain in a forged From line belongs to whoever is being impersonated.
@@ -517,7 +624,7 @@ export function groupBySender(messages) {
         unsubHttp: '', unsubMailto: '', unsubFrom: '', oneClick: false,
         addresses: new Set(), recipients: new Set(), subjects: [], isEsp: m.isEsp,
         linkDomains: new Set(), replyToHosts: new Set(), risk: '', providerSpamCount: 0, names: new Set(),
-        transactional: false, idNames: new Set(), idPostal: new Set(), idPhones: new Set(), idEmails: new Set(), phoneSeen: new Set()
+        transactional: false, privacyEmail: '', privacyUrl: '', idNames: new Set(), idPostal: new Set(), idPhones: new Set(), idEmails: new Set(), phoneSeen: new Set()
       });
     }
     const g = map.get(key);
@@ -539,6 +646,8 @@ export function groupBySender(messages) {
     for (const r of m.recipients) g.recipients.add(r);
     for (const d of m.linkDomains || []) g.linkDomains.add(d);
     if (m.replyToHost) g.replyToHosts.add(m.replyToHost);
+    if (!g.privacyEmail && m.privacy?.email) g.privacyEmail = m.privacy.email;
+    if (!g.privacyUrl && m.privacy?.url) g.privacyUrl = m.privacy.url;
     const id = m.identity || {};
     for (const [k, set] of [['names', g.idNames], ['postal', g.idPostal], ['phones', g.idPhones], ['emails', g.idEmails], ['phoneSeen', g.phoneSeen]])
       for (const v of id[k] || []) set.add(v);
@@ -549,6 +658,7 @@ export function groupBySender(messages) {
     .map(g => ({ ...g, providerSpam: g.providerSpamCount * 2 >= g.count && g.providerSpamCount > 0,
                  names: [...g.names], addresses: [...g.addresses], recipients: [...g.recipients],
                  linkDomains: [...g.linkDomains], replyToHosts: [...g.replyToHosts],
+                 nameMismatch: !g.personal && !nameMatchesDomain(g.name, [...g.addresses][0], g.domain),
                  identity: { names: [...g.idNames].slice(0, 3), postal: [...g.idPostal].slice(0, 2), phones: [...g.idPhones].slice(0, 3),
                              emails: [...g.idEmails].slice(0, 5), phoneSeen: [...g.phoneSeen].slice(0, 20) } }))
     .sort((a, b) => b.count - a.count);

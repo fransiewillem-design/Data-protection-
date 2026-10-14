@@ -201,6 +201,15 @@ to clean up after. So there is no server.
 | A sender's one-click unsubscribe URL | `List-Unsubscribe=One-Click`, no cookies, no referrer (see below) |
 | Letters | Nothing from the app: they open in your own mail app, and you press Send |
 
+**Where letters go.** In order: an address you typed; the privacy or DPO address the company's own mail
+gives (privacy@, dpo@, fg@ … on its own domain); a short list checked against the companies' own privacy
+statements (`src/contacts.js`, each entry with its source); and only then a guess, `privacy@` their
+domain, labelled *guessed* with a link to their privacy statement where known. The address each letter
+went to is kept; drop the "could not be delivered" notice in on Home and that address is marked wrong,
+the request goes back on the list, and the next attempt uses the next-best address. HoopUp does not look
+addresses up on company websites itself: a browser page cannot read other sites, and doing it through a
+server would tell that server which companies you deal with.
+
 **Letters reveal nothing the recipient did not already have.** A company found in your own mail is
 identified with exactly what its own mail shows it holds, and nothing from your profile: the addresses it
 wrote to (and any "this mail was sent to …" in its footer), the name it addresses you by (the To line, the

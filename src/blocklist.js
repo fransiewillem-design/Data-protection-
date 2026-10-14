@@ -81,6 +81,15 @@ export const asReplyList = bl => [...bl.replyTo, ...bl.sharedReplyTo].join('\n')
 const xmlEsc = s => String(s).replace(/[&<>'"]/g, c =>
   ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', "'": '&apos;', '"': '&quot;' }[c]));
 
+// The same filter as one line for Gmail's search bar: braces mean "any of
+// these", so one paste makes one filter. Split like the file, because Gmail
+// rejects very long criteria.
+export function asGmailQueries(bl) {
+  const out = [];
+  for (let i = 0; i < bl.links.length; i += 20) out.push('{' + bl.links.slice(i, i + 20).join(' ') + '}');
+  return out;
+}
+
 // Gmail's own export format (Settings → Filters and Blocked Addresses → Import).
 // Queries are chunked because Gmail rejects very long filter criteria.
 export function asGmailXml(bl, now = new Date()) {

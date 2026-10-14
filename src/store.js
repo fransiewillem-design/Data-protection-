@@ -16,6 +16,7 @@ const EMPTY = {
   hibpKey: '',
   addressAnswers: {}, // address -> 'keep' | 'retire': the user's answer on Home
   addressMoves: {},   // address -> steps of the move plan ticked off
+  mailApp: '',        // the mail app the block rules are for: from the dropped files, or chosen
   uiLang: ''      // '' = follow the browser; 'en' | 'nl' once chosen
 };
 
@@ -140,6 +141,30 @@ export function setStatus(brokerId, status, extra = {}) {
     rec.history.push({ ts: new Date().toISOString(), event: STATUSES[status]?.label || status });
     s.requests[brokerId] = rec;
   });
+}
+
+// A delivery failure for an address a letter went to: that address is wrong.
+// The request goes back on the list without it, so the next attempt uses the
+// next-best address, or asks the user for one.
+export function markBounced(addresses) {
+  const hit = [];
+  update(s => {
+    for (const [id, rec] of Object.entries(s.requests || {})) {
+      if (!['sent', 'ack'].includes(rec.status)) continue;
+      const b = s.custom.find(c => c.id === id);
+      const sent = String(rec.sentTo || rec.to || b?.email || '').toLowerCase();
+      if (!sent || !addresses.has(sent)) continue;
+      rec.bounced = [...new Set([...(rec.bounced || []), sent])];
+      if (String(rec.to || '').toLowerCase() === sent) delete rec.to;
+      delete rec.sentTo;
+      rec.status = 'todo';
+      rec.sentAt = '';
+      rec.history = rec.history || [];
+      rec.history.push({ ts: new Date().toISOString(), event: `Bounced: ${sent}` });
+      hit.push(id);
+    }
+  });
+  return hit;
 }
 
 // A follow-up does not change the status: the request is still open, and the

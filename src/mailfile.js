@@ -39,6 +39,17 @@ async function readLarge(file, emit, progress) {
   flush();
 }
 
+// Which mail app the files came from, so the block rules are offered for the
+// app the user actually reads this mail in, not guessed from the address (a
+// Hotmail address read in Apple Mail wants Apple Mail rules).
+function appOf(file, head, isOutlookMsg) {
+  if (isOutlookMsg) return 'outlookwin';
+  if (/^X-Gmail-Labels:|^X-GM-THRID:/m.test(head)) return 'gmail';
+  const mac = /mac/i.test(navigator.userAgentData?.platform || navigator.platform || '');
+  if (mac && /\.eml$/i.test(file.name)) return 'apple';
+  return '';
+}
+
 export async function readMailFiles(files, onProgress = () => {}) {
   const total = files.reduce((n, f) => n + f.size, 0) || 1;
   const messages = [];
@@ -46,13 +57,18 @@ export async function readMailFiles(files, onProgress = () => {}) {
   // function call can take arguments.
   const add = list => { for (const m of list) messages.push(m); };
   let before = 0;
+  const apps = {};
   for (const f of files) {
     const head = new Uint8Array(await f.slice(0, 512).arrayBuffer());
+    const headText = new TextDecoder().decode(await f.slice(0, 64 * 1024).arrayBuffer());
+    const app = appOf(f, headText, isMsg(head));
+    if (app) apps[app] = (apps[app] || 0) + 1;
     if (isMsg(head)) add(parseMessages(msgToText(await f.arrayBuffer()), { single: true }));
     else if (f.size <= WHOLE) add(parseMessages(await f.text()));
     else await readLarge(f, add, n => onProgress((before + n) / total, f.name));
     before += f.size;
     onProgress(before / total, f.name);
   }
-  return messages;
+  const app = Object.entries(apps).sort((a, b) => b[1] - a[1])[0]?.[0] || '';
+  return { messages, app };
 }
