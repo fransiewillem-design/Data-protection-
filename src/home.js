@@ -3,12 +3,10 @@
 
 import * as store from './store.js';
 import { L, plural } from './i18n.js';
-import { relationOf } from './letters.js';
-import { groupBySender } from './mailscan.js';
-import { readMailFiles } from './mailfile.js';
+import { relationOf, keptMailing } from './letters.js';
 import { moveGuide, MOVE_STEPS } from './move.js';
 import {
-  esc, toast, senderClass, unsubTier, upsertSenders, runOneClickBatch,
+  esc, toast, senderClass, unsubTier, ingestFiles, ingestToasts, runOneClickBatch,
   startUnsubQueue, wireQueue, wireBlock, blockAllCard, hostOf, nameOf, akaOf, deleteWork, unsafeReason, writable, coveredBy,
   blockDoneIds, blockDoneAt, blockView, ruleCount
 } from './views.js';
@@ -228,7 +226,9 @@ export function home(state) {
   const companies = state.custom.filter(writable);
   const work = deleteWork(companies);
   const toAsk = work.send.length + work.forms.length;
-  const followUps = work.reminders.length + work.complaints.length;
+  const followUps = work.reminders.length + work.complaints.length + work.answers.length;
+  // Senders that kept mailing after the user unsubscribed.
+  const kept = mail.filter(t => t.unsubscribedAt && keptMailing(t, store.getRequest(t.id)));
   const suspect = [...work.send, ...work.forms].filter(t => relationOf(t, store.getRequest(t.id)) === 'none').length;
   const flagged = addressHealth(state).filter(h => h.verdict !== 'ok');
   const open = flagged.filter(h => !(state.addressAnswers || {})[h.address]);
@@ -256,6 +256,8 @@ export function home(state) {
       : unsub.length && !unchecked.length
         ? L(`Unsubscribed from all ${unsub.length}.`, `Bij alle ${unsub.length} uitgeschreven.`)
         : L('No verified company left to unsubscribe from.', 'Geen echt bedrijf meer om je bij uit te schrijven.'))
+    + (kept.length ? L(` ${kept.length} kept mailing after you unsubscribed: a letter is ready in Details.`,
+                       ` ${kept.length} ${kept.length === 1 ? 'bleef' : 'bleven'} mailen nadat je je uitschreef: er staat een brief klaar bij Details.`) : '')
     + (unchecked.length ? L(` ${unchecked.length} more could not be verified. Check ${unchecked.length === 1 ? 'it' : 'them'} in Details.`,
                             ` ${unchecked.length} ${unchecked.length === 1 ? 'andere kon' : 'andere konden'} niet worden gecontroleerd. Bekijk ze bij Details.`) : '');
 
@@ -322,6 +324,8 @@ export function home(state) {
                   `${toAsk} ${toAsk === 1 ? 'bedrijf heeft' : 'bedrijven hebben'} je gegevens. Een AVG-verzoek verplicht ze die te wissen, en ze moeten binnen een maand antwoorden.`) : '',
         suspect ? L(`${suspect} with no reason to have it ${suspect === 1 ? 'goes' : 'go'} first.`,
                     `${suspect} zonder reden om ze te hebben ${suspect === 1 ? 'gaat' : 'gaan'} voor.`) : '',
+        work.answers.length ? L(`${work.answers.length} answered with a demand the law does not support. Your reply is ready.`,
+                                `${work.answers.length} ${work.answers.length === 1 ? 'antwoordde' : 'antwoordden'} met een eis die de wet niet steunt. Je reactie staat klaar.`) : '',
         work.reminders.length ? L(`${work.reminders.length} did not answer in time. A reminder is ready.`,
                                   `${work.reminders.length} ${work.reminders.length === 1 ? 'reageerde' : 'reageerden'} niet op tijd. Er staat een herinnering klaar.`) : '',
         work.complaints.length ? L(`${work.complaints.length} ready for a complaint to the regulator.`,
@@ -332,6 +336,7 @@ export function home(state) {
           : L('No company to write to yet.', 'Nog geen bedrijf om aan te schrijven.')) : ''
       ].filter(Boolean).join(' '),
       cta: work.send.length ? L(`Send ${work.send.length} ${work.send.length === 1 ? 'request' : 'requests'}`, `${work.send.length} ${work.send.length === 1 ? 'verzoek' : 'verzoeken'} versturen`)
+         : work.answers.length ? L('Write replies', 'Reacties schrijven')
          : work.reminders.length ? L('Send reminders', 'Herinneringen versturen') : L('Open', 'Openen'),
       href: work.send.length ? '#/delete?send=1' : '#/delete',
       done: companies.length ? L('All asked', 'Alles verstuurd') : L('Nothing yet', 'Nog niets') })}
@@ -392,28 +397,18 @@ export function mountHome(root, state, rerender) {
     try {
       if (big && drop) drop.innerHTML = `<p class="drop-title" aria-live="polite">${L('Reading your mail on this device…', 'Je mail wordt op dit apparaat gelezen…')} <span id="drop-pct">0%</span></p>
         <p class="small muted">${L('A large export takes a few minutes. Nothing is uploaded.', 'Een grote export duurt een paar minuten. Er wordt niets geüpload.')}</p>`;
-      const { messages, app } = await readMailFiles(files, frac => {
+      const result = await ingestFiles(files, frac => {
         const el = root.querySelector('#drop-pct');
         if (el) el.textContent = Math.floor(frac * 100) + '%';
       });
-      // Delivery failures for letters the user sent: those addresses are wrong.
-      const bounced = new Set(messages.flatMap(m => m.bounce || []));
-      const { back, partial } = bounced.size ? store.markBounced(bounced) : { back: [], partial: [] };
-      if (partial.length) toast(L(`${partial.length === 1 ? 'One address' : `${partial.length} addresses`} did not exist, but the letter reached their other addresses: the request stands and the deadline runs.`,
-        `${partial.length === 1 ? 'Eén adres bestond' : `${partial.length} adressen bestonden`} niet, maar de brief kwam aan op hun andere adressen: het verzoek staat en de termijn loopt.`));
-      const mail = messages.filter(m => !m.bounce);
-      if (back.length) toast(L(`${back.length} ${back.length === 1 ? 'letter' : 'letters'} bounced: the address did not exist. ${back.length === 1 ? 'It is' : 'They are'} back on your list under Delete data.`,
-        `${back.length} ${back.length === 1 ? 'brief kwam' : 'brieven kwamen'} terug: het adres bestond niet. ${back.length === 1 ? 'Hij staat' : 'Ze staan'} weer op je lijst bij Gegevens verwijderen.`));
+      rerender();
+      const said = ingestToasts(result);
+      const { mail, senders } = result;
       if (!mail.length) {
-        rerender();
-        if (!back.length && !partial.length) toast(L('No mail found in those files. Use .eml, .msg or .mbox files.', 'Geen mail gevonden in die bestanden. Gebruik .eml-, .msg- of .mbox-bestanden.'));
+        if (!said) toast(L('No mail found in those files. Use .eml, .msg or .mbox files.', 'Geen mail gevonden in die bestanden. Gebruik .eml-, .msg- of .mbox-bestanden.'));
         return;
       }
-      const senders = groupBySender(mail);
-      upsertSenders(senders);
-      if (app) store.update(st => { st.mailApp = app; });
-      rerender();
-      if (!back.length && !partial.length) toast(L(`${mail.length} ${plural(mail.length, 'mail', 'mails', '', '')} from ${senders.length} ${plural(senders.length, 'sender', 'senders', '', '')} sorted`,
+      if (!said) toast(L(`${mail.length} ${plural(mail.length, 'mail', 'mails', '', '')} from ${senders.length} ${plural(senders.length, 'sender', 'senders', '', '')} sorted`,
         `${mail.length} ${plural(mail.length, '', '', 'mail', 'mails')} van ${senders.length} ${plural(senders.length, '', '', 'afzender', 'afzenders')} gesorteerd`));
     } catch (err) {
       if (big) rerender();
@@ -445,7 +440,7 @@ export function mountHome(root, state, rerender) {
     if (act === 'home-unsub') {
       const pending = now.custom.filter(t => senderClass(t) === 'unsub' && !t.unsubscribedAt && t.trust === 'verified');
       const instant = pending.filter(t => unsubTier(t) === 'instant');
-      const links = pending.filter(t => unsubTier(t) === 'link');
+      const links = pending.filter(t => ['link', 'mail'].includes(unsubTier(t)));
       if (instant.length) runOneClickBatch(root, instant, links);
       else startUnsubQueue(root, links);
       root.querySelector('#unsub-queue').scrollIntoView({ behavior: 'smooth', block: 'center' });

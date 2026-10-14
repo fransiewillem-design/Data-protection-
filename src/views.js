@@ -1,12 +1,17 @@
 import * as store from './store.js';
 import {
   TEMPLATES, TEMPLATE_LABELS_NL, render as renderLetter, suggestedTemplate,
-  templateFor, relationOf, RELATION_ORDER, writesDutch, letterLang, evidenceLines
+  templateFor, relationOf, RELATION_ORDER, writesDutch, letterLang, evidenceLines,
+  keptMailing, lastAnswer, REPLY_FOR, PUSHBACK, longDate
 } from './letters.js';
+import { matchAnswers, ownedAddresses } from './replies.js';
+import { readMailFiles } from './mailfile.js';
+import { icsFor, upcoming } from './calendar.js';
+import { csvLog } from './log.js';
 import { allBreaches, breachesForAccount, pwnedPasswordCount } from './hibp.js';
 import { L, plural, lang } from './i18n.js';
 import { buildBlockList, asLinkList, asReplyList, asGmailXml, asGmailQueries, asSieve, asAppleScript, asPowerShell, guessClient } from './blocklist.js';
-import { isPersonalDomain, cleanHost, nameMatchesDomain } from './mailscan.js';
+import { isPersonalDomain, cleanHost, nameMatchesDomain, groupBySender } from './mailscan.js';
 import { contactFor, CHECKED, lookupAvailable, lookupContact } from './contacts.js';
 
 export const esc = s => String(s ?? '').replace(/[&<>"']/g,
@@ -44,13 +49,33 @@ export function safeUnsubUrl(u) {
   }
 }
 
+// An unsubscribe by email (List-Unsubscribe: <mailto:…>): one address on a
+// real domain, and at most a subject and a body. Any cc or bcc is dropped, so
+// the user's mail goes nowhere but the sender's own unsubscribe address.
+export function safeUnsubMailto(u) {
+  const m = /^mailto:([^?#]+)(\?[^#]*)?$/i.exec(String(u ?? '').trim());
+  if (!m) return '';
+  let to;
+  try { to = decodeURIComponent(m[1]).trim(); } catch { return ''; }
+  if (!/^[a-z0-9._%+-]+@[a-z0-9-]+(\.[a-z0-9-]+)*\.[a-z]{2,}$/i.test(to)) return '';
+  const q = new URLSearchParams((m[2] || '').slice(1).replace(/\+/g, '%2B'));
+  const keep = [];
+  for (const k of ['subject', 'body']) {
+    const v = [...q].find(([key]) => key.toLowerCase() === k)?.[1];
+    if (v) keep.push(`${k}=${encodeURIComponent(v.replace(/[\r\n]+/g, ' ').slice(0, 300))}`);
+  }
+  if (!keep.length) keep.push('subject=unsubscribe');
+  return `mailto:${encodeURIComponent(to)}?${keep.join('&')}`;
+}
+
 export function toast(msg) {
   document.querySelector('.toast')?.remove();
   const el = document.createElement('div');
   el.className = 'toast';
   el.textContent = msg;
   document.body.appendChild(el);
-  setTimeout(() => el.remove(), 2600);
+  // Long enough to read: a sentence takes longer than a word.
+  setTimeout(() => el.remove(), Math.min(9000, Math.max(2600, msg.length * 55)));
 }
 
 const CATEGORIES = () => ({
@@ -65,10 +90,16 @@ const CATEGORIES = () => ({
 
 const STATUS_NL = { todo: 'Niet gestart', sent: 'Verstuurd', ack: 'Ontvangst bevestigd',
                     done: 'Gewist', refused: 'Geweigerd', escalated: 'Klacht ingediend' };
-const EVENT_NL = { 'Reminder sent': 'Herinnering verstuurd' };
+const EVENT_NL = { 'Reminder sent': 'Herinnering verstuurd', 'Reply sent': 'Antwoord verstuurd',
+  'Answer: erased': 'Antwoord: gewist', 'Answer: erased, some kept by law': 'Antwoord: gewist, een deel wettelijk bewaard',
+  'Answer: holds nothing': 'Antwoord: heeft niets van je', 'Answer: refused': 'Antwoord: geweigerd',
+  'Answer: wants an ID copy': 'Antwoord: wil een kopie ID', 'Answer: wants their form': 'Antwoord: wil hun formulier',
+  'Answer: must keep some by law': 'Antwoord: moet iets wettelijk bewaren', 'Answer: takes two more months': 'Antwoord: neemt twee maanden extra',
+  'Answer: received': 'Antwoord: ontvangen', 'Answer received': 'Antwoord ontvangen' };
+const eventText = ev => ev.startsWith('Bounced: ') ? L(ev, 'Kwam terug: ' + ev.slice(9)) : ev;
 const eventLabel = ev => {
   const k = Object.keys(store.STATUSES).find(k => store.STATUSES[k].label === ev);
-  return k ? statusLabel(k) : L(ev, EVENT_NL[ev] || ev);
+  return k ? statusLabel(k) : EVENT_NL[ev] ? L(ev, EVENT_NL[ev]) : eventText(ev);
 };
 export const statusLabel = k => L(store.STATUSES[k]?.label || k, STATUS_NL[k] || k);
 
@@ -475,6 +506,8 @@ function senderRecord(sn, owned, ownPhones = []) {
     linkDomains: (sn.linkDomains || []).slice(0, 10),
     replyToHosts: (sn.replyToHosts || []).slice(0, 3),
     mailCount: sn.count || 1,
+    // The last mail with an unsubscribe option: shows whether they stopped.
+    lastBulkAt: sn.lastBulkAt || '',
     transactional: !!sn.transactional,
     nameMismatch: !!sn.nameMismatch,
     // The privacy address and statement their own mail gives, if any, and the
@@ -518,6 +551,7 @@ export function upsertSenders(list) {
                        evidence: mergeEvidence(old.evidence, data.evidence),
                        serviceEmails: data.serviceEmails?.length || !old.serviceEmails ? [...new Set([...(data.serviceEmails || []), ...(old.serviceEmails || [])])].slice(0, 3) : old.serviceEmails,
                        companyPostal: data.companyPostal || old.companyPostal || '',
+                       lastBulkAt: [old.lastBulkAt, data.lastBulkAt].filter(Boolean).sort().at(-1) || '',
                        unsubscribedAt: old.unsubscribedAt };
     }
   });
@@ -525,6 +559,37 @@ export function upsertSenders(list) {
 }
 
 export const upsertSender = sn => upsertSenders([sn]) > 0;
+
+// Dropped mail, wherever it is dropped: delivery failures for letters, answers
+// from companies, and senders. Everything is read on this device.
+export async function ingestFiles(files, onProgress) {
+  const { messages, app } = await readMailFiles(files, onProgress);
+  const bounced = new Set(messages.flatMap(m => m.bounce || []));
+  const { back, partial } = bounced.size ? store.markBounced(bounced) : { back: [], partial: [] };
+  const { answers, used } = matchAnswers(messages.filter(m => !m.bounce), store.get());
+  const changed = answers.length ? store.recordAnswers(answers) : [];
+  // Mail the user sent (a whole-mailbox export holds it) is not a sender to
+  // sort; one forged in their name (the "I hacked you" scam) still is.
+  const own = ownedAddresses(store.get());
+  const mail = messages.filter(m => !m.bounce && !used.has(m) && !(own.has(String(m.address).toLowerCase()) && m.trust !== 'forged'));
+  const senders = mail.length ? groupBySender(mail) : [];
+  if (senders.length) upsertSenders(senders);
+  if (app && senders.length) store.update(st => { st.mailApp = app; });
+  return { back, partial, answers: answers.filter(a => changed.includes(a.id)), mail, senders };
+}
+
+// What dropping the files did, said once.
+export function ingestToasts({ back, partial, answers }) {
+  const said = [];
+  if (answers.length) said.push(L(`${answers.length} ${answers.length === 1 ? 'answer' : 'answers'} to your letters recognised. See Delete data.`,
+    `${answers.length} ${answers.length === 1 ? 'antwoord' : 'antwoorden'} op je brieven herkend. Zie Gegevens verwijderen.`));
+  if (partial.length) said.push(L(`${partial.length === 1 ? 'One address' : `${partial.length} addresses`} did not exist, but the letter reached their other addresses: the request stands and the deadline runs.`,
+    `${partial.length === 1 ? 'Eén adres bestond' : `${partial.length} adressen bestonden`} niet, maar de brief kwam aan op hun andere adressen: het verzoek staat en de termijn loopt.`));
+  if (back.length) said.push(L(`${back.length} ${back.length === 1 ? 'letter' : 'letters'} bounced: the address did not exist. ${back.length === 1 ? 'It is' : 'They are'} back on your list under Delete data.`,
+    `${back.length} ${back.length === 1 ? 'brief kwam' : 'brieven kwamen'} terug: het adres bestond niet. ${back.length === 1 ? 'Hij staat' : 'Ze staan'} weer op je lijst bij Gegevens verwijderen.`));
+  if (said.length) toast(said.join(' '));
+  return said.length > 0;
+}
 
 export function markUnsubscribed(ids) {
   if (!ids.length) return;
@@ -580,6 +645,20 @@ export function brokers(state, catalog, params) {
     <div><b>${sent}</b><span>${L('requests sent', 'verzoeken verstuurd')}</span></div>
     <div class="${overdue ? 'bad' : ''}"><b>${overdue}</b><span>${L('past deadline', 'termijn verlopen')}</span></div>
   </div>` : ''}
+
+  ${sent || Object.values(state.requests || {}).some(r => r.status !== 'todo') ? `<section class="card tools-card">
+    <div id="answer-drop" class="drop drop-compact">
+      <span>${L(`<b>Got an answer from a company?</b> Drop it here (.eml or .msg), or <button class="link-btn" data-action="pick-answer">choose files</button>. HoopUp reads it on this device and moves the request on.`,
+                `<b>Antwoord gekregen van een bedrijf?</b> Sleep het hierheen (.eml of .msg), of <button class="link-btn" data-action="pick-answer">kies bestanden</button>. HoopUp leest het op dit apparaat en werkt het verzoek bij.`)}</span>
+      <input type="file" id="answer-files" multiple accept=".eml,.msg,.mbox,.txt,message/rfc822,application/vnd.ms-outlook" hidden>
+    </div>
+    <div class="row" style="margin-top:10px">
+      ${upcoming(state, targets).length ? `<button data-action="export-ics">${L('Add the deadlines to my calendar', 'Zet de termijnen in mijn agenda')}</button>` : ''}
+      <button data-action="export-csv">${L('Download my log (CSV)', 'Download mijn overzicht (CSV)')}</button>
+    </div>
+    <p class="small muted" style="margin:8px 0 0">${L('Both files are made on this device. The calendar file holds only company names and dates; the log is your record for a complaint.',
+      'Beide bestanden worden op dit apparaat gemaakt. Het agendabestand bevat alleen bedrijfsnamen en datums; het overzicht is je bewijs bij een klacht.')}</p>
+  </section>` : ''}
 
   ${!sendQueue && guessed.length && lookupAvailable() ? `<div class="notice">
     <p><b>${L(`${guessed.length} ${guessed.length === 1 ? 'letter would go' : 'letters would go'} to a guessed address.`, `${guessed.length} ${guessed.length === 1 ? 'brief zou' : 'brieven zouden'} naar een geraden adres gaan.`)}</b>
@@ -653,7 +732,7 @@ function targetRow(b, state) {
   const r = store.getRequest(b.id);
   const overdue = store.isOverdue(b, r);
   const pill = overdue ? 'overdue' : (store.STATUSES[r.status]?.pill || 'todo');
-  const late = store.daysSince(r.sentAt) - store.deadlineDays(b);
+  const late = store.daysSince(r.sentAt) - store.deadlineFor(b, r);
   const label = overdue ? L(`Overdue by ${late}d`, `${late} dagen te laat`) : statusLabel(r.status);
 
   const SRC = { mail: L('from your mail', 'uit je mail'), phone: L('from a call or text', 'uit een telefoontje of sms'),
@@ -667,6 +746,14 @@ function targetRow(b, state) {
         ${SRC[b.source] ? `<span class="pill sent">${SRC[b.source]}</span>` : ''}
       </div>
       ${reveals ? `<div class="meta">${L('Letter reveals only', 'De brief noemt alleen')} <span class="mono">${esc(reveals)}</span></div>` : ''}
+      ${lastAnswer(r) ? `<div class="meta">${L('Their answer', 'Hun antwoord')} ${esc(answerText(lastAnswer(r)))} <span class="muted">${L('(as HoopUp read it; correct the status if not)', '(zoals HoopUp het las; pas de status aan als het niet klopt)')}</span>
+        ${['partial', 'nodata'].includes(lastAnswer(r).kind) && !(r.answeredAt >= lastAnswer(r).at) && (lastAnswer(r).kind === 'partial' || b.source === 'mail')
+          ? `<a href="#/letter?b=${encodeURIComponent(b.id)}&t=${templateFor('reply', b, state.profile, r)}">${lastAnswer(r).kind === 'partial'
+            ? L('Ask what they keep and why', 'Vraag wat ze bewaren en waarom') : L('Their mail reached you: ask again', 'Hun mail bereikte je: vraag het opnieuw')}</a>` : ''}</div>` : ''}
+      ${keptMailing(b, r) ? `<div class="meta"><span class="pill overdue">${L('kept mailing', 'bleef mailen')}</span>
+        ${keptMailing(b, r).since === 'request'
+          ? L(`Marketing after your request, last on ${esc(keptMailing(b, r).last)}.`, `Reclame na je verzoek, laatst op ${esc(keptMailing(b, r).last)}.`)
+          : L(`Unsubscribed ${esc(keptMailing(b, r).from)}, mail again on ${esc(keptMailing(b, r).last)}. The letter says so.`, `Uitgeschreven op ${esc(keptMailing(b, r).from)}, opnieuw mail op ${esc(keptMailing(b, r).last)}. De brief noemt dat.`)}</div>` : ''}
       <div class="meta">${b.site ? `<span class="mono">${esc(b.site)}</span>` : ''}${r.sentAt
         ? ` · ${L('sent', 'verstuurd')} ${esc(r.sentAt)}` : ''}${b.source ? '' : ` · ${esc(CATEGORIES()[b.category] || b.category)}`}</div>
       ${b.notes && lang() === 'en' ? `<div class="meta">${esc(b.notes)}</div>` : ''}
@@ -690,6 +777,40 @@ function targetRow(b, state) {
 
 export function mountBrokers(root, state, rerender) {
   wireSend(root, rerender);
+
+  // Answers dropped here go through the same reading as on Home.
+  const drop = root.querySelector('#answer-drop');
+  const input = root.querySelector('#answer-files');
+  const take = async list => {
+    const files = [...list].filter(f => f.size > 0);
+    if (!files.length) return;
+    try {
+      const result = await ingestFiles(files);
+      if (!ingestToasts(result)) toast(result.mail.length
+        ? L('No answer to one of your letters in there. The mail was added to your senders.', 'Daar zat geen antwoord op een van je brieven bij. De mail is bij je afzenders gezet.')
+        : L('No mail found in those files. Use .eml, .msg or .mbox files.', 'Geen mail gevonden in die bestanden. Gebruik .eml-, .msg- of .mbox-bestanden.'));
+    } catch (err) {
+      toast(L('Could not read those files: ', 'Kon die bestanden niet lezen: ') + err.message);
+    }
+  };
+  if (drop) {
+    ['dragenter', 'dragover'].forEach(ev => drop.addEventListener(ev, e => { e.preventDefault(); drop.classList.add('over'); }));
+    ['dragleave', 'drop'].forEach(ev => drop.addEventListener(ev, e => { e.preventDefault(); drop.classList.remove('over'); }));
+    drop.addEventListener('drop', e => take(e.dataTransfer.files));
+  }
+  input?.addEventListener('change', () => take(input.files));
+  root.addEventListener('click', e => {
+    const act = e.target.closest('[data-action]')?.dataset.action;
+    if (act === 'pick-answer') input?.click();
+    if (act === 'export-ics') {
+      const link = location.origin + location.pathname + '#/delete';
+      downloadText({ text: icsFor(store.get(), [...lastTargets.values()], link), name: 'hoopup-deadlines.ics', type: 'text/calendar;charset=utf-8' });
+      toast(L('Calendar file saved. Open it to add the dates to your calendar.', 'Agendabestand opgeslagen. Open het om de datums in je agenda te zetten.'));
+    }
+    if (act === 'export-csv') {
+      downloadText({ text: csvLog(store.get(), [...lastTargets.values()], statusLabel, answerText), name: `hoopup-log-${store.today()}.csv`, type: 'text/csv;charset=utf-8' });
+    }
+  });
   root.addEventListener('change', e => {
     const sel = e.target.closest('[data-action="set-status"]');
     if (sel) { store.setStatus(sel.dataset.id, sel.value); toast(L('Status updated', 'Status bijgewerkt')); }
@@ -738,7 +859,7 @@ export function mountBrokers(root, state, rerender) {
 
 const isEU = b => ['EU', 'NL', 'UK'].some(r => (b.regions || []).includes(r));
 export const recipient = (b, r = store.getRequest(b.id)) => contactFor(b, r).email;
-const REMINDER_GRACE = 14;   // days the reminder letter gives them
+const REMINDER_GRACE = store.REMINDER_GRACE;   // days the reminder letter gives them
 
 // Without a confirmed privacy address, two routes that always work: their
 // contact form, or a letter by post to the company's own address.
@@ -800,10 +921,14 @@ function contactNote(c) {
 // What each company needs next. Spam, bait and unverifiable senders never get
 // here: a letter to them confirms the address is live.
 export function deleteWork(targets) {
-  const w = { send: [], forms: [], reminders: [], complaints: [] };
+  const w = { send: [], forms: [], reminders: [], complaints: [], answers: [] };
   for (const b of targets) {
     if (!writable(b)) continue;
     const r = store.getRequest(b.id);
+    // They answered with a demand the law does not support, and the user has
+    // not replied to it yet.
+    const a = lastAnswer(r);
+    if (a && PUSHBACK.has(a.kind) && ['sent', 'ack'].includes(r.status) && !(r.answeredAt >= a.at)) w.answers.push(b);
     if (r.status === 'todo') {
       if (b.method === 'form' && safeUrl(b.optOutUrl)) w.forms.push(b);
       else if (recipient(b, r)) w.send.push(b);
@@ -814,7 +939,9 @@ export function deleteWork(targets) {
   }
   // The companies with no business holding the data go first; the user's own
   // providers, who get the narrower letter, go last.
-  const rank = b => RELATION_ORDER[relationOf(b, store.getRequest(b.id))] * 2 + (b.source ? 0 : 1);
+  // Anyone who kept mailing after an unsubscribe goes before everyone.
+  const rank = b => (keptMailing(b, store.getRequest(b.id)) ? -10 : 0)
+    + RELATION_ORDER[relationOf(b, store.getRequest(b.id))] * 2 + (b.source ? 0 : 1);
   for (const k of ['send', 'forms', 'reminders']) w[k].sort((a, b) => rank(a) - rank(b));
   return w;
 }
@@ -842,7 +969,8 @@ function sendQueueCard(state) {
             'De termijn van een maand loopt. Wie dan nog niet heeft gereageerd, verschijnt hier met een herinnering klaar. Je hoeft niets bij te houden.')}</p>
       <p class="small muted">${L('Did not send one after all? Set it back to "Not started" in the list below.',
         'Toch eentje niet verstuurd? Zet hem in de lijst hieronder terug op "Niet gestart".')}</p>
-      <div class="row"><button data-action="send-close">${L('Close', 'Sluiten')}</button></div>
+      <div class="row"><button class="primary" data-action="export-ics">${L('Add the deadlines to my calendar', 'Zet de termijnen in mijn agenda')}</button>
+        <button data-action="send-close">${L('Close', 'Sluiten')}</button></div>
     </section>`;
 
   const b = lastTargets.get(q.ids[q.i]);
@@ -911,6 +1039,24 @@ function sendQueueCard(state) {
   </section>`;
 }
 
+// What a company's answer said, as HoopUp read it.
+export function answerText(a) {
+  if (!a) return '';
+  const said = {
+    done: L('says your data is erased', 'zegt dat je gegevens zijn gewist'),
+    partial: L('erased, but keeps some by law', 'gewist, maar bewaart een deel wettelijk'),
+    nodata: L('says it holds nothing on you', 'zegt niets van je te hebben'),
+    refused: L('refused', 'weigerde'),
+    id: L('wants a copy of your ID', 'wil een kopie van je identiteitsbewijs'),
+    form: L('wants you to use its web form', 'wil dat je hun webformulier gebruikt'),
+    retain: L('says it must keep some by law', 'zegt een deel wettelijk te moeten bewaren'),
+    extend: L('takes two more months', 'neemt twee maanden extra'),
+    ack: L('confirmed receipt', 'bevestigde de ontvangst'),
+    other: L('answered', 'antwoordde')
+  }[a.kind] || L('answered', 'antwoordde');
+  return `${a.at ? longDate(a.at, lang() === 'nl') + ': ' : ''}${said}`;
+}
+
 function workCard(w, params) {
   const all = params.get('all') === '1' ? '&all=1' : '';
   const n = w.send.length;
@@ -926,6 +1072,23 @@ function workCard(w, params) {
       <div class="row">
         <button class="primary" data-action="send-start" data-kind="request">${L(`Send ${n} ${n === 1 ? 'request' : 'requests'}`, `${n} ${n === 1 ? 'verzoek' : 'verzoeken'} versturen`)}</button>
         <a class="btn" href="#/print?set=request${all}">${L('Print all / PDF', 'Alles afdrukken / PDF')}</a>
+      </div>
+    </div>`);
+
+  if (w.answers.length) parts.push(`
+    <div class="work-row">
+      <div>
+        <h2>${L('They answered: reply ready', 'Ze antwoordden: je reactie staat klaar')} <span class="count">${w.answers.length}</span></h2>
+        <p class="small muted">${L('These answered with a demand the law does not support. The reply explains why, and asks them to go ahead. Their deadline keeps running.',
+          'Deze antwoordden met een eis die de wet niet steunt. De reactie legt uit waarom en vraagt ze door te gaan. Hun termijn loopt gewoon door.')}</p>
+        <div class="list">${w.answers.map(b => `
+          <div class="pick" style="cursor:default">
+            <span class="pick-name">${esc(nameOf(b))}<span class="aka">${esc(answerText(lastAnswer(store.getRequest(b.id))))}</span></span>
+            <a class="btn primary" href="#/letter?b=${encodeURIComponent(b.id)}&t=${templateFor('reply', b, store.get().profile, store.getRequest(b.id))}">${L('Write reply', 'Reactie schrijven')}</a>
+          </div>`).join('')}</div>
+        ${w.answers.some(b => lastAnswer(store.getRequest(b.id))?.kind === 'id') ? `<p class="small muted" style="margin:8px 0 0">${L(
+          'Decide to send an ID copy after all? Cover your photo and citizen service number (BSN) first, for example with the KopieID app from the Dutch government, and write on it who it is for.',
+          'Besluit je toch een kopie ID te sturen? Dek eerst je pasfoto en BSN af, bijvoorbeeld met de KopieID-app van de Rijksoverheid, en zet erop voor wie hij is.')}</p>` : ''}
       </div>
     </div>`);
 
@@ -1133,7 +1296,7 @@ export function mountPrintAll(root) {
 export function runOneClickBatch(root, items, rest) {
   const q = root.querySelector('#unsub-queue');
   if (!q) return;
-  q.dataset.rest = JSON.stringify(rest.map(t => ({ id: t.id, name: t.name, unsubUrl: t.unsubUrl })));
+  q.dataset.rest = JSON.stringify(rest.map(t => ({ id: t.id, name: t.name, unsubUrl: t.unsubUrl, unsubMailto: t.unsubMailto })));
 
   const paint = (done, failed, total, finished) => {
     q.innerHTML = `
@@ -1210,7 +1373,11 @@ export function wireQueue(root, onClose) {
       if (i < urls.length) {
         // One window.open per click. A loop is silently swallowed by the popup
         // blocker after the first, so stepping through is the only honest way.
-        window.open(urls[i].url, '_blank', 'noopener,noreferrer');
+        if (/^mailto:/i.test(urls[i].url)) {
+          // An unsubscribe by email: the mail app opens it, the user sends it.
+          const href = safeUnsubMailto(urls[i].url);
+          if (href) { const a = document.createElement('a'); a.href = href; a.click(); }
+        } else window.open(urls[i].url, '_blank', 'noopener,noreferrer');
         if (urls[i].id) markUnsubscribed([urls[i].id]);
         q.dataset.i = String(i + 1);
         renderQueue(q, urls, i + 1);
@@ -1219,8 +1386,8 @@ export function wireQueue(root, onClose) {
 
     if (act === 'unsub-copy') {
       const urls = JSON.parse(q.dataset.urls || '[]');
-      navigator.clipboard.writeText(urls.map(u => u.url).join('\n'))
-        .then(() => toast(L(`${urls.length} links copied`, `${urls.length} links gekopieerd`)))
+      navigator.clipboard.writeText(urls.filter(u => !/^mailto:/i.test(u.url)).map(u => u.url).join('\n'))
+        .then(() => toast(L(`${urls.filter(u => !/^mailto:/i.test(u.url)).length} links copied`, `${urls.filter(u => !/^mailto:/i.test(u.url)).length} links gekopieerd`)))
         .catch(() => toast(L('Could not copy. Select them by hand', 'Kopiëren mislukt. Selecteer ze zelf')));
     }
 
@@ -1232,7 +1399,7 @@ export function startUnsubQueue(root, list) {
   const q = root.querySelector('#unsub-queue');
   if (!q) return;
   if (!list.length) { toast(L('None of these published an unsubscribe link', 'Geen van deze gaf een uitschrijflink')); return; }
-  const urls = list.map(t => ({ id: t.id, name: t.name, url: safeUnsubUrl(t.unsubUrl) })).filter(t => t.url);
+  const urls = list.map(t => ({ id: t.id, name: t.name, url: safeUnsubUrl(t.unsubUrl) || safeUnsubMailto(t.unsubMailto) })).filter(t => t.url);
   q.dataset.urls = JSON.stringify(urls);
   q.dataset.i = '0';
   renderQueue(q, urls, 0);
@@ -1246,11 +1413,16 @@ function renderQueue(q, urls, i) {
         ? `<p><strong>${L(`All ${urls.length} opened.`, `Alle ${urls.length} geopend.`)}</strong> ${L('Each opened in its own tab. Finish any that ask for a confirmation click.', 'Elk opende in een eigen tabblad. Rond af waar nog om een bevestiging wordt gevraagd.')}</p>`
         : `<p><strong>${L(`Unsubscribing: ${i} of ${urls.length} done.`, `Uitschrijven: ${i} van ${urls.length} klaar.`)}</strong> ${L('Next:', 'Volgende:')}
            <strong>${esc(urls[i].name)}</strong></p>
-           <p class="small muted">${L('Your browser blocks a page from opening many tabs at once, so this steps through them: one click each, no hunting for the link.',
-             'Je browser laat een pagina niet veel tabbladen tegelijk openen, dus dit gaat er één voor één doorheen: één klik per afzender, zonder de link te hoeven zoeken.')}</p>`}
+           <p class="small muted">${/^mailto:/i.test(urls[i].url)
+             ? L('This one only takes an unsubscribe by email. Your mail app opens with it filled in: press Send there, then come back for the next.',
+                 'Deze afzender neemt alleen een afmelding per e-mail aan. Je mailapp opent met de mail al ingevuld: druk daar op Verstuur en kom terug voor de volgende.')
+             : L('Your browser blocks a page from opening many tabs at once, so this steps through them: one click each, no hunting for the link.',
+                 'Je browser laat een pagina niet veel tabbladen tegelijk openen, dus dit gaat er één voor één doorheen: één klik per afzender, zonder de link te hoeven zoeken.')}</p>`}
       <div class="row" style="margin-top:8px">
-        ${done ? '' : `<button class="primary" data-action="unsub-next">${L(`Open ${esc(urls[i].name)} →`, `Open ${esc(urls[i].name)} →`)}</button>`}
-        <button data-action="unsub-copy">${L(`Copy all ${urls.length} links`, `Kopieer alle ${urls.length} links`)}</button>
+        ${done ? '' : /^mailto:/i.test(urls[i].url)
+          ? `<button class="primary" data-action="unsub-next">${L(`Email ${esc(urls[i].name)} →`, `Mail ${esc(urls[i].name)} →`)}</button>`
+          : `<button class="primary" data-action="unsub-next">${L(`Open ${esc(urls[i].name)} →`, `Open ${esc(urls[i].name)} →`)}</button>`}
+        ${urls.some(u => !/^mailto:/i.test(u.url)) ? `<button data-action="unsub-copy">${L(`Copy all ${urls.filter(u => !/^mailto:/i.test(u.url)).length} links`, `Kopieer alle ${urls.filter(u => !/^mailto:/i.test(u.url)).length} links`)}</button>` : ''}
         <button data-action="unsub-close">${done ? L('Close', 'Sluiten') : L('Stop', 'Stoppen')}</button>
       </div>
     </div>`;
@@ -1290,7 +1462,8 @@ export function senderClass(b) {
   // sdothemed.com): the check proves who owns the domain, not who they claim
   // to be, so their links are not used and they are not written to.
   if (!isPersonal(b) && nameMismatch(b)) return 'unclear';
-  if (hasLink) return 'unsub';
+  // A link, or an unsubscribe by email from a sender the check confirmed.
+  if (hasLink || safeUnsubMailto(b.unsubMailto)) return 'unsub';
   if (isPersonal(b)) return 'person';
   // A verified sender without an unsubscribe link is a real company sending
   // receipts or account mail: a deletion letter, never a block. One that
@@ -1323,15 +1496,17 @@ export function unsubTier(b) {
   if (senderClass(b) !== 'unsub') return null;
   // One-click POST only for a verified sender's own header: never fire a
   // request at an endpoint whose owner could not be confirmed.
-  if (b.trust !== 'verified' || !safeUnsubUrl(b.unsubUrl)) return null;
-  return b.oneClick && b.unsubFrom === 'header' ? 'instant' : 'link';
+  if (b.trust !== 'verified') return null;
+  if (safeUnsubUrl(b.unsubUrl)) return b.oneClick && b.unsubFrom === 'header' ? 'instant' : 'link';
+  // Some only take an unsubscribe by email: the mail app opens it filled in.
+  return safeUnsubMailto(b.unsubMailto) ? 'mail' : null;
 }
 
 let unsubPrimed = false;
 
 export function unsubscribe(state) {
   const mail = state.custom.filter(b => b.source === 'mail');
-  const tiers = { instant: [], link: [] };
+  const tiers = { instant: [], link: [], mail: [] };
   const spam = [], bait = [], unclear = [], people = [], unsubscribed = [];
   for (const b of state.custom) {
     const t = unsubTier(b);
@@ -1345,12 +1520,15 @@ export function unsubscribe(state) {
     else if (c === 'person') people.push(b);
   }
 
-  if (!unsubPrimed && (tiers.instant.length || tiers.link.length)) {
-    [...tiers.instant, ...tiers.link].filter(b => b.trust === 'verified').forEach(b => selected.add(b.id));
+  if (!unsubPrimed && (tiers.instant.length || tiers.link.length || tiers.mail.length)) {
+    [...tiers.instant, ...tiers.link, ...tiers.mail].filter(b => b.trust === 'verified').forEach(b => selected.add(b.id));
     unsubPrimed = true;
   }
 
   const sel = k => tiers[k].filter(b => selected.has(b.id));
+  // Who ignored the unsubscribe: marketing more than ten days after it.
+  const kept = unsubscribed.filter(b => keptMailing(b, store.getRequest(b.id)));
+  const quiet = unsubscribed.filter(b => !kept.includes(b));
 
   const group = (key, title, blurb, cta, cls) => tiers[key].length ? `
     <section class="card">
@@ -1409,12 +1587,33 @@ export function unsubscribe(state) {
       'Deze afzenders hebben een uitschrijflink (meestal "Uitschrijven" onderaan de mail), maar geen uitschrijving met één klik. Hun pagina\'s openen één voor één.'),
     n => L(`Open ${n || ''}`, `${n || ''} openen`), '')}
 
-  ${unsubscribed.length ? `
+  ${group('mail', L('By email', 'Per e-mail'),
+    L('These only take an unsubscribe by email. Your mail app opens with it filled in, addressed only to their unsubscribe address: press Send, then come back for the next.',
+      'Deze afzenders nemen alleen een afmelding per e-mail aan. Je mailapp opent met de mail al ingevuld, alleen gericht aan hun afmeldadres: druk op Verstuur en kom terug voor de volgende.'),
+    n => L(`Email ${n || ''}`, `${n || ''} mailen`), '')}
+
+  ${kept.length ? `
     <section class="card">
-      <h2>${L('Already unsubscribed', 'Al uitgeschreven')} <span class="count">${unsubscribed.length}</span></h2>
-      <p class="small muted" style="max-width:60ch">${L('Done. Still getting mail from one after a few days? It ignored the request: send it a deletion letter under <a href="#/delete">Delete data</a>, which you can enforce.',
-        'Klaar. Krijg je na een paar dagen toch nog mail van een van deze? Dan negeerde die het verzoek: stuur een verwijderverzoek via <a href="#/delete">Gegevens verwijderen</a>, dat kun je afdwingen.')}</p>
-      ${list(unsubscribed, b => L(`unsubscribed ${b.unsubscribedAt}`, `uitgeschreven op ${b.unsubscribedAt}`))}
+      <h2>${L('Still mailing you', 'Mailen je nog steeds')} <span class="count bad">${kept.length}</span></h2>
+      <p class="small muted" style="max-width:62ch">${L('These sent marketing more than ten days after you unsubscribed. After an unsubscribe they must stop. A deletion letter makes that enforceable, and it says they kept mailing, with the dates.',
+        'Deze stuurden nog reclame, meer dan tien dagen nadat je je uitschreef. Na een afmelding moeten ze stoppen. Een verwijderverzoek maakt dat afdwingbaar, en de brief noemt dat ze bleven mailen, met de datums.')}</p>
+      <div class="list">${kept.map(b => `
+        <div class="pick" style="cursor:default;flex-wrap:wrap">
+          <span class="pick-name">${esc(nameOf(b))}</span>
+          <span class="pick-meta mono">${esc(L(`unsubscribed ${b.unsubscribedAt} · mailed ${b.lastBulkAt}`, `uitgeschreven ${b.unsubscribedAt} · gemaild ${b.lastBulkAt}`))}</span>
+          ${writable(b) ? `<a class="btn" href="#/letter?b=${encodeURIComponent(b.id)}">${L('Write to them', 'Schrijf ze aan')}</a>` : ''}
+        </div>`).join('')}</div>
+      ${state.profile?.country === 'NL' ? `<p class="small muted" style="margin:10px 0 0">${L(
+        'Never bought anything from them, or never agreed to their mail? You can also report it to the ACM, the Dutch consumer regulator: <a href="https://www.acm.nl/nl/spamklacht" target="_blank" rel="noopener noreferrer">acm.nl/spamklacht</a>.',
+        'Nooit iets bij ze gekocht, of nooit toestemming gegeven? Je kunt het ook melden bij de ACM: <a href="https://www.acm.nl/nl/spamklacht" target="_blank" rel="noopener noreferrer">acm.nl/spamklacht</a>.')}</p>` : ''}
+    </section>` : ''}
+
+  ${quiet.length ? `
+    <section class="card">
+      <h2>${L('Already unsubscribed', 'Al uitgeschreven')} <span class="count">${quiet.length}</span></h2>
+      <p class="small muted" style="max-width:60ch">${L('Done. Drop your junk mail in again in a couple of weeks: anyone who keeps mailing shows up above, with a letter ready.',
+        'Klaar. Sleep over een paar weken je ongewenste mail opnieuw hierheen: wie blijft mailen verschijnt dan hierboven, met een brief klaar.')}</p>
+      ${list(quiet, b => L(`unsubscribed ${b.unsubscribedAt}`, `uitgeschreven op ${b.unsubscribedAt}`))}
     </section>` : ''}
 
   ${bait.length + spam.length ? blockAllCard(state) : ''}
@@ -1441,9 +1640,47 @@ export function unsubscribe(state) {
       <p class="small muted" style="max-width:60ch">${L('Sent from a personal account on a free mail service (Gmail, Outlook, Ziggo…), so there is no company to unsubscribe from or write to, and the service itself is never blocked. If you do not know the sender, mark the mail as junk in your mail app; never reply.',
         'Verstuurd vanaf een persoonlijk account bij een gratis maildienst (Gmail, Outlook, Ziggo…). Er is dus geen bedrijf om je bij uit te schrijven of aan te schrijven, en de maildienst zelf blokkeren we nooit. Ken je de afzender niet, markeer de mail dan als ongewenst in je mailapp en reageer nooit.')}</p>
       ${list(people, b => String(b.id || '').replace(/^mail:/, '').replace(/#forged$/, ''))}
-    </section>` : ''}`;
+    </section>` : ''}
+
+  ${offlineCard(state)}`;
 }
 
+
+// Mail on the doormat and sales calls: no file to drop, but the same right to
+// be left alone. Per country, because the opt-out registers are national.
+const ext = (href, text) => `<a href="${href}" target="_blank" rel="noopener noreferrer">${text}</a>`;
+export function offlineCard(state) {
+  const c = state.profile?.country || 'NL';
+  const items = c === 'NL' ? [
+    L(`<b>Advertising post with your name on it:</b> sign up at ${ext('https://www.postfilter.nl', 'Postfilter')}. It is free, takes up to six weeks to work, and lasts six years. Companies you are or were a customer of fall outside it: the letter under <a href="#/delete">Delete data</a> tells them to stop marketing by post as well.`,
+      `<b>Reclamepost op je naam:</b> schrijf je in bij ${ext('https://www.postfilter.nl', 'Postfilter')}. Het is gratis, werkt binnen zes weken en geldt zes jaar. Bedrijven waar je klant bent of was vallen erbuiten: de brief bij <a href="#/delete">Gegevens verwijderen</a> laat ook hen stoppen met reclame per post.`),
+    L('<b>Folders without your name:</b> a Nee/Nee sticker (no folders, no free local papers) or a Nee/Ja sticker (no folders, but the local paper) on your letterbox. Most municipalities hand them out for free.',
+      '<b>Folders zonder naam:</b> een Nee/Nee-sticker (geen folders en geen huis-aan-huisbladen) of een Nee/Ja-sticker (geen folders, wel de huis-aan-huiskrant) op je brievenbus. De meeste gemeenten geven ze gratis.'),
+    L(`<b>Sales calls:</b> since 1 July 2021 a company may only call you to sell something if you agreed to it, or if you are (or recently were) its customer. Tell the caller you do not want to be called again: they must stop. A call you never agreed to can be reported to ${ext('https://www.consuwijzer.nl', 'ACM ConsuWijzer')}. To get the company to erase your number too, add the number under <a href="#/find">More ways to find</a>, at Spam calls and texts.`,
+      `<b>Verkoopgesprekken aan de telefoon:</b> sinds 1 juli 2021 mag een bedrijf je alleen bellen om iets te verkopen als je daar toestemming voor gaf, of als je er klant bent (of kort geleden was). Zeg dat je niet meer gebeld wilt worden: dan moeten ze stoppen. Een telefoontje waar je nooit mee instemde meld je bij ${ext('https://www.consuwijzer.nl', 'ACM ConsuWijzer')}. Wil je dat het bedrijf ook je nummer wist, voeg het nummer dan toe bij <a href="#/find">Meer manieren om te vinden</a>, onder Spamtelefoontjes en -sms.`),
+    L(`<b>Spam by text message:</b> report it at ${ext('https://www.acm.nl/nl/spamklacht', 'acm.nl/spamklacht')} if you never agreed to it. A text that tries to get your bank details or login is fraud, not spam: report that to the ${ext('https://www.fraudehelpdesk.nl', 'Fraudehelpdesk')}.`,
+      `<b>Spam per sms:</b> meld het op ${ext('https://www.acm.nl/nl/spamklacht', 'acm.nl/spamklacht')} als je er nooit toestemming voor gaf. Een sms die je bankgegevens of inlog probeert te krijgen is fraude, geen spam: meld die bij de ${ext('https://www.fraudehelpdesk.nl', 'Fraudehelpdesk')}.`)
+  ] : c === 'BE' ? [
+    L(`<b>Advertising post and calls:</b> the ${ext('https://www.robinson.be', 'Robinson list')} stops addressed advertising post, and the ${ext('https://www.dncm.be', 'Do Not Call Me list')} stops sales calls. Both are free.`,
+      `<b>Reclamepost en telefoontjes:</b> de ${ext('https://www.robinson.be', 'Robinsonlijst')} stopt geadresseerde reclamepost, en de ${ext('https://www.dncm.be', 'Bel-me-niet-meer-lijst')} stopt verkoopgesprekken. Beide zijn gratis.`)
+  ] : c === 'UK' ? [
+    L(`<b>Advertising post:</b> register with the ${ext('https://www.mpsonline.org.uk', 'Mailing Preference Service')}. <b>Sales calls:</b> register with the ${ext('https://www.tpsonline.org.uk', 'Telephone Preference Service')}. Both are free.`,
+      `<b>Reclamepost:</b> schrijf je in bij de ${ext('https://www.mpsonline.org.uk', 'Mailing Preference Service')}. <b>Verkoopgesprekken:</b> schrijf je in bij de ${ext('https://www.tpsonline.org.uk', 'Telephone Preference Service')}. Beide zijn gratis.`)
+  ] : c === 'US' ? [
+    L(`<b>Sales calls:</b> the ${ext('https://www.donotcall.gov', 'National Do Not Call Registry')}. <b>Pre-approved credit offers:</b> ${ext('https://www.optoutprescreen.com', 'OptOutPrescreen')}. <b>Catalogs and advertising post:</b> ${ext('https://www.dmachoice.org', 'DMAchoice')}.`,
+      `<b>Verkoopgesprekken:</b> de ${ext('https://www.donotcall.gov', 'National Do Not Call Registry')}. <b>Vooraf goedgekeurde kredietaanbiedingen:</b> ${ext('https://www.optoutprescreen.com', 'OptOutPrescreen')}. <b>Catalogi en reclamepost:</b> ${ext('https://www.dmachoice.org', 'DMAchoice')}.`)
+  ] : [
+    L('<b>Advertising post and sales calls:</b> most countries keep a free national opt-out list for both. Your consumer authority can tell you which, and the letter under <a href="#/delete">Delete data</a> stops a company you can name, by post and phone as well.',
+      '<b>Reclamepost en verkoopgesprekken:</b> de meeste landen hebben voor allebei een gratis landelijke afmeldlijst. Je consumentenautoriteit weet welke, en de brief bij <a href="#/delete">Gegevens verwijderen</a> stopt een bedrijf dat je kunt noemen, ook per post en telefoon.')
+  ];
+  return `
+  <section class="card">
+    <h2>${L('Post on the doormat and sales calls', 'Reclame op de mat en aan de telefoon')}</h2>
+    <p class="small muted" style="max-width:62ch">${L(`Not in your mailbox, so not in a file to drop. For ${c === 'other' ? 'your country' : c}; change the country in <a href="#/profile">Settings</a>.`,
+      `Niet in je mailbox, dus niet in een bestand te slepen. Voor ${c === 'other' ? 'jouw land' : c}; wijzig het land bij <a href="#/profile">Instellingen</a>.`)}</p>
+    <ul class="small">${items.map(i => `<li>${i}</li>`).join('')}</ul>
+  </section>`;
+}
 
 // ---------------------------------------------------------------- block all
 
@@ -1728,6 +1965,7 @@ export function mountUnsubscribe(root, state, rerender) {
     const pick = k => state.custom.filter(b => unsubTier(b) === k && selected.has(b.id));
     if (act === 'run-instant') runOneClickBatch(root, pick('instant'), []);
     if (act === 'run-link')    startUnsubQueue(root, pick('link').map(b => ({ id: b.id, name: b.name, unsubUrl: b.unsubUrl })));
+    if (act === 'run-mail')    startUnsubQueue(root, pick('mail').map(b => ({ id: b.id, name: b.name, unsubMailto: b.unsubMailto })));
   });
 }
 
@@ -1742,7 +1980,12 @@ export function letter(state, catalog, params) {
   const rec = store.getRequest(b.id);
   const tid = params.get('t') || suggestedTemplate(b, state.profile, rec);
   const { subject, body } = renderLetter(tid, b, state.profile, rec);
-  const to = recipient(b, rec);
+  // A reply to their answer goes back to whoever answered, unless that was an
+  // address nobody reads.
+  const isReply = tid.startsWith('reply_');
+  const answeredFrom = lastAnswer(rec)?.from || '';
+  const to = isReply && answeredFrom && !/^(no-?reply|do-?not-?reply|donotreply|noreply|mailer-daemon|postmaster)\b/i.test(answeredFrom)
+    ? answeredFrom : recipient(b, rec);
   const mailto = `mailto:${encodeURIComponent(to)}?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}`;
   const tplLabel = (k, t) => L(t.label, TEMPLATE_LABELS_NL[k] || t.label);
 
@@ -1755,6 +1998,11 @@ export function letter(state, catalog, params) {
     `Lees hem door voor je hem verstuurt. Schrap wat niet op jou van toepassing is. Een verzoek waar je achter
     kunt staan werkt beter dan een maximaal verzoek dat je niet kunt onderbouwen.`)}</p>
   </div>
+
+  ${isReply && lastAnswer(rec) ? `<div class="notice no-print">
+    <p>${L(`Their answer of ${esc(answerText(lastAnswer(rec)))}. This reply goes back to <code>${esc(to)}</code>, on their subject, so it lands with their answer.`,
+           `Hun antwoord van ${esc(answerText(lastAnswer(rec)))}. Deze reactie gaat terug naar <code>${esc(to)}</code>, met hun onderwerp, zodat hij bij hun antwoord terechtkomt.`)}</p>
+  </div>` : ''}
 
   ${b.method === 'form' && safeUrl(b.optOutUrl) ? `<div class="notice no-print">
     <p>${L(`<strong>This one has a self-serve form.</strong> Use
@@ -1788,7 +2036,9 @@ export function letter(state, catalog, params) {
       <button data-action="copy">${L('Copy letter', 'Brief kopiëren')}</button>
       ${to ? `<a class="btn" href="${mailto}">${L('Open in mail app', 'Openen in je mailapp')}</a>` : ''}
       <button data-action="print">${L('Print / PDF', 'Afdrukken / PDF')}</button>
-      <button class="primary" data-action="mark-sent">${L('Mark as sent', 'Markeer als verstuurd')}</button>
+      ${isReply
+        ? `<button class="primary" data-action="mark-answered">${L('Mark reply as sent', 'Markeer reactie als verstuurd')}</button>`
+        : `<button class="primary" data-action="mark-sent">${L('Mark as sent', 'Markeer als verstuurd')}</button>`}
     </div>
   </div>
 
@@ -1844,6 +2094,10 @@ export function mountLetter(root, state, rerender, params) {
       }
     }
     if (a === 'print') window.print();
+    if (a === 'mark-answered') {
+      store.markAnswered(id);
+      toast(L('Reply marked as sent. Their deadline keeps running.', 'Reactie gemarkeerd als verstuurd. Hun termijn loopt door.'));
+    }
     if (a === 'mark-sent') {
       store.setStatus(id, 'sent');
       toast(L('Marked as sent, deadline clock started', 'Gemarkeerd als verstuurd, de termijn loopt'));
@@ -2181,11 +2435,11 @@ export function about() {
   ${sec(L('What it does', 'Wat het doet'), `<ul>${L(`
       <li><b>Unsubscribe</b> from real companies, in one go where they support it.</li>
       <li><b>Block scams</b> and other unsafe mail such as gambling spam, never a real company.</li>
-      <li><b>Delete your data</b>: letters under the GDPR, sent from your own mail app, with reminders and a complaint to the regulator when a company ignores you.</li>
+      <li><b>Delete your data</b>: letters under the GDPR, sent from your own mail app, with reminders, replies when a company stalls, and a complaint to the regulator when a company ignores you.</li>
       <li><b>Advise on your addresses</b>: which one gets mostly spam, and whether to keep or retire it.</li>`, `
       <li><b>Uitschrijven</b> bij echte bedrijven, in één keer waar ze dat ondersteunen.</li>
       <li><b>Oplichters blokkeren</b> en andere onveilige mail zoals gokspam, nooit een echt bedrijf.</li>
-      <li><b>Je gegevens laten wissen</b>: brieven op grond van de AVG, verstuurd vanuit je eigen mailapp, met herinneringen en een klacht bij de toezichthouder als een bedrijf je negeert.</li>
+      <li><b>Je gegevens laten wissen</b>: brieven op grond van de AVG, verstuurd vanuit je eigen mailapp, met herinneringen, reacties als een bedrijf traineert, en een klacht bij de toezichthouder als een bedrijf je negeert.</li>
       <li><b>Advies over je adressen</b>: welk adres vooral spam krijgt, en of je het houdt of opheft.</li>`)}</ul>`)}
 
   <h2 class="legal-title" id="privacy">${L('Privacy statement', 'Privacyverklaring')}</h2>
@@ -2204,10 +2458,10 @@ export function about() {
       'Alles hieronder wordt in je browser verwerkt en alleen daar opgeslagen (localStorage). Het verlaat je apparaat alleen in de gevallen onder het volgende kopje, en alleen als jij dat kiest.')}</p>
     <ul>${L(`
       <li>The details you fill in under Settings: name, date of birth, email addresses, phone numbers and postal address. They are only used to fill in your letters.</li>
-      <li>From mail you drop in, per sender only: its name and any other names it used, its domain, which of your addresses it wrote to, how many mails it sent, the domains its links and reply addresses point to, its unsubscribe address, the privacy address and privacy statement link its own mail gives, the service address and postal address it uses itself, and the outcome of the checks (sender check, your mail provider's spam rating, kind of content such as gambling). For a real company that may get a letter, also what its own mail shows it holds about you: the name it addresses you by, a postal address and phone number if its mail lists them as yours. Those go into your letter to that company and nowhere else. Subjects and message text are read for these checks and are not kept.</li>
+      <li>From mail you drop in, per sender only: its name and any other names it used, its domain, which of your addresses it wrote to, how many mails it sent, the domains its links and reply addresses point to, its unsubscribe address, the privacy address and privacy statement link its own mail gives, the service address and postal address it uses itself, the date of its last marketing mail (to see whether it stopped after you unsubscribed), and the outcome of the checks (sender check, your mail provider's spam rating, kind of content such as gambling). For a real company that may get a letter, also what its own mail shows it holds about you: the name it addresses you by, a postal address and phone number if its mail lists them as yours. Those go into your letter to that company and nowhere else. Subjects and message text are read for these checks and are not kept, with one exception: when a company answers your letter, its date, the address it came from, its subject and what HoopUp read in it (such as "wants a copy of your ID") are kept with that request, so your reply can go back to them.</li>
       <li>Your progress: which companies you wrote to and when, notes, aliases, your answers about your addresses and the steps of a move you ticked off, which block rules you added, your language and mail app choice, and a breach-database API key if you add one.</li>`, `
       <li>De gegevens die je bij Instellingen invult: naam, geboortedatum, e-mailadressen, telefoonnummers en postadres. Ze worden alleen gebruikt om je brieven in te vullen.</li>
-      <li>Uit mail die je erin sleept, per afzender alleen: de naam en eventuele andere namen die hij gebruikte, het domein, naar welk adres van jou hij schreef, hoeveel mails hij stuurde, de domeinen waar zijn links en antwoordadressen naar wijzen, het uitschrijfadres, het privacyadres en de link naar de privacyverklaring die zijn eigen mail noemt, het service- en postadres dat het zelf gebruikt, en de uitkomst van de controles (afzendercontrole, spamoordeel van je mailprovider, soort inhoud zoals gokken). Bij een echt bedrijf dat een brief kan krijgen ook wat zijn eigen mail laat zien dat het van je heeft: de naam waarmee het je aanschrijft, en een postadres en telefoonnummer als zijn mail die als de jouwe noemt. Die komen in je brief aan dat bedrijf en nergens anders. Onderwerpen en berichttekst worden voor deze controles gelezen en niet bewaard.</li>
+      <li>Uit mail die je erin sleept, per afzender alleen: de naam en eventuele andere namen die hij gebruikte, het domein, naar welk adres van jou hij schreef, hoeveel mails hij stuurde, de domeinen waar zijn links en antwoordadressen naar wijzen, het uitschrijfadres, het privacyadres en de link naar de privacyverklaring die zijn eigen mail noemt, het service- en postadres dat het zelf gebruikt, de datum van zijn laatste reclamemail (om te zien of hij stopte nadat je je uitschreef), en de uitkomst van de controles (afzendercontrole, spamoordeel van je mailprovider, soort inhoud zoals gokken). Bij een echt bedrijf dat een brief kan krijgen ook wat zijn eigen mail laat zien dat het van je heeft: de naam waarmee het je aanschrijft, en een postadres en telefoonnummer als zijn mail die als de jouwe noemt. Die komen in je brief aan dat bedrijf en nergens anders. Onderwerpen en berichttekst worden voor deze controles gelezen en niet bewaard, op één ding na: als een bedrijf je brief beantwoordt, blijven de datum, het adres waar het vandaan kwam, het onderwerp en wat HoopUp erin las (zoals "wil een kopie ID") bij dat verzoek bewaard, zodat je reactie naar hen terug kan.</li>
       <li>Je voortgang: welke bedrijven je wanneer aanschreef, notities, aliassen, je antwoorden over je adressen en de stappen van een verhuizing die je afvinkte, welke blokkeerregels je toevoegde, je taal- en mailappkeuze en een API-sleutel voor de datalekdatabase als je die toevoegt.</li>`)}</ul>
     <p>${L('This storage is not encrypted: use a device and browser profile only you use. You remove it all with <a href="#/profile">Settings</a> → Erase everything, or by clearing this site\'s data in your browser. Because it is strictly necessary for the service you ask for, and contains nothing used to track you, no cookie consent is needed for it.',
       'Deze opslag is niet versleuteld: gebruik een apparaat en browserprofiel dat alleen jij gebruikt. Je wist alles via <a href="#/profile">Instellingen</a> → Alles wissen, of door de websitegegevens van deze site in je browser te wissen. Omdat de opslag strikt noodzakelijk is voor de dienst die je vraagt, en niets bevat waarmee je gevolgd wordt, is er geen cookietoestemming voor nodig.')}</p>`)}
@@ -2221,14 +2475,16 @@ export function about() {
       <li><b>One-click unsubscribe.</b> Your browser sends the unsubscribe request to the address the sender published. That sender already has your email address; it also sees your IP address. No cookies or other details are sent.</li>
       <li><b>Opening a link</b> (an unsubscribe page, an opt-out form, the regulator's website) works like any link: that website sees your visit. This site never sends it where you came from.</li>
       <li><b>Looking up a privacy address</b> (only when you press <i>Look it up</i>). Your browser sends the company's web address, such as webwinkel.nl, to hoopup.tech, and nothing else. A small function there reads that company's own privacy statement and returns the address it gives. Nothing about you is sent, and we store or log nothing; the answer is kept for a week per company, so the next person asking about the same company gets it without the site being read again. ${host.short} runs the function and sees your IP address, as with any visit.</li>
-      <li><b>Letters</b> open in your own mail app and are sent by you, through your own mail provider. HoopUp does not put them on your clipboard unless you press Copy, because a clipboard can sync to your other devices.</li>
+      <li><b>Letters</b>, replies to a company's answer and unsubscribes by email open in your own mail app and are sent by you, through your own mail provider. HoopUp does not put them on your clipboard unless you press Copy, because a clipboard can sync to your other devices.</li>
+      <li><b>The calendar file and your log</b> are made on your device and saved where you choose. The calendar file holds company names and dates only. If you add it to a calendar that syncs (Google, iCloud, Outlook), that calendar's provider holds those names and dates.</li>
       <li><b>Emailing us.</b> Mail to ${esc(CONTACT_EMAIL)} is forwarded by Cloudflare Email Routing to a Gmail mailbox (Google). We use it only to answer you, and delete it once your question is settled.</li>`, `
       <li><b>Het bezoeken van de site.</b> De site wordt gehost door ${host.name} (${host.whereNL}). Zoals elke webhost ontvangt ${host.short} je IP-adres en de bestanden die je browser laadt, en kan die voor beveiliging vastleggen. Zie de ${ext(host.policy, `privacyverklaring van ${host.short}`)}; ${host.short} neemt deel aan het EU-VS Data Privacy Framework.</li>
       <li><b>Datalek- en wachtwoordcheck.</b> Als je die gebruikt, maakt je browser contact met ${ext('https://haveibeenpwned.com/Privacy', 'Have I Been Pwned')} (Australië). De lijst met datalekken bevat niets over jou. Een wachtwoordcheck stuurt alleen de eerste 5 tekens van een versleutelde hash van het wachtwoord, nooit het wachtwoord zelf. Alleen als je een eigen API-sleutel toevoegt en een adres controleert, wordt dat e-mailadres naar Have I Been Pwned gestuurd.</li>
       <li><b>Uitschrijven met één klik.</b> Je browser stuurt het uitschrijfverzoek naar het adres dat de afzender opgaf. Die afzender heeft je e-mailadres al; hij ziet ook je IP-adres. Er worden geen cookies of andere gegevens meegestuurd.</li>
       <li><b>Een link openen</b> (een uitschrijfpagina, een afmeldformulier, de website van de toezichthouder) werkt zoals elke link: die website ziet je bezoek. Deze site stuurt niet mee waar je vandaan kwam.</li>
       <li><b>Een privacyadres opzoeken</b> (alleen als je op <i>Zoek het op</i> drukt). Je browser stuurt het webadres van het bedrijf, zoals webwinkel.nl, naar hoopup.tech, en verder niets. Een kleine functie daar leest de privacyverklaring van dat bedrijf zelf en geeft het adres terug dat erin staat. Er wordt niets over jou verstuurd, en wij bewaren of loggen niets; het antwoord blijft een week per bedrijf bewaard, zodat wie daarna naar hetzelfde bedrijf vraagt het krijgt zonder dat de site opnieuw wordt gelezen. ${host.short} voert de functie uit en ziet je IP-adres, zoals bij elk bezoek.</li>
-      <li><b>Brieven</b> openen in je eigen mailapp en worden door jou verstuurd, via je eigen mailprovider. HoopUp zet ze niet op je klembord tenzij je op Kopieer drukt, omdat een klembord naar je andere apparaten kan synchroniseren.</li>
+      <li><b>Brieven</b>, reacties op het antwoord van een bedrijf en afmeldingen per e-mail openen in je eigen mailapp en worden door jou verstuurd, via je eigen mailprovider. HoopUp zet ze niet op je klembord tenzij je op Kopieer drukt, omdat een klembord naar je andere apparaten kan synchroniseren.</li>
+      <li><b>Het agendabestand en je overzicht</b> worden op je apparaat gemaakt en opgeslagen waar jij kiest. Het agendabestand bevat alleen bedrijfsnamen en datums. Zet je het in een agenda die synchroniseert (Google, iCloud, Outlook), dan heeft de aanbieder van die agenda die namen en datums.</li>
       <li><b>Ons mailen.</b> Mail aan ${esc(CONTACT_EMAIL)} wordt door Cloudflare Email Routing doorgestuurd naar een Gmail-mailbox (Google). We gebruiken die alleen om je te antwoorden, en verwijderen hem zodra je vraag is afgehandeld.</li>`)}</ul>`)}
 
   ${sec(L('Sharing, sale and legal requests', 'Delen, verkoop en vorderingen'), `<p>${L(

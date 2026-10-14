@@ -120,6 +120,9 @@ export const STATUSES = {
   escalated: { label: 'Escalated',   pill: 'escalated' }
 };
 
+// Days a reminder letter gives a company before the complaint.
+export const REMINDER_GRACE = 14;
+
 // GDPR Art. 12(3): one month, extendable by two more.
 // CCPA/CPRA: 45 days, extendable by another 45.
 export function deadlineDays(broker) {
@@ -173,6 +176,49 @@ export function markBounced(addresses) {
   return { back: hit, partial };
 }
 
+// Answers from companies, recognised in mail the user dropped in. What the
+// answer says moves the request on: erased (or nothing held) closes it, a
+// refusal opens the complaint, anything else means they responded. A demand
+// the law does not support (an ID copy, their own form, "we must keep it")
+// leaves it open, with a reply ready. The same answer dropped in twice counts
+// once. Returns the ids that changed.
+const OUTCOME = { done: 'done', partial: 'done', nodata: 'done', refused: 'refused' };
+const EVENT = { done: 'Answer: erased', partial: 'Answer: erased, some kept by law', nodata: 'Answer: holds nothing',
+                refused: 'Answer: refused', id: 'Answer: wants an ID copy', form: 'Answer: wants their form',
+                retain: 'Answer: must keep some by law', extend: 'Answer: takes two more months', ack: 'Answer: received', other: 'Answer received' };
+export function recordAnswers(list) {
+  const changed = [];
+  update(s => {
+    for (const a of list) {
+      const rec = s.requests[a.id];
+      if (!rec) continue;
+      rec.replies = rec.replies || [];
+      if (rec.replies.some(r => r.at === a.at && r.subject === a.subject && r.kind === a.kind)) continue;
+      rec.replies.push({ at: a.at || today(), kind: a.kind, from: a.from || '', subject: String(a.subject || '').slice(0, 200) });
+      rec.replies.sort((x, y) => String(x.at).localeCompare(String(y.at)));
+      if (a.kind === 'extend') rec.extended = true;
+      const next = OUTCOME[a.kind];
+      if (next) rec.status = next;
+      else if (rec.status === 'sent') rec.status = 'ack';
+      rec.history = rec.history || [];
+      rec.history.push({ ts: new Date().toISOString(), event: EVENT[a.kind] || EVENT.other });
+      changed.push(a.id);
+    }
+  });
+  return changed;
+}
+
+// The user sent the reply to their answer.
+export function markAnswered(brokerId) {
+  update(s => {
+    const rec = s.requests[brokerId];
+    if (!rec) return;
+    rec.answeredAt = today();
+    rec.history = rec.history || [];
+    rec.history.push({ ts: new Date().toISOString(), event: 'Reply sent' });
+  });
+}
+
 // A follow-up does not change the status: the request is still open, and the
 // date is what starts the 14-day clock towards a complaint.
 export function markReminder(brokerId, extra = {}) {
@@ -221,8 +267,14 @@ export function daysSince(dateStr) {
   return Math.floor((Date.now() - then.getTime()) / 86400000);
 }
 
+// Article 12(3) lets a company extend by two months, if it says so within the
+// first month. An answer saying so moves the deadline.
+export function deadlineFor(broker, rec = {}) {
+  return deadlineDays(broker) + (rec.extended ? 60 : 0);
+}
+
 export function isOverdue(broker, rec) {
   if (!['sent', 'ack'].includes(rec.status)) return false;
   const d = daysSince(rec.sentAt);
-  return d !== null && d > deadlineDays(broker);
+  return d !== null && d > deadlineFor(broker, rec);
 }

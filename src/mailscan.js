@@ -620,6 +620,7 @@ export function parseMessages(text, { single = false } = {}) {
     const headerUnsub = parseUnsubscribe(h['list-unsubscribe']);
     const auth = parseAuth(h);
     const bodyUnsub = headerUnsub.http ? { url: '', how: '' } : findUnsubInBody(parts);
+    const lines = textLines(parts);
 
     // Which of the user's own addresses this was sent to. This is the ONLY
     // identifier the sender demonstrably holds, and the letter must not go
@@ -640,6 +641,9 @@ export function parseMessages(text, { single = false } = {}) {
       domain: from.domain,
       subject: decodeWords(h.subject || ''),
       date: h.date || '',
+      at: dayOf(h.date),
+      // Possibly an answer to one of the user's letters.
+      reply: replyInfo(decodeWords(h.subject || ''), lines),
       recipients,
       unsub: { http: headerUnsub.http || bodyUnsub.url, mailto: headerUnsub.mailto },
       unsubFrom: headerUnsub.http ? 'header' : bodyUnsub.how,
@@ -653,12 +657,80 @@ export function parseMessages(text, { single = false } = {}) {
       identity: identityFrom({ to: h.to, parts, recipients, brand: `${from.name} ${from.domain}` }),
       privacy: privacyContact(parts, from.domain),
       contacts: serviceAddresses(parts, from.address, parseFrom(h['reply-to'] || '').address, from.domain),
-      companyPostal: companyPostal(textLines(parts), from.name, from.domain),
+      companyPostal: companyPostal(lines, from.name, from.domain),
       linkDomains: collectLinkDomains(parts),
       isEsp: ESP_DOMAINS.has(from.domain),
       personal: isPersonalDomain(from.domain)
     };
   }).filter(Boolean);
+}
+
+// --- answers to the user's letters -------------------------------------------
+//
+// A company's answer to an erasure request quotes the letter's reference
+// (HU-XXXXX), or comes back on its subject. What it says is read from the
+// answer itself, above the quoted letter: the letter itself mentions identity
+// documents and legal retention, and must never be mistaken for the answer.
+
+const LETTER_REF = /\bHU-[A-Z0-9]{5}\b/g;
+const OUR_SUBJECT = /artikel 15, 17 en 21 AVG|Articles 15, 17 and 21 GDPR|CCPA\/CPRA request|termijn verstreken|overdue: request/i;
+const ABOUT_SUBJECT = /\b(avg|gdpr|privacy\w*|persoonsgegevens|personal data|verwijder\w*|gegevens wissen|erasure|deletion|data (subject |access |deletion )?request|inzage\w*|art(ikel|icle|\.)\s?1[57])\b/i;
+const ABOUT_BODY = /\b(privacyverzoek|verwijderverzoek|verwijderingsverzoek|inzageverzoek|avg-verzoek|verzoek (op grond van|tot|om)\b.{0,40}\b(avg|verwijder\w*|wissen|inzage|persoonsgegevens)|(your|the) (privacy|data|deletion|erasure|access|gdpr|data subject) request|request (to|for) (delete|erase|erasure|deletion|access)|right to (erasure|be forgotten))\b/i;
+// Where the quoted letter, or an earlier message, starts.
+const QUOTE_START = /^(>|-{2,}\s*(original message|oorspronkelijk bericht|forwarded message|doorgestuurd bericht)|_{5,}|(from|van|sent|verzonden):\s|(op|on)\s.{4,120}\s(schreef|wrote)\b|.{0,80}\b(schreef|wrote):\s*$|aan de functionaris gegevensbescherming|to the (data protection officer|privacy team)|mijn kenmerk:|my reference for this request:|##-)/i;
+
+// What the answer says, in the order that matters: a demand for an ID copy or
+// a web form is a demand even when the answer also mentions deletion.
+const RETAIN = /\b(wettelijke|fiscale|administratieve)\s+(bewaar(plicht|termijn)\w*|verplichting\w*)|\bbewaarplicht\w*|\bwettelijk\b.{0,40}\b(verplicht|vereist)\b.{0,40}\bbewaren\b|\blegal(ly)?\b.{0,20}\b(obligation|required|requirement|bound)\b.{0,40}\b(keep|retain|store)\b|\brequired by law to (keep|retain|store)\b|\b(tax|accounting|fiscal) (law|laws|obligations?|rules|records)\b|\bretention (period|obligation)s?\b/i;
+const PAST = String.raw`(?:(?!\b(?:zullen|zal|worden|wordt|will|would|shall)\b)[^.\n]){0,50}`;
+const NOT_DONE = /\bnog niet\b|\bniet\b.{0,20}\b(verwijderd|gewist)\b|\bnot (yet )?(been )?(deleted|erased|removed)\b|\bbefore (we|it) (can|could) (be )?(delete|erase)/i;
+const SAYS = [
+  ['id', /\b(kopie|scan|foto)\b.{0,40}\b(identiteitsbewijs|legitimatiebewijs|paspoort|id-?kaart|identiteitskaart|rijbewijs)\b|\b(identiteitsbewijs|legitimatiebewijs)\b|\b(copy|scan|photo)\b.{0,40}\b(passport|id card|identity (card|document)|driv(er'?s|ing) licen[cs]e|photo id|government[- ]issued id)\b|\bproof of (identity|id)\b|\bverify your identity\b|\b(uw|je|jouw) identiteit\b.{0,40}\b(vaststellen|verifi[eë]ren|controleren|bevestigen)\b/i],
+  // Done, in the past tense and within one sentence: "zijn verwijderd", not
+  // "zullen worden verwijderd".
+  ['done', new RegExp(String.raw`\b(zijn|is|werden|werd|hebben|heeft)\b${PAST}\b(verwijderd|gewist|geanonimiseerd|vernietigd)\b|\b(have|has) (now )?been (permanently )?(deleted|erased|removed|anonymi[sz]ed)\b|\bwe (have )?(now )?(deleted|erased|anonymi[sz]ed)\b`, 'i')],
+  ['nodata', /\bgeen\b.{0,30}\b(persoons)?gegevens\b.{0,40}\b(gevonden|aangetroffen|bekend)\b|\b(niet|geen)\b.{0,20}\b(bekend|klant)\b.{0,20}\b(bij ons|in onze|in ons)\b|\bkunnen\b.{0,20}\b(u|je)\b.{0,30}\bniet\b.{0,20}\b(vinden|terugvinden)\b|\bno (personal )?(data|information|records?|account)\b.{0,40}\b(found|associated|linked|on file|about you|for you|matching)\b|\b(could|can) ?not (find|locate)\b.{0,40}\b(data|records?|account|you)\b|\bdo(es)? not (hold|have|process) any (personal )?(data|information)\b/i],
+  ['refused', /\b(niet|geen gevolg)\b.{0,30}\b(voldoen|honoreren|uitvoeren|in behandeling nemen)\b|\b(wijzen|weigeren)\b.{0,40}\b(af|verzoek)\b|\bafgewezen\b|\b(cannot|can ?not|unable to|will not|won'?t)\b.{0,20}\b(comply|fulfil+|honou?r|process|action)\b.{0,20}\b(your|this|the)\b.{0,20}\brequest\b|\b(declin|refus|reject)(e|ed|ing)\b.{0,20}\b(your|this|the) request\b/i],
+  ['form', /\b(verzoek|aanvraag|request)\b.{0,80}(formulier|portaal|\bweb ?form|\bonline form|\bportal)\b|(formulier|portaal|\bweb ?form|\bonline form|\bportal)\b.{0,80}\b(verzoek|aanvraag|request)\b/i],
+  ['retain', RETAIN],
+  ['extend', /\b(verlengen|verlengd|verlenging)\b.{0,80}\b(termijn|maanden)\b|\btermijn\b.{0,40}\b(verlengen|verlengd)\b|\btwee (extra |aanvullende )?maanden\b|\bextend(ed|ing)?\b.{0,60}\b(period|deadline|time|months)\b|\b(two|2) (further|more|additional|extra) months\b/i],
+  ['ack', /\b(ontvangen|ontvangst|in behandeling|wordt behandeld|received (your|the)|receipt of (your|the)|we have received|is being (processed|handled|reviewed)|we will (respond|reply|get back|process|handle)|binnen (30|dertig) dagen|within (30|thirty) days|binnen (één|een) maand|within one month)\b/i]
+];
+
+export function answerKind(text) {
+  const t = String(text || '');
+  for (const [kind, re] of SAYS) {
+    if (!re.test(t)) continue;
+    if (kind === 'done' && NOT_DONE.test(t)) continue;
+    // Erased, except what the law makes them keep.
+    if (kind === 'done' && RETAIN.test(t)) return 'partial';
+    return kind;
+  }
+  return 'other';
+}
+
+export function replyInfo(subject, lines) {
+  const refs = [...new Set((subject + '\n' + lines.join('\n')).match(LETTER_REF) || [])].slice(0, 5);
+  const cut = lines.findIndex(l => QUOTE_START.test(l));
+  const top = (cut < 0 ? lines : lines.slice(0, cut)).join('\n').slice(0, 6000);
+  const subjectHit = OUR_SUBJECT.test(subject) || ABOUT_SUBJECT.test(subject);
+  const kind = answerKind(top);
+  // About the request: it says so, or it says what only an answer to one
+  // says ("your data has been deleted", "send a copy of your passport"). A
+  // bank's "verify your identity in the app" is not one.
+  const bodyHit = ABOUT_BODY.test(top) || ['done', 'partial', 'nodata'].includes(kind)
+    || (kind === 'id' && /identiteitsbewijs|legitimatiebewijs|paspoort|passport|identity document|id[- ]?(card|kaart)/i.test(top))
+    || (/\b(uw|je|jouw|your) (verzoek|request)\b/i.test(top) && /\b(persoonsgegevens|gegevens|personal data|privacy)\b/i.test(top));
+  if (!refs.length && !subjectHit && !bodyHit) return null;
+  return { refs, subjectHit, bodyHit, kind };
+}
+
+// The day a message was sent, from its Date header. Dates in the future or
+// before 1995 are spam lying about it, and count as unknown.
+export function dayOf(raw) {
+  const t = Date.parse(String(raw || '').replace(/\s*\([^)]*\)\s*$/, ''));
+  if (!Number.isFinite(t) || t > Date.now() + 2 * 864e5 || t < Date.UTC(1995, 0, 1)) return '';
+  return new Date(t).toISOString().slice(0, 10);
 }
 
 // --- grouping --------------------------------------------------------------
@@ -677,7 +749,7 @@ export function groupBySender(messages) {
     if (!map.has(key)) {
       map.set(key, {
         key, domain: m.domain, personal: !!m.personal, name: m.name || m.domain, count: 0,
-        unsubHttp: '', unsubMailto: '', unsubFrom: '', oneClick: false,
+        unsubHttp: '', unsubMailto: '', unsubFrom: '', oneClick: false, lastBulkAt: '',
         addresses: new Set(), recipients: new Set(), subjects: [], isEsp: m.isEsp,
         linkDomains: new Set(), replyToHosts: new Set(), risk: '', providerSpamCount: 0, names: new Set(),
         transactional: false, privacyEmail: '', privacyUrl: '', serviceEmails: new Set(), companyPostal: '', idNames: new Set(), idPostal: new Set(), idPhones: new Set(), idEmails: new Set(), phoneSeen: new Set()
@@ -690,6 +762,9 @@ export function groupBySender(messages) {
     if (!g.unsubHttp && m.unsub.http) { g.unsubHttp = m.unsub.http; g.unsubFrom = m.unsubFrom; }
     if (!g.unsubMailto && m.unsub.mailto) g.unsubMailto = m.unsub.mailto;
     if (m.oneClick) g.oneClick = true;
+    // The last marketing mail: what shows whether they stopped after an
+    // unsubscribe or a request.
+    if (m.at && (m.unsub.http || m.unsub.mailto) && (!g.lastBulkAt || m.at > g.lastBulkAt)) g.lastBulkAt = m.at;
     // A checked message with no way to unsubscribe is an order, an invoice or
     // an account notice: mail that only goes to customers. One is enough to
     // know the user deals with this company, even if it also sends marketing.

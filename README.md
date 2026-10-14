@@ -76,6 +76,7 @@ the message and could be written by the sender.
 | Sender | Offered |
 | --- | --- |
 | Verified, with an unsubscribe link | Unsubscribe, and an erasure letter. The link is used only if it is `https`, on a real domain name (no bare IP address, no link shortener) and carries no login details |
+| Verified, unsubscribe by email only (`List-Unsubscribe: <mailto:…>`) | Unsubscribe: the mail app opens with the unsubscribe mail filled in, addressed to their unsubscribe address only (any `cc` or `bcc` in the header is dropped), and an erasure letter |
 | Verified, no unsubscribe link (an order confirmation, a bank) | An erasure letter only: never a block |
 | Failed authentication, with an "unsubscribe" link | Block; the link is flagged as a tracker, never clicked |
 | Failed authentication, no link | Block |
@@ -111,6 +112,23 @@ excluded from every rule.
   regulator is written for you, to submit on its website.
 - **Web form only**: companies that only accept their own form get a checklist with direct links.
 - **Print all / PDF**: every pending letter, one per page, to keep as a record or post.
+- **They answered: reply ready**: drop a company's answer in (on Home, or the drop zone on Delete data)
+  and it is recognised: by the letter's reference (`HU-` and five characters, the same for every letter to
+  one company), or by coming from the company's own checked domain on the subject of the request. Mail you
+  sent yourself, forged mail and mailings never count. What the answer says, read from the answer above
+  the quoted letter, moves the request on: *erased* or *we hold nothing* closes it, a refusal opens the
+  complaint, *we take two more months* moves the deadline (Art. 12(3)), anything else means they
+  responded. An answer the law does not support gets a reply ready: a demand for a copy of your ID, an
+  insistence on their own web form, or "we must keep it by law" without saying what, which law and how long.
+  The row says what HoopUp read; the status can always be corrected.
+- **Kept mailing**: every sender's last marketing mail (one with an unsubscribe option) is remembered.
+  Marketing more than ten days after you unsubscribed, or after the month a request gives them, is
+  flagged on the Unsubscribe page and on Home; the letter, the reminder and the complaint say so, with the
+  dates, and in the Netherlands the page links the ACM's spam report form.
+- **Calendar and log**: *Add the deadlines to my calendar* saves an `.ics` file with each deadline, each
+  reminder's end and a "scan your junk mail again" date, so the reminders come from your own calendar
+  rather than from a server. It holds company names and dates only. *Download my log* saves a CSV of every
+  request (dates, addresses, answers, bounces, history) for your records or a complaint.
 
 The app never sends mail itself. A page that could send mail as you is a page that, if compromised,
 could send anything as you; the one click per company is the price of not holding that power. Spam,
@@ -163,17 +181,37 @@ authority under Art. 77 GDPR. In the Netherlands that is the
 [Autoriteit Persoonsgegevens](https://autoriteitpersoonsgegevens.nl); elsewhere in the EU it is your
 national DPA. Complaints are free.
 
-Two refusals worth knowing:
+Refusals worth knowing. For the first three, Delete data has the reply ready once their answer is dropped in:
 
 - **"Send us a copy of your passport."** Under Art. 12(6) a controller may ask for more only when it has
   reasonable doubts about your identity, and only what is necessary to resolve them. For a company that
   only ever had your email address, that doubt is hard to justify, and the EDPB considers an ID copy
-  generally disproportionate (Guidelines 01/2022). The letters say so.
+  generally inappropriate (Guidelines 01/2022). The Dutch DPA fined DPG Media in 2022 for routinely
+  demanding one. The letters say so. If you decide to send one anyway, cover your photo and citizen
+  service number first (the Dutch government's KopieID app does this).
+- **"Use our web form."** The GDPR prescribes no form. A request through any channel the company provides
+  is valid, and the time limit runs from its receipt.
+- **"We must keep it by law."** Only the data the obligation covers, only as long as it applies, only for
+  that purpose (Art. 17(3)(b), 5(1)(b) and (e)); Art. 12(4) requires reasons. The reply asks which data,
+  which provision and until when.
+- **"We hold no data about you."** From a company whose mail reached you, the reply asks them to check
+  their mailing lists and processors, and where the address came from (Art. 15(1)(g)).
 - **"We have a legitimate interest."** For direct marketing this does not survive an objection:
   Art. 21(3) is absolute, with no balancing test. The letters invoke it explicitly.
 
 Credit bureaus are the real exception: registrations there usually have a statutory basis and cannot be
 erased on request. You can still demand access under Art. 15 and object to *marketing* use.
+
+## Post on the doormat and sales calls
+
+Not in a mailbox, so not something to drop in. The Unsubscribe page gives the opt-outs for the country in
+Settings: in the Netherlands, [Postfilter](https://www.postfilter.nl) for addressed advertising post (free,
+up to six weeks to take effect, six years valid; companies you are or were a customer of fall outside it,
+which the erasure letter covers), a Nee/Nee or Nee/Ja sticker for folders, and, for sales calls, the rule
+since 1 July 2021 that a company may only call you with consent or as its (recent) customer, with ACM
+ConsuWijzer for reports and [acm.nl/spamklacht](https://www.acm.nl/nl/spamklacht) for spam texts. Belgium
+(Robinson list, Do Not Call Me), the UK (MPS, TPS) and the US (Do Not Call Registry, OptOutPrescreen,
+DMAchoice) get their own registers.
 
 ## Accuracy of the target list
 
@@ -202,6 +240,8 @@ looks up a company's privacy address on request, and it receives only that compa
 | A sender's one-click unsubscribe URL | `List-Unsubscribe=One-Click`, no cookies, no referrer (see below) |
 | `hoopup.tech/api/privacy-contact?domain=…` | Only the company's domain, when you press *Look it up*; the function reads that company's privacy statement, keeps and logs nothing, and the answer is cached a week per company |
 | Letters | Nothing from the app: they open in your own mail app, and you press Send |
+| Unsubscribe by email, replies to a company's answer | Nothing from the app: they open in your own mail app, and you press Send |
+| Calendar file, request log | Nothing: both are made on your device and saved where you choose. The calendar file holds company names and dates only; if your calendar syncs, that is your calendar's doing |
 
 **Where letters go.** In order: an address you typed; the privacy or DPO address the company's own mail
 gives (privacy@, dpo@, fg@ … on its own domain); a short list checked against the companies' own privacy

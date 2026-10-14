@@ -105,7 +105,39 @@ If this message has not reached the person or team responsible for data protecti
 const FORWARD_NL = `JUISTE ADRES
 Is dit bericht niet terechtgekomen bij de persoon of afdeling die over gegevensbescherming gaat, stuur het dan aan hen door. Een verzoek dat via een van uw kanalen binnenkomt is geldig, en de termijn loopt vanaf de dag van ontvangst (EDPB-richtsnoeren 01/2022 over het recht op inzage).`;
 
-const ref = () => 'HU-' + Math.random().toString(36).slice(2, 7).toUpperCase();
+// The letter's reference, the same for every letter to one company, so a reply
+// that quotes it is recognised, and a reminder carries the reference of the
+// request it follows up.
+export function refOf(b) {
+  let h = 0x811c9dc5;
+  for (const c of String(b?.id || b?.name || '')) { h ^= c.codePointAt(0); h = Math.imul(h, 0x01000193) >>> 0; }
+  return 'HU-' + h.toString(36).toUpperCase().padStart(5, '0').slice(-5);
+}
+
+// Marketing that came after the user said stop: more than ten days after an
+// unsubscribe (time for a mailing already scheduled to go out), or after the
+// month a request gives them. Only mail with an unsubscribe option counts, so
+// an invoice or an answer to the request never does.
+const daysBetween = (a, b) => Math.round((Date.parse(b) - Date.parse(a)) / 864e5);
+export function keptMailing(b, rec = {}) {
+  const last = b?.lastBulkAt;
+  if (!last) return null;
+  if (rec?.sentAt && rec.status !== 'todo' && daysBetween(rec.sentAt, last) > 30) return { since: 'request', from: rec.sentAt, last };
+  if (b.unsubscribedAt && daysBetween(b.unsubscribedAt, last) > 10) return { since: 'unsub', from: b.unsubscribedAt, last };
+  return null;
+}
+
+// The paragraph a letter gets when they kept mailing.
+function keptNote(b, rec, nl) {
+  const k = keptMailing(b, rec);
+  if (!k) return '';
+  if (k.since === 'request') return nl
+    ? `\nSinds mijn verzoek stuurt u mij nog steeds reclame, voor het laatst op ${longDate(k.last, true)}, terwijl u daar op grond van artikel 21, lid 3, AVG mee had moeten stoppen.\n`
+    : `\nSince my request you have kept sending me marketing, most recently on ${longDate(k.last, false)}, although Article 21(3) GDPR required you to stop.\n`;
+  return nl
+    ? `\nU BLEEF MAILEN\nOp ${longDate(k.from, true)} heb ik mij afgemeld voor uw mailings. Daarna stuurde u mij toch weer reclame, voor het laatst op ${longDate(k.last, true)}. Na mijn bezwaar mag u mijn gegevens niet meer gebruiken voor direct marketing (artikel 21, lid 3, AVG), en reclame mailen na een afmelding is ook in strijd met artikel 11.7 van de Telecommunicatiewet.\n`
+    : `\nYOU KEPT MAILING ME\nOn ${longDate(k.from, false)} I unsubscribed from your mailings. You sent me marketing again afterwards, most recently on ${longDate(k.last, false)}. Once I object, you may no longer use my data for direct marketing (Article 21(3) GDPR), and marketing email after an unsubscribe also breaks the ePrivacy rules (Article 13 of Directive 2002/58/EC).\n`;
+}
 
 // Letters carry dates the way people write them: "11 oktober 2026".
 const MONTHS = {
@@ -125,15 +157,15 @@ export const TEMPLATES = {
     label: 'GDPR erasure (Art. 17 + 15 + 21)',
     jurisdiction: 'EU',
     subject: (b, p) => `Request under Articles 15, 17 and 21 GDPR, ${subjectId(b, p)}`,
-    body: (b, p) => `To the Data Protection Officer / Privacy Team of ${b.name},
+    body: (b, p, rec) => `To the Data Protection Officer / Privacy Team of ${b.name},
 
 I am a data subject within the meaning of Regulation (EU) 2016/679 (GDPR). I am writing to exercise my rights in respect of all personal data you hold about me.
 
-My reference for this request: ${ref()}
+My reference for this request: ${refOf(b)}
 
 IDENTIFYING DETAILS
 ${isEvidenceDerived(b) ? minimalBlock(b, false) : identityBlock(p)}
-
+${keptNote(b, rec, false)}
 I request that you do the following.
 
 1. ERASURE (Article 17 GDPR)
@@ -175,15 +207,15 @@ ${longDate(todayISO(), false)}`
     label: 'AVG verwijderingsverzoek (NL)',
     jurisdiction: 'EU',
     subject: (b, p) => `Verzoek op grond van artikel 15, 17 en 21 AVG, ${subjectId(b, p)}`,
-    body: (b, p) => `Aan de Functionaris Gegevensbescherming / het privacyteam van ${b.name},
+    body: (b, p, rec) => `Aan de Functionaris Gegevensbescherming / het privacyteam van ${b.name},
 
 Ik ben betrokkene in de zin van de Algemene verordening gegevensbescherming (AVG / Verordening (EU) 2016/679). Hierbij doe ik een beroep op mijn rechten met betrekking tot alle persoonsgegevens die u over mij verwerkt.
 
-Mijn kenmerk: ${ref()}
+Mijn kenmerk: ${refOf(b)}
 
 IDENTIFICATIEGEGEVENS
 ${isEvidenceDerived(b) ? minimalBlock(b, true) : identityBlockNL(p)}
-
+${keptNote(b, rec, true)}
 Ik verzoek u het volgende.
 
 1. VERWIJDERING (artikel 17 AVG)
@@ -227,7 +259,7 @@ ${longDate(todayISO(), true)}`
 
 I am making a consumer rights request under the California Consumer Privacy Act as amended by the CPRA (Cal. Civ. Code § 1798.100 et seq.).
 
-My reference for this request: ${ref()}
+My reference for this request: ${refOf(b)}
 
 IDENTIFYING DETAILS
 ${isEvidenceDerived(b) ? minimalBlock(b, false) : identityBlock(p)}
@@ -260,8 +292,10 @@ ${longDate(todayISO(), false)}`
     subject: (b, p) => `Overdue: request under Articles 15, 17 and 21 GDPR, ${subjectId(b, p)}`,
     body: (b, p, rec) => `To the Data Protection Officer / Privacy Team of ${b.name},
 
-On ${rec?.sentAt ? longDate(rec.sentAt, false) : '[date]'} I sent you a request to erase my personal data and to stop processing it, under Articles 15, 17 and 21 GDPR. The one-month period set by Article 12(3) has now passed without an adequate response.
+On ${rec?.sentAt ? longDate(rec.sentAt, false) : '[date]'} I sent you a request to erase my personal data and to stop processing it, under Articles 15, 17 and 21 GDPR. The ${rec?.extended ? 'extended period of three months' : 'one-month period'} set by Article 12(3) has now passed without an adequate response.
 
+My reference for that request: ${refOf(b)}
+${keptNote(b, rec, false)}
 IDENTIFYING DETAILS
 ${isEvidenceDerived(b) ? minimalBlock(b, false) : identityBlock(p)}
 
@@ -290,9 +324,10 @@ ${identityBlock(p)}
 WHAT HAPPENED
 On ${rec?.sentAt ? longDate(rec.sentAt, false) : '[date]'} I sent ${b.name} a request under Articles 15, 17 and 21 GDPR, asking them to erase my personal data, to stop processing it for direct marketing, and to disclose the source of any data they retain.
 
-The statutory period under Article 12(3) expired on ${rec?.sentAt ? longDate(addDays(rec.sentAt, 30), false) : '[date]'}. ${rec?.status === 'refused'
+The statutory period under Article 12(3) expired on ${rec?.sentAt ? longDate(addDays(rec.sentAt, rec.extended ? 90 : 30), false) : '[date]'}. ${rec?.status === 'refused'
   ? 'The controller refused the request without providing an adequate legal basis.'
-  : 'The controller has not responded, or has not responded adequately.'}
+  : 'The controller has not responded, or has not responded adequately.'}${keptMailing(b, rec) ? `
+The controller also kept sending me marketing email after ${keptMailing(b, rec).since === 'request' ? 'my request' : `I unsubscribed on ${longDate(keptMailing(b, rec).from, false)}`}, most recently on ${longDate(keptMailing(b, rec).last, false)}.` : ''}
 
 WHY I AM COMPLAINING
 The controller has infringed:
@@ -321,8 +356,10 @@ TEMPLATES.reminder_nl = {
   subject: (b, p) => `Termijn verstreken: verzoek op grond van artikel 15, 17 en 21 AVG, ${subjectId(b, p)}`,
   body: (b, p, rec) => `Aan de Functionaris Gegevensbescherming / het privacyteam van ${b.name},
 
-Op ${rec?.sentAt ? longDate(rec.sentAt, true) : '[datum]'} heb ik u verzocht mijn persoonsgegevens te wissen en de verwerking ervan te staken, op grond van artikel 15, 17 en 21 AVG. De termijn van één maand uit artikel 12, lid 3, is inmiddels verstreken zonder toereikende reactie.
+Op ${rec?.sentAt ? longDate(rec.sentAt, true) : '[datum]'} heb ik u verzocht mijn persoonsgegevens te wissen en de verwerking ervan te staken, op grond van artikel 15, 17 en 21 AVG. De ${rec?.extended ? 'verlengde termijn van drie maanden' : 'termijn van één maand'} uit artikel 12, lid 3, is inmiddels verstreken zonder toereikende reactie.
 
+Mijn kenmerk bij dat verzoek: ${refOf(b)}
+${keptNote(b, rec, true)}
 IDENTIFICATIEGEGEVENS
 ${isEvidenceDerived(b) ? minimalBlock(b, true) : identityBlockNL(p)}
 
@@ -351,9 +388,10 @@ ${identityBlockNL(p)}
 WAT ER GEBEURDE
 Op ${rec?.sentAt ? longDate(rec.sentAt, true) : '[datum]'} heb ik ${b.name} verzocht op grond van artikel 15, 17 en 21 AVG mijn persoonsgegevens te wissen, de verwerking voor direct marketing te staken en de bron te noemen van gegevens die zij bewaren.
 
-De wettelijke termijn uit artikel 12, lid 3, is verstreken op ${rec?.sentAt ? longDate(addDays(rec.sentAt, 30), true) : '[datum]'}. ${rec?.status === 'refused'
+De wettelijke termijn uit artikel 12, lid 3, is verstreken op ${rec?.sentAt ? longDate(addDays(rec.sentAt, rec.extended ? 90 : 30), true) : '[datum]'}. ${rec?.status === 'refused'
   ? 'De verwerkingsverantwoordelijke heeft het verzoek geweigerd zonder toereikende rechtsgrond.'
-  : 'De verwerkingsverantwoordelijke heeft niet, of niet toereikend, gereageerd.'}
+  : 'De verwerkingsverantwoordelijke heeft niet, of niet toereikend, gereageerd.'}${keptMailing(b, rec) ? `
+Daarnaast bleef de verwerkingsverantwoordelijke mij reclame mailen na ${keptMailing(b, rec).since === 'request' ? 'mijn verzoek' : `mijn afmelding op ${longDate(keptMailing(b, rec).from, true)}`}, voor het laatst op ${longDate(keptMailing(b, rec).last, true)}.` : ''}
 
 WAAROM IK KLAAG
 De verwerkingsverantwoordelijke heeft gehandeld in strijd met:
@@ -388,13 +426,15 @@ TEMPLATES.customer_minimise = {
   label: 'Existing customer: stop marketing, keep only what is needed',
   jurisdiction: 'EU',
   subject: (b, p) => `Request under Articles 15, 17 and 21 GDPR (existing customer), ${subjectId(b, p)}`,
-  body: (b, p) => `To the Data Protection Officer / Privacy Team of ${b.name},
+  body: (b, p, rec) => `To the Data Protection Officer / Privacy Team of ${b.name},
 
 I am a customer of yours and I intend to remain one. This is not a request to close my account or end any contract.
 
+My reference for this request: ${refOf(b)}
+
 IDENTIFYING DETAILS
 ${isEvidenceDerived(b) ? minimalBlock(b, false) : identityBlock(p)}
-${breachNote(b, false)}
+${breachNote(b, false)}${keptNote(b, rec, false)}
 I ask you to:
 
 1. Stop processing my personal data for direct marketing, including profiling for that purpose, by email, phone, text, post or online advertising (Article 21(2) and (3) GDPR). This objection is unconditional.
@@ -418,13 +458,15 @@ TEMPLATES.customer_minimise_nl = {
   label: 'Bestaande klant: geen marketing, alleen bewaren wat nodig is',
   jurisdiction: 'EU',
   subject: (b, p) => `Verzoek op grond van artikel 15, 17 en 21 AVG (bestaande klant), ${subjectId(b, p)}`,
-  body: (b, p) => `Aan de Functionaris Gegevensbescherming / het privacyteam van ${b.name},
+  body: (b, p, rec) => `Aan de Functionaris Gegevensbescherming / het privacyteam van ${b.name},
 
 Ik ben klant bij u en wil dat blijven. Dit is geen verzoek om mijn account op te heffen of een overeenkomst te beëindigen.
 
+Mijn kenmerk: ${refOf(b)}
+
 IDENTIFICATIEGEGEVENS
 ${isEvidenceDerived(b) ? minimalBlock(b, true) : identityBlockNL(p)}
-${breachNote(b, true)}
+${breachNote(b, true)}${keptNote(b, rec, true)}
 Ik verzoek u:
 
 1. Mijn persoonsgegevens niet langer te verwerken voor direct marketing, inclusief profilering voor dat doel, per e-mail, telefoon, sms, post of online advertenties (artikel 21, lid 2 en 3, AVG). Dit bezwaar is onvoorwaardelijk.
@@ -443,6 +485,214 @@ Met vriendelijke groet,
 ${signature(b, p, true)}
 ${longDate(todayISO(), true)}`
 };
+
+// --- Answers to their answer -------------------------------------------------------
+//
+// The usual ways a company stalls a request, each with the reply the law
+// supports: a demand for a copy of an ID, an insistence on its own web form,
+// "we must keep it by law" without saying what, and "we have nothing on you"
+// from a company whose mail reached the user.
+
+export const lastAnswer = rec => (rec?.replies || []).at(-1) || null;
+
+function idLines(b, p, nl) {
+  if (!isEvidenceDerived(b)) return nl ? identityBlockNL(p) : identityBlock(p);
+  const lines = evidenceLines(b, nl);
+  return lines.length ? lines.map(([k, v]) => `${k}: ${v}`).join('\n')
+    : nl ? 'E-mailadres: [vul het adres in waarop u hun bericht ontving]' : 'Email address: [fill in the address their message reached you on]';
+}
+
+function answerSubject(b, p, rec, nl) {
+  const theirs = String(lastAnswer(rec)?.subject || '').replace(/[\r\n]+/g, ' ').trim().slice(0, 150);
+  if (theirs) return /^(re|antw|aw|sv)\s*:/i.test(theirs) ? theirs : `Re: ${theirs}`;
+  return `Re: ${nl ? `Verzoek op grond van artikel 15, 17 en 21 AVG, ${subjectId(b, p)}` : `Request under Articles 15, 17 and 21 GDPR, ${subjectId(b, p)}`}`;
+}
+
+const opening = (b, rec, nl, what) => nl
+  ? `Aan de Functionaris Gegevensbescherming / het privacyteam van ${b.name},
+
+Mijn kenmerk: ${refOf(b)}
+
+Op ${rec?.sentAt ? longDate(rec.sentAt, true) : '[datum]'} heb ik u op grond van de AVG verzocht mijn persoonsgegevens te wissen en niet langer te gebruiken. Op ${lastAnswer(rec)?.at ? longDate(lastAnswer(rec).at, true) : '[datum]'} antwoordde u ${what}.`
+  : `To the Data Protection Officer / Privacy Team of ${b.name},
+
+My reference: ${refOf(b)}
+
+On ${rec?.sentAt ? longDate(rec.sentAt, false) : '[date]'} I asked you, under the GDPR, to erase my personal data and to stop using it. On ${lastAnswer(rec)?.at ? longDate(lastAnswer(rec).at, false) : '[date]'} you replied ${what}.`;
+
+const closing = (b, p, nl) => nl
+  ? `Met vriendelijke groet,
+${signature(b, p, true)}
+${longDate(todayISO(), true)}`
+  : `Yours faithfully,
+${signature(b, p, false)}
+${longDate(todayISO(), false)}`;
+
+TEMPLATES.reply_id = {
+  label: 'Their answer: they want a copy of your ID',
+  jurisdiction: 'EU',
+  subject: (b, p, rec) => answerSubject(b, p, rec, false),
+  body: (b, p, rec) => `${opening(b, rec, false, 'that you first need a copy of my identity document')}
+
+I will not send one, because it is not necessary. Under Article 12(6) GDPR you may ask for additional information only where you have reasonable doubts about my identity, and only what is necessary to resolve them. You know me by the details below, which come from your own messages to me, and my request was sent from that address. You can confirm that it is mine by writing to it.
+
+The European Data Protection Board considers a copy of an identity document generally inappropriate for this purpose, because it creates a security risk of its own (Guidelines 01/2022 on the right of access). The Dutch Data Protection Authority fined DPG Media in 2022 for routinely demanding one with requests like mine.
+
+IDENTIFYING DETAILS
+${idLines(b, p, false)}
+
+If you have a specific doubt about my identity, tell me what it is and what you need to resolve it. Otherwise, please carry out my request and confirm it to me within the time limit of Article 12(3) GDPR.
+
+${closing(b, p, false)}`
+};
+
+TEMPLATES.reply_id_nl = {
+  label: 'Hun antwoord: ze willen een kopie van je identiteitsbewijs',
+  jurisdiction: 'EU',
+  subject: (b, p, rec) => answerSubject(b, p, rec, true),
+  body: (b, p, rec) => `${opening(b, rec, true, 'dat u eerst een kopie van mijn identiteitsbewijs nodig heeft')}
+
+Die stuur ik niet, omdat het niet nodig is. Op grond van artikel 12, lid 6, AVG mag u alleen om aanvullende gegevens vragen als u redelijke twijfel heeft over mijn identiteit, en dan alleen wat nodig is om die twijfel weg te nemen. U kent mij aan de hand van de gegevens hieronder, die uit uw eigen berichten aan mij komen, en mijn verzoek is vanaf dat adres verstuurd. U kunt controleren dat het van mij is door ernaar te schrijven.
+
+Volgens de Europese toezichthouders (EDPB, richtsnoeren 01/2022 over het recht op inzage) is een kopie van een identiteitsbewijs daarvoor in de regel niet passend, omdat die zelf een beveiligingsrisico oplevert. De Autoriteit Persoonsgegevens heeft DPG Media in 2022 beboet omdat het bij verzoeken zoals het mijne standaard om een kopie vroeg.
+
+IDENTIFICATIEGEGEVENS
+${idLines(b, p, true)}
+
+Heeft u een concrete twijfel over mijn identiteit, laat mij dan weten welke en wat u nodig heeft om die weg te nemen. Zo niet, voer dan mijn verzoek uit en bevestig dat binnen de termijn van artikel 12, lid 3, AVG.
+
+${closing(b, p, true)}`
+};
+
+TEMPLATES.reply_form = {
+  label: 'Their answer: they want you to use their web form',
+  jurisdiction: 'EU',
+  subject: (b, p, rec) => answerSubject(b, p, rec, false),
+  body: (b, p, rec) => `${opening(b, rec, false, 'that I should submit it through your web form or portal')}
+
+That is not required. The GDPR prescribes no form for a request. You may offer one, but a request that reaches you through another channel you provide, such as the email address I wrote to, is just as valid, and you must facilitate it (Article 12(2) GDPR; EDPB Guidelines 01/2022 on the right of access). The time limit runs from the day you received it.
+
+My request stands as I sent it. If your form needs details from me, copy them from my email, or tell me which specific detail is missing.
+
+IDENTIFYING DETAILS
+${idLines(b, p, false)}
+
+Please carry out my request and confirm it to me within the time limit of Article 12(3) GDPR.
+
+${closing(b, p, false)}`
+};
+
+TEMPLATES.reply_form_nl = {
+  label: 'Hun antwoord: ze willen dat je hun webformulier gebruikt',
+  jurisdiction: 'EU',
+  subject: (b, p, rec) => answerSubject(b, p, rec, true),
+  body: (b, p, rec) => `${opening(b, rec, true, 'dat ik het verzoek via uw webformulier of portaal moet indienen')}
+
+Dat is niet vereist. De AVG schrijft geen vorm voor een verzoek voor. U mag een formulier aanbieden, maar een verzoek dat via een ander kanaal van u binnenkomt, zoals het e-mailadres waaraan ik schreef, is net zo geldig, en u moet het faciliteren (artikel 12, lid 2, AVG; EDPB-richtsnoeren 01/2022 over het recht op inzage). De termijn loopt vanaf de dag van ontvangst.
+
+Mijn verzoek staat zoals ik het verstuurde. Heeft uw formulier gegevens van mij nodig, neem die dan over uit mijn e-mail, of laat mij weten welk gegeven precies ontbreekt.
+
+IDENTIFICATIEGEGEVENS
+${idLines(b, p, true)}
+
+Voer mijn verzoek uit en bevestig dat binnen de termijn van artikel 12, lid 3, AVG.
+
+${closing(b, p, true)}`
+};
+
+TEMPLATES.reply_retain = {
+  label: 'Their answer: they must keep some of it by law',
+  jurisdiction: 'EU',
+  subject: (b, p, rec) => answerSubject(b, p, rec, false),
+  body: (b, p, rec) => `${opening(b, rec, false, 'that you must keep some of it because of a legal obligation')}
+
+Article 17(3)(b) GDPR allows that only for the data the obligation actually covers, only for as long as it applies, and only for that purpose (Article 5(1)(b) and (e)). Under Article 12(4) you must give reasons for any part of my request you do not carry out. So please tell me, for each category of data you keep:
+   a. which data it is;
+   b. which legal provision requires you to keep it;
+   c. until when you will keep it.
+
+Please also confirm that:
+   - you have erased all my other personal data;
+   - you use the data you keep for that legal obligation only: no marketing, no profiling, and you do not pass it on;
+   - you will erase it when the retention period ends.
+
+IDENTIFYING DETAILS
+${idLines(b, p, false)}
+
+${closing(b, p, false)}`
+};
+
+TEMPLATES.reply_retain_nl = {
+  label: 'Hun antwoord: ze moeten iets wettelijk bewaren',
+  jurisdiction: 'EU',
+  subject: (b, p, rec) => answerSubject(b, p, rec, true),
+  body: (b, p, rec) => `${opening(b, rec, true, 'dat u een deel ervan moet bewaren vanwege een wettelijke verplichting')}
+
+Artikel 17, lid 3, onder b, AVG staat dat alleen toe voor de gegevens waarop die verplichting echt ziet, alleen zolang die geldt, en alleen voor dat doel (artikel 5, lid 1, onder b en e). Op grond van artikel 12, lid 4, moet u motiveren welk deel van mijn verzoek u niet uitvoert. Ik verzoek u daarom per categorie gegevens die u bewaart op te geven:
+   a. om welke gegevens het gaat;
+   b. welk wetsartikel u verplicht ze te bewaren;
+   c. tot wanneer u ze bewaart.
+
+Ik verzoek u ook te bevestigen dat:
+   - u al mijn overige persoonsgegevens heeft gewist;
+   - u de bewaarde gegevens alleen voor die wettelijke verplichting gebruikt: niet voor marketing, niet voor profilering, en u verstrekt ze niet aan anderen;
+   - u ze wist zodra de bewaartermijn verstreken is.
+
+IDENTIFICATIEGEGEVENS
+${idLines(b, p, true)}
+
+${closing(b, p, true)}`
+};
+
+// Only fair when their own mail shows they had the address; the app offers it
+// only then, and says so in the letter.
+const mailedNote = (b, nl) => {
+  const a = b.evidence?.address;
+  if (b.source !== 'mail' || !a) return '';
+  const last = b.lastBulkAt ? (nl ? `, voor het laatst op ${longDate(b.lastBulkAt, true)}` : `, most recently on ${longDate(b.lastBulkAt, false)}`) : '';
+  return nl
+    ? `\n\nToch bereikten uw eigen berichten mij op ${a}${last}. U had dus ten minste dat adres, en mogelijk meer bij een maildienst die u gebruikt.`
+    : `\n\nYet your own messages reached me at ${a}${last}. So you held at least that address, and possibly more with a mailing service you use.`;
+};
+
+TEMPLATES.reply_nodata = {
+  label: 'Their answer: they say they hold nothing on you',
+  jurisdiction: 'EU',
+  subject: (b, p, rec) => answerSubject(b, p, rec, false),
+  body: (b, p, rec) => `${opening(b, rec, false, 'that you hold no personal data about me')}${mailedNote(b, false)}
+
+Please check again, including your mailing lists and any service that sends mail on your behalf, and confirm:
+   a. that the details below are erased everywhere, including with your processors (Articles 17 and 28 GDPR);
+   b. where you obtained them, if not from me (Article 15(1)(g) GDPR);
+   c. to whom you passed them on (Article 15(1)(c) GDPR).
+
+IDENTIFYING DETAILS
+${idLines(b, p, false)}
+
+${closing(b, p, false)}`
+};
+
+TEMPLATES.reply_nodata_nl = {
+  label: 'Hun antwoord: ze zeggen niets van je te hebben',
+  jurisdiction: 'EU',
+  subject: (b, p, rec) => answerSubject(b, p, rec, true),
+  body: (b, p, rec) => `${opening(b, rec, true, 'dat u geen persoonsgegevens van mij verwerkt')}${mailedNote(b, true)}
+
+Ik verzoek u opnieuw te kijken, ook in uw mailinglijsten en bij diensten die namens u mail versturen, en te bevestigen:
+   a. dat de gegevens hieronder overal zijn gewist, ook bij uw verwerkers (artikel 17 en 28 AVG);
+   b. waar u ze vandaan heeft, als dat niet van mij was (artikel 15, lid 1, onder g, AVG);
+   c. aan wie u ze heeft verstrekt (artikel 15, lid 1, onder c, AVG).
+
+IDENTIFICATIEGEGEVENS
+${idLines(b, p, true)}
+
+${closing(b, p, true)}`
+};
+
+// Which reply an answer calls for. 'partial' (erased, except what the law
+// makes them keep) and 'nodata' are outcomes, so their reply is optional.
+export const REPLY_FOR = { id: 'reply_id', form: 'reply_form', retain: 'reply_retain', partial: 'reply_retain', nodata: 'reply_nodata' };
+export const PUSHBACK = new Set(['id', 'form', 'retain']);
 
 // --- Which letter, in which language ---------------------------------------------
 
@@ -474,7 +724,7 @@ export function guessRelation(b) {
     // Verified mail with no unsubscribe at all is transactional (an order,
     // an invoice, an account notice), which only goes to customers. One such
     // message counts even when the same company also sends marketing.
-    return b.unsubUrl && !b.transactional ? 'maybe' : 'customer';
+    return (b.unsubUrl || b.unsubMailto) && !b.transactional ? 'maybe' : 'customer';
   }
   return 'maybe';
 }
@@ -485,6 +735,10 @@ export function templateFor(kind, b, profile, rec) {
   const nl = writesDutch(b, profile);
   if (kind === 'reminder') return nl && isEU(b) ? 'reminder_nl' : 'reminder';
   if (kind === 'complaint') return letterLang(profile) === 'nl' ? 'complaint_nl' : 'complaint';
+  if (kind === 'reply') {
+    const t = REPLY_FOR[lastAnswer(rec)?.kind];
+    if (t) return nl ? t + '_nl' : t;
+  }
   return suggestedTemplate(b, profile, rec);
 }
 
@@ -498,7 +752,15 @@ export const TEMPLATE_LABELS_NL = {
   complaint: 'Klacht bij de toezichthouder (Engels)',
   complaint_nl: 'Klacht bij de Autoriteit Persoonsgegevens (Nederlands)',
   customer_minimise: 'Bestaande klant: geen marketing, alleen het nodige bewaren (Engels)',
-  customer_minimise_nl: 'Bestaande klant: geen marketing, alleen het nodige bewaren (Nederlands)'
+  customer_minimise_nl: 'Bestaande klant: geen marketing, alleen het nodige bewaren (Nederlands)',
+  reply_id: 'Antwoord: ze willen een kopie ID (Engels)',
+  reply_id_nl: 'Antwoord: ze willen een kopie ID (Nederlands)',
+  reply_form: 'Antwoord: ze willen hun webformulier (Engels)',
+  reply_form_nl: 'Antwoord: ze willen hun webformulier (Nederlands)',
+  reply_retain: 'Antwoord: ze moeten iets wettelijk bewaren (Engels)',
+  reply_retain_nl: 'Antwoord: ze moeten iets wettelijk bewaren (Nederlands)',
+  reply_nodata: 'Antwoord: ze zeggen niets te hebben (Engels)',
+  reply_nodata_nl: 'Antwoord: ze zeggen niets te hebben (Nederlands)'
 };
 
 function addDays(dateStr, n) {
@@ -519,5 +781,5 @@ export function suggestedTemplate(broker, profile, rec) {
 export function render(templateId, broker, profile, record) {
   const t = TEMPLATES[templateId];
   if (!t) throw new Error('Unknown template: ' + templateId);
-  return { subject: t.subject(broker, profile), body: t.body(broker, profile, record) };
+  return { subject: t.subject(broker, profile, record), body: t.body(broker, profile, record) };
 }
