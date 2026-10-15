@@ -1820,6 +1820,86 @@ export function blockView(state, all = showAllRules) {
   };
 }
 
+// Whose servers the scanned scams went to: decides what works best.
+function mailProvider(state) {
+  const votes = {};
+  for (const t of state.custom.filter(isBlockable)) {
+    const a = String(t.evidence?.address || '').toLowerCase();
+    const k = /@(outlook|hotmail|live|msn)\./.test(a) ? 'microsoft' : /@(gmail|googlemail)\./.test(a) ? 'google'
+      : /@(icloud|me|mac)\./.test(a) ? 'icloud' : a ? 'other' : '';
+    if (k) votes[k] = (votes[k] || 0) + 1;
+  }
+  return Object.entries(votes).sort((a, b) => b[1] - a[1])[0]?.[0] || 'other';
+}
+
+// The short version: what to do, for this address in this mail app, in at
+// most three lines. The panel below it has the clicks.
+export function blockAdvice(provider, client, n) {
+  const outlookJunk = ext('https://outlook.live.com/mail/0/junkemail', 'outlook.com');
+  const learn = {
+    microsoft: L('<b>On your phone or the web:</b> mark anything that still gets through as junk. Microsoft\'s filter learns from it.',
+      '<b>Op je telefoon of het web:</b> markeer wat er nog doorkomt als ongewenst. Het filter van Microsoft leert daarvan.'),
+    google: L('<b>Anything that still gets through:</b> <i>Report spam</i>. Gmail learns from it.',
+      '<b>Wat er nog doorkomt:</b> <i>Spam melden</i>. Gmail leert daarvan.'),
+    icloud: L('<b>On your iPhone:</b> move anything that still gets through to Junk. Apple\'s filter learns from it.',
+      '<b>Op je iPhone:</b> verplaats wat er nog doorkomt naar Ongewenst. Het filter van Apple leert daarvan.')
+  };
+  const appleRule = L('<b>New scams:</b> add the Apple Mail rule below, with one paste. It deletes them as they arrive, while Mail is open on your Mac.',
+    '<b>Nieuwe oplichters:</b> zet met één keer plakken de Apple Mail-regel hieronder erin. Die verwijdert ze zodra ze binnenkomen, zolang Mail op je Mac open staat.');
+  const emptyJunk = L(`<b>Scams already in Junk:</b> empty that folder on ${outlookJunk} (<i>Junk Email</i> → <i>Empty folder</i>).`,
+    `<b>Oplichters die al in Ongewenst staan:</b> leeg die map op ${outlookJunk} (<i>Ongewenste e-mail</i> → <i>Map leegmaken</i>).`);
+  const outlookWeb = [
+    L(`Outlook.com on the web takes rules one value at a time (${n} here). Do you also use <b>Apple Mail</b> on a Mac or <b>Outlook</b> on a Windows PC? Choose that above: there one paste does it all.`,
+      `Outlook.com op het web neemt regels één waarde tegelijk aan (hier ${n}). Gebruik je ook <b>Apple Mail</b> op een Mac of <b>Outlook</b> op een Windows-pc? Kies dat hierboven: daar is het één keer plakken.`),
+    L('Otherwise, step through them below; it takes a few minutes.', 'Anders loop je ze hieronder een voor een door; dat kost een paar minuten.') + ' ' + emptyJunk];
+  let lines;
+  if (provider === 'microsoft') {
+    if (outlookAvailable() && client === 'outlookcom') lines = [
+      L('<b>One click:</b> add the rules to Outlook.com below. They run on Microsoft\'s server: on your phone too, and with your computer off.',
+        '<b>Eén klik:</b> zet de regels hieronder in Outlook.com. Ze draaien op de server van Microsoft: ook op je telefoon, en als je computer uit staat.'),
+      emptyJunk, learn.microsoft];
+    else if (client === 'apple') lines = [
+      outlookAvailable() ? L('<b>Best:</b> choose <b>Outlook.com / Hotmail</b> above and add the rules with one click, on Microsoft\'s server.',
+        '<b>Het beste:</b> kies hierboven <b>Outlook.com / Hotmail</b> en zet de regels er met één klik in, op de server van Microsoft.') : appleRule,
+      emptyJunk + ' ' + L('Do not run the rule over Junk yourself: Mail cannot move damaged spam to your Outlook.com bin, and shows an error for each one.',
+        'Laat de regel niet zelf over Ongewenst lopen: Mail kan beschadigde spam niet naar je Outlook.com-prullenbak verplaatsen en geeft dan per bericht een foutmelding.'),
+      learn.microsoft];
+    else if (client === 'outlookwin') lines = [
+      L('<b>Once:</b> paste the script below into PowerShell. It adds the rules to Outlook and clears what is already in Junk and Inbox.',
+        '<b>Eén keer:</b> plak het script hieronder in PowerShell. Het zet de regels in Outlook en ruimt op wat er al in Ongewenste e-mail en Postvak IN staat.'),
+      learn.microsoft];
+    else if (client === 'outlookcom') lines = [...outlookWeb, learn.microsoft];
+    else lines = [L('Your address is on Outlook.com or Hotmail. Choose <b>Apple Mail</b>, <b>Outlook</b> or <b>Outlook.com</b> above, whichever you read it in.',
+      'Je adres is van Outlook.com of Hotmail. Kies hierboven <b>Apple Mail</b>, <b>Outlook</b> of <b>Outlook.com</b>, waar je het ook leest.')];
+  } else if (provider === 'google') {
+    lines = client === 'gmail' ? [
+      L('<b>Once:</b> import the filter file below. Gmail then deletes these scams on Google\'s server, on every device.',
+        '<b>Eén keer:</b> importeer het filterbestand hieronder. Gmail verwijdert deze oplichters dan op de server van Google, op elk apparaat.'),
+      L('Tick <i>Also apply filter to matching conversations</i> while importing: that clears what is already there too.',
+        'Vink bij het importeren <i>Filter ook toepassen op overeenkomende gesprekken</i> aan: dan verdwijnt ook wat er al staat.'),
+      learn.google
+    ] : [L('Your address is Gmail. Gmail\'s own filters work best: on Google\'s server, on every device. Choose <b>Gmail</b> above.',
+      'Je adres is van Gmail. De eigen filters van Gmail werken het best: op de server van Google, op elk apparaat. Kies hierboven <b>Gmail</b>.')];
+  } else if (provider === 'icloud') {
+    lines = client === 'apple' ? [appleRule,
+      L('<b>Scams already in Junk:</b> in Mail, open Junk, select all (<b>⌘A</b>) and press Delete.', '<b>Oplichters die al in Ongewenst staan:</b> open in Mail Ongewenst, selecteer alles (<b>⌘A</b>) en druk op Delete.'),
+      learn.icloud
+    ] : [L('Your address is iCloud. iCloud\'s own rules cannot look at links, so choose <b>Apple Mail</b> above.',
+      'Je adres is van iCloud. De eigen regels van iCloud kunnen niet naar links kijken, dus kies hierboven <b>Apple Mail</b>.')];
+  } else {
+    lines = client === 'sieve' ? [L('<b>Once:</b> copy the version for your mail service below and paste it in its filter settings. It runs on their server, on every device.',
+      '<b>Eén keer:</b> kopieer hieronder de versie voor je maildienst en plak die in de filterinstellingen. Hij draait op hun server, op elk apparaat.')]
+      : client === 'apple' ? [appleRule, L('<b>Scams already in Junk:</b> in Mail, open Junk, select all (<b>⌘A</b>) and press Delete.', '<b>Oplichters die al in Ongewenst staan:</b> open in Mail Ongewenst, selecteer alles (<b>⌘A</b>) en druk op Delete.')]
+      : client === 'outlookwin' ? [L('<b>Once:</b> paste the script below into PowerShell. It adds the rules to Outlook and clears what is already in Junk and Inbox.',
+        '<b>Eén keer:</b> plak het script hieronder in PowerShell. Het zet de regels in Outlook en ruimt op wat er al in Ongewenste e-mail en Postvak IN staat.')]
+      : client === 'outlookcom' ? (outlookAvailable() ? [] : outlookWeb)
+      : [];
+  }
+  if (!lines.length) return '';
+  return `<div class="notice advice"><p><b>${L('Best way for you', 'Zo doe je het het best')}</b></p>
+    <ol class="small">${lines.map(l => `<li>${l}</li>`).join('')}</ol></div>`;
+}
+
 export function blockAllCard(state, { closable = false } = {}) {
   const view = blockView(state);
   const bl = view.bl;
@@ -1862,6 +1942,7 @@ export function blockAllCard(state, { closable = false } = {}) {
     ${view.delta ? `<p class="small">${L(`Only what is new since ${at}. Add these to the rules you made then, or make a new rule. Both work.`,
       `Alleen wat nieuw is sinds ${at}. Voeg ze toe aan de regels die je toen maakte, of maak een nieuwe regel. Allebei werkt.`)}</p>` : ''}
 
+    ${rules ? `<div id="block-advice">${blockAdvice(mailProvider(state), blockClient, rules)}</div>` : ''}
     <div id="block-panel">${rules ? blockPanel(bl, blockClient) : `<p class="small muted">${L('Nothing blockable yet: these senders left no reusable trace. Drop the messages in again so their links and reply addresses are recorded.',
       'Nog niets te blokkeren: deze afzenders lieten geen herbruikbaar spoor achter. Zet de mails er opnieuw in, zodat hun links en antwoordadressen worden vastgelegd.')}</p>`}</div>
     ${rules ? `
@@ -1897,8 +1978,7 @@ export function blockPanel(bl, client) {
       <p class="small">${L('You sign in on Microsoft\'s own page. HoopUp asks only to change your mailbox settings, where rules live: not to read or send your mail. It adds the rules, replaces earlier HoopUp rules, and forgets the permission straight away. They run on Microsoft\'s server, so they also work on your phone and when your computer is off.',
         'Je logt in op de eigen pagina van Microsoft. HoopUp vraagt alleen toestemming om je mailboxinstellingen te wijzigen, waar regels staan: niet om je mail te lezen of te versturen. Het zet de regels erin, vervangt eerdere HoopUp-regels en vergeet de toestemming meteen. Ze draaien op de server van Microsoft, dus ze werken ook op je telefoon en als je computer uit staat.')}</p>
       <details class="small"><summary>${L('Or add them by hand', 'Of zet ze er zelf in')}</summary>` : `
-      <p class="small notice">${L('Outlook.com in the browser only takes one value at a time: Microsoft offers no way to paste a list. Do you read this mail in <b>Apple Mail</b> on a Mac, or in <b>Outlook on a Windows PC</b>? Choose that above: there it is one copy and one paste, and the rule works for your Outlook.com account too.',
-        'Outlook.com in de browser neemt maar één waarde tegelijk aan: Microsoft biedt geen manier om een lijst te plakken. Lees je deze mail in <b>Apple Mail</b> op een Mac, of in <b>Outlook op een Windows-pc</b>? Kies dat hierboven: daar is het één keer kopiëren en plakken, en de regel werkt ook voor je Outlook.com-account.')}</p>`) + `
+      `) + `
       <ol class="small">
         ${bl.links.length ? `<li>${L('<b>Settings</b> (gear) → <b>Mail</b> → <b>Rules</b> → <b>Add new rule</b>. Name it <i>HoopUp – links</i>, condition <b>Subject or body includes</b>.',
           '<b>Instellingen</b> (tandwiel) → <b>E-mail</b> → <b>Regels</b> → <b>Nieuwe regel toevoegen</b>. Noem hem <i>HoopUp – links</i>, voorwaarde <b>Onderwerp of hoofdtekst bevat</b>.')}</li>
@@ -1939,13 +2019,9 @@ export function blockPanel(bl, client) {
         <li>${L('Copy the script:', 'Kopieer het script:')} ${scriptBtn('applescript')}</li>
         <li>${L('Open <b>Script Editor</b>: press <b>⌘ Space</b>, type <i>Script Editor</i>, press Enter (choose <b>New Document</b> if asked).', 'Open <b>Scripteditor</b>: druk op <b>⌘ spatie</b>, typ <i>Scripteditor</i>, druk op Enter (kies <b>Nieuw document</b> als daarom wordt gevraagd).')}</li>
         <li>${L('Paste (<b>⌘V</b>) and click <b>▶</b> (Run). When macOS asks whether Script Editor may control Mail, click <b>OK</b>.', 'Plak (<b>⌘V</b>) en klik op <b>▶</b> (Start). Vraagt macOS of Scripteditor Mail mag bedienen, klik dan op <b>OK</b>.')}</li>
-        <li>${L('To clear what is already there: everything in Junk is junk, so empty it in one go rather than running the rule over it. <b>Outlook.com, Hotmail or Exchange account:</b> on <a href="https://outlook.live.com/mail/0/junkemail" target="_blank" rel="noopener noreferrer">outlook.com</a>, open <b>Junk Email</b> and choose <b>Empty folder</b>. Microsoft deletes it all on its own server, so Mail never has to move a damaged message (the <i>Invalid base64 string</i> error). <b>iCloud and other accounts:</b> in Mail, open <b>Junk</b>, select all (<b>⌘A</b>) and press <b>Delete</b>.',
-          'Om op te ruimen wat er al staat: alles in Ongewenst is rommel, dus leeg die map in één keer in plaats van de regel erover te laten lopen. <b>Outlook.com-, Hotmail- of Exchange-account:</b> open op <a href="https://outlook.live.com/mail/0/junkemail" target="_blank" rel="noopener noreferrer">outlook.com</a> de map <b>Ongewenste e-mail</b> en kies <b>Map leegmaken</b>. Microsoft verwijdert dan alles op de eigen server, dus Mail hoeft geen beschadigd bericht te verplaatsen (de fout <i>Invalid base64 string</i>). <b>iCloud en andere accounts:</b> open in Mail <b>Ongewenst</b>, selecteer alles (<b>⌘A</b>) en druk op <b>Delete</b>.')}</li>
       </ol>
-      <p class="small muted">${L('The script adds one rule to Mail (Settings → Rules), checks every condition it made, and tells you how many it added. It reads nothing and sends nothing. Mac rules run while Mail is open.',
-        'Het script zet één regel in Mail (Instellingen → Regels), controleert elke voorwaarde die het maakte en meldt hoeveel het er toevoegde. Het leest niets en verstuurt niets. Regels op de Mac werken zolang Mail open is.')}
-        ${outlookAvailable() ? L('Is this an Outlook.com or Hotmail account in Mail? Then also choose <b>Outlook.com / Hotmail</b> above: one click puts the same rules on Microsoft\'s server, so they also work when your Mac is off and on your phone.',
-          'Is dit een Outlook.com- of Hotmail-account in Mail? Kies dan ook <b>Outlook.com / Hotmail</b> hierboven: met één klik staan dezelfde regels op de server van Microsoft, dus ze werken ook als je Mac uit staat, en op je telefoon.') : ''}</p>`,
+      <p class="small muted">${L('The script adds one rule to Mail (Settings → Rules), checks every condition it made, and tells you how many it added. It reads nothing and sends nothing.',
+        'Het script zet één regel in Mail (Instellingen → Regels), controleert elke voorwaarde die het maakte en meldt hoeveel het er toevoegde. Het leest niets en verstuurt niets.')}</p>`,
     sieve: `
       <ol class="small">
         <li>${L('Copy the script for your mail service:', 'Kopieer het script voor je maildienst:')}
@@ -1995,7 +2071,10 @@ export function wireBlock(root, state, onChange) {
     if (e.target.id !== 'block-client') return;
     blockClient = e.target.value;
     store.update(st => { st.mailApp = blockClient; });
-    root.querySelector('#block-panel').innerHTML = blockPanel(blockView(store.get()).bl, blockClient);
+    const bl = blockView(store.get()).bl;
+    root.querySelector('#block-panel').innerHTML = blockPanel(bl, blockClient);
+    const advice = root.querySelector('#block-advice');
+    if (advice) advice.innerHTML = blockAdvice(mailProvider(store.get()), blockClient, bl.links.length + bl.replyTo.length + bl.sharedReplyTo.length);
   });
   root.addEventListener('click', e => {
     const btn = e.target.closest('[data-action]');
