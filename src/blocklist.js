@@ -250,8 +250,7 @@ tell application "Mail"
     set enabled of r to true
     set msg to "HoopUp: rule \\"${name}\\" added with " & added & " conditions."
     if skipped > 0 then set msg to msg & " " & skipped & " could not be added; please tell HoopUp."
-    set msg to msg & return & return & "Now open Junk, select all (Cmd-A) and choose Message > Apply Rules (Option-Cmd-L) to clear what is already there."
-    set msg to msg & return & return & "If Mail then says a message could not be moved (Invalid base64 string), that one message is damaged: click OK and delete it by hand."
+    set msg to msg & return & return & "New scams now go straight to the Trash. To clear what is already in Junk, empty it in one go: for an Outlook.com, Hotmail or Exchange account on outlook.com (Junk Email > Empty folder), which also avoids Mail's 'Invalid base64 string' error; for other accounts in Mail (Junk, Cmd-A, Delete)."
   on error errText
     try
       delete r
