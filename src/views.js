@@ -1950,12 +1950,17 @@ export function blockPanel(bl, client) {
           'Is dit een Outlook.com- of Hotmail-account in Mail? Kies dan ook <b>Outlook.com / Hotmail</b> hierboven: met één klik staan dezelfde regels op de server van Microsoft, dus ze werken ook als je Mac uit staat, en op je telefoon.') : ''}</p>`,
     sieve: `
       <ol class="small">
-        <li>${L('Download the Sieve script below.', 'Download hieronder het Sieve-script.')}</li>
-        <li>${L('<b>Fastmail:</b> Settings → Filters &amp; Rules → <b>Edit custom Sieve code</b> → paste. <b>Proton:</b> Settings → Filters → <b>Add sieve filter</b> → paste, and change <code>"Junk"</code> to <code>"Spam"</code>.',
-               '<b>Fastmail:</b> Settings → Filters &amp; Rules → <b>Edit custom Sieve code</b> → plakken. <b>Proton:</b> Instellingen → Filters → <b>Sieve-filter toevoegen</b> → plakken, en verander <code>"Junk"</code> in <code>"Spam"</code>.')}</li>
+        <li>${L('Copy the script for your mail service:', 'Kopieer het script voor je maildienst:')}
+          <div class="row">
+            <button class="primary" data-action="copy-block" data-fmt="sieve-fastmail">Fastmail</button>
+            <button class="primary" data-action="copy-block" data-fmt="sieve-proton">Proton</button>
+            <button data-action="copy-block" data-fmt="sieve-other">${L('Other (Junk folder)', 'Andere (map Junk)')}</button>
+          </div></li>
+        <li>${L('<b>Fastmail:</b> Settings → Filters &amp; Rules → <b>Edit custom Sieve code</b> → paste it in the last box, below the code Fastmail made → Save. <b>Proton:</b> Settings → Filters → <b>Add sieve filter</b> → give it a name, paste → Save.',
+               '<b>Fastmail:</b> Settings → Filters &amp; Rules → <b>Edit custom Sieve code</b> → plak het in het laatste vak, onder de code die Fastmail maakte → Save. <b>Proton:</b> Instellingen → Filters → <b>Sieve-filter toevoegen</b> → geef het een naam, plak → Opslaan.')}</li>
       </ol>
-      <div class="row"><button class="primary" data-action="dl-block" data-fmt="sieve">${L('Download Sieve script', 'Download Sieve-script')}</button>
-      <button data-action="copy-block" data-fmt="sieve">${L('Copy', 'Kopieer')}</button></div>`
+      <p class="small muted">${L('Each version moves matches to that service\'s own spam folder. On Fastmail the folder name must be exact: if it does not exist, Fastmail leaves the mail in the inbox.',
+        'Elke versie verplaatst wat matcht naar de eigen spammap van die dienst. Bij Fastmail moet de mapnaam precies kloppen: bestaat hij niet, dan laat Fastmail de mail in de inbox staan.')}</p>`
   };
 
   return steps[client] + sharedNote + `
@@ -1967,7 +1972,7 @@ export function blockText(state, fmt, i = 0) {
   const bl = blockView(state).bl;
   if (fmt === 'gmailq') return { text: asGmailQueries(bl)[i] || '', name: 'gmail-filter.txt', type: 'text/plain' };
   if (fmt === 'gmail') return { text: asGmailXml(bl), name: 'hoopup-filters.xml', type: 'application/xml' };
-  if (fmt === 'sieve') return { text: asSieve(bl), name: 'hoopup.sieve', type: 'text/plain' };
+  if (/^sieve/.test(fmt)) return { text: asSieve(bl, fmt.split('-')[1]), name: 'hoopup.sieve', type: 'text/plain' };
   if (fmt === 'applescript') return { text: asAppleScript(bl, store.today()), name: 'hoopup.applescript', type: 'text/plain' };
   if (fmt === 'powershell') return { text: asPowerShell(bl, store.today()), name: 'hoopup.ps1', type: 'text/plain' };
   if (fmt === 'reply') return { text: asReplyList(bl), name: 'hoopup-reply-addresses.txt', type: 'text/plain' };

@@ -124,9 +124,18 @@ ${entries.join('\n')}
 
 const sieveList = arr => '[' + arr.map(s => '"' + s.replace(/["\\]/g, '\\$&') + '"').join(', ') + ']';
 
+// Where each service keeps spam, as its Sieve names it. A folder that does
+// not exist is not an error everywhere: Fastmail then quietly leaves the
+// message in the inbox, so the name has to be right. Fastmail names folders
+// "INBOX.<name>" in Sieve; Proton's own examples use "spam"; Dovecot-based
+// services (mailbox.org, Posteo, most self-hosted mail) call it "Junk".
+export const SIEVE_FOLDER = { fastmail: 'INBOX.Spam', proton: 'spam', other: 'Junk' };
+
 // Sieve (RFC 5228): Fastmail, Proton, Mailbox.org and most self-hosted mail.
-// Moves to Junk rather than discarding, so a wrong match is recoverable.
-export function asSieve(bl) {
+// Moves to the spam folder rather than discarding, so a wrong match is
+// recoverable.
+export function asSieve(bl, host = 'other') {
+  const folder = SIEVE_FOLDER[host] || SIEVE_FOLDER.other;
   const tests = [];
   if (bl.replyTo.length + bl.sharedReplyTo.length)
     tests.push(`  header :contains "reply-to" ${sieveList([...bl.replyTo, ...bl.sharedReplyTo])}`);
@@ -136,14 +145,14 @@ export function asSieve(bl) {
 # Catches mail from senders that failed authentication, by what their
 # campaigns reuse: the sites they link to and the address replies go to.
 # The From address is never matched: in forged mail it is made up or
-# borrowed from a real company. Moves matches to Junk; change the folder if
-# yours is called something else (Proton: "Spam").
+# borrowed from a real company. Moves matches to "${folder}", the spam
+# folder${host === 'fastmail' ? ' on Fastmail' : host === 'proton' ? ' on Proton' : ' on most mail services'}.
 require ["fileinto", "body"];
 
 if anyof (
 ${tests.join(',\n')}
 ) {
-  fileinto "Junk";
+  fileinto "${folder}";
   stop;
 }
 `;
@@ -260,22 +269,32 @@ export function asPowerShell(bl, day) {
   const name = scriptName(day);
   const list = arr => '@(' + arr.map(h => `'${h}'`).join(',') + ')';
   const links = hosts(bl.links), replies = hosts([...bl.replyTo, ...bl.sharedReplyTo]);
-  const rule = (label, cond, arr) => `  $n = '${name} ${label}'; try { $rules.Remove($n) } catch {}
-  $r = $rules.Create($n, 0)
+  if (!links.length && !replies.length) return '# Nothing to block yet.\n';
+  // Exchange limits how large a mailbox's rules may be, so long lists are
+  // split over several rules of at most 100 values each.
+  const parts = (arr, n = 100) => Array.from({ length: Math.ceil(arr.length / n) }, (_, i) => arr.slice(i * n, i * n + n));
+  const rules = [
+    ...parts(links).map((arr, i, all) => [`links${all.length > 1 ? ' ' + (i + 1) : ''}`, 'BodyOrSubject', arr]),
+    ...parts(replies).map((arr, i, all) => [`replies${all.length > 1 ? ' ' + (i + 1) : ''}`, 'MessageHeader', arr])
+  ];
+  const rule = ([label, cond, arr]) => `  $r = $rules.Create('${name} ${label}', 0)
   $r.Conditions.${cond}.Text = [string[]]${list(arr)}
   $r.Conditions.${cond}.Enabled = $true
   $r.Actions.Delete.Enabled = $true
   $made += $r`;
-  if (!links.length && !replies.length) return '# Nothing to block yet.\n';
   return `# HoopUp: adds block rules to Outlook. Paste into PowerShell and press Enter.
 & {
-  try { $ol = New-Object -ComObject Outlook.Application } catch { Write-Host 'HoopUp: classic Outlook is not installed here. In the new Outlook, follow the Outlook.com steps.'; return }
+  try { $ol = New-Object -ComObject Outlook.Application }
+  catch { Write-Host 'HoopUp: could not reach classic Outlook. Is it installed? If this PowerShell window runs as administrator, open a normal one and paste again. In the new Outlook, follow the Outlook.com steps.'; return }
   $rules = $ol.Session.DefaultStore.GetRules()
+  # Running it again the same day replaces that day's rules instead of adding copies.
+  for ($i = $rules.Count; $i -ge 1; $i--) { if ($rules.Item($i).Name -like '${name} *') { $rules.Remove($i) } }
   $made = @()
-${[links.length ? rule('links', 'BodyOrSubject', links) : '', replies.length ? rule('replies', 'MessageHeader', replies) : ''].filter(Boolean).join('\n')}
-  $rules.Save()
+${rules.map(rule).join('\n')}
+  try { $rules.Save($false) }
+  catch { Write-Host "HoopUp: Outlook did not accept the rules ($($_.Exception.Message)), so nothing was saved. Please tell HoopUp."; return }
   foreach ($f in 23, 6) { foreach ($r in $made) { try { $r.Execute($false, $ol.Session.GetDefaultFolder($f)) } catch {} } }
-  Write-Host 'HoopUp: rules added. Scams already in Junk and Inbox were deleted.'
+  Write-Host "HoopUp: $($made.Count) rules added to Outlook. Scams already in Junk and Inbox were moved to Deleted Items."
 }
 `;
 }
