@@ -408,7 +408,11 @@ Outlook on the web takes rule values one at a time. Microsoft's Graph API takes 
 the whole block list goes in with one click. That needs an app registration at Microsoft, made once by
 whoever runs the site (free, no secret, no certificate):
 
-1. [entra.microsoft.com](https://entra.microsoft.com) (or portal.azure.com) → **App registrations** →
+1. An app registration lives in a Microsoft Entra directory. A personal Microsoft account (Outlook.com,
+   Hotmail) has none of its own: signing up for a free Azure account at
+   [azure.microsoft.com/free](https://azure.microsoft.com/free) creates one (Microsoft asks for a card to
+   verify identity; registering an app costs nothing). A work or school account already has one.
+   Then [entra.microsoft.com](https://entra.microsoft.com) (or portal.azure.com) → **App registrations** →
    **New registration**. Name: *HoopUp*. Supported account types: **Personal Microsoft accounts only**.
 2. Redirect URI: platform **Single-page application (SPA)**, `https://hoopup.tech/auth.html`.
 3. **Register**, then copy the **Application (client) ID** into `MS_CLIENT_ID` in `src/config.js`.
