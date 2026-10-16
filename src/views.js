@@ -11,7 +11,7 @@ import { csvLog } from './log.js';
 import { outlookAvailable, outlookStart, outlookFinish } from './outlook.js';
 import { allBreaches, breachesForAccount, pwnedPasswordCount } from './hibp.js';
 import { L, plural, lang } from './i18n.js';
-import { buildBlockList, asLinkList, asReplyList, asGmailXml, asGmailQueries, asSieve, asAppleScript, asPowerShell, guessClient } from './blocklist.js';
+import { buildBlockList, asLinkList, asReplyList, asGmailXml, asGmailQueries, asSieve, asAppleScript, asPowerShell } from './blocklist.js';
 import { isPersonalDomain, cleanHost, nameMatchesDomain, groupBySender, registrableDomain } from './mailscan.js';
 import { contactFor, CHECKED, lookupAvailable, lookupContact } from './contacts.js';
 
@@ -1774,13 +1774,41 @@ export function offlineCard(state) {
 // ---------------------------------------------------------------- block all
 
 const CLIENTS = () => ({
-  outlookcom: 'Outlook.com / Hotmail',
-  outlookwin: L('Outlook for Windows', 'Outlook voor Windows'),
-  gmail:      'Gmail',
   apple:      'Apple Mail / iCloud',
+  outlookmac: 'Outlook for Mac',
+  outlookwin: L('Outlook (classic)', 'Outlook (klassiek)'),
+  outlooknew: L('New Outlook', 'Nieuwe Outlook'),
+  outlookcom: L('Outlook.com / Hotmail (browser)', 'Outlook.com / Hotmail (browser)'),
+  gmail:      'Gmail',
   sieve:      L('Fastmail, Proton & others', 'Fastmail, Proton & andere')
 });
-let blockClient = null;
+// What can run where: a script for Apple Mail only on a Mac, one for classic
+// Outlook only on Windows. Outlook for Mac and the new Outlook run no scripts
+// at all; they use the rules kept on the Outlook.com account, which is where
+// the Outlook.com route puts them.
+const SYSTEMS = () => ({ mac: 'Mac', windows: 'Windows', other: L('Phone, tablet or other', 'Telefoon, tablet of anders') });
+const CLIENTS_ON = { mac: ['apple', 'outlookmac', 'outlookcom', 'gmail', 'sieve'], windows: ['outlookwin', 'outlooknew', 'outlookcom', 'gmail', 'sieve'], other: ['outlookcom', 'gmail', 'sieve'] };
+let blockClient = null, blockSystem = null;
+
+export function detectSystem() {
+  const ua = navigator.userAgent || '';
+  const platform = (navigator.userAgentData?.platform || navigator.platform || '') + ' ' + ua;
+  // An iPad asks for the desktop site as a Mac, but has a touch screen.
+  if (/iPhone|iPad|Android|Mobile/i.test(ua) || (/Mac/i.test(platform) && navigator.maxTouchPoints > 1)) return 'other';
+  if (/Mac/i.test(platform)) return 'mac';
+  if (/Win/i.test(platform)) return 'windows';
+  return 'other';
+}
+
+// The best mail app to start with on this computer, for this address.
+function defaultClient(system, provider) {
+  if (provider === 'google') return 'gmail';
+  // One click on Microsoft's server beats anything on one computer.
+  if (provider === 'microsoft' && outlookAvailable()) return 'outlookcom';
+  if (system === 'mac') return 'apple';
+  if (system === 'windows') return 'outlookwin';
+  return provider === 'microsoft' ? 'outlookcom' : 'sieve';
+}
 
 // What the user has confirmed adding to their mail app ("Done"). An older
 // "exported" record counts too: before the Done button existed, downloading
@@ -1834,7 +1862,7 @@ function mailProvider(state) {
 
 // The short version: what to do, for this address in this mail app, in at
 // most three lines. The panel below it has the clicks.
-export function blockAdvice(provider, client, n) {
+export function blockAdvice(provider, client, n, system = 'other') {
   const outlookJunk = ext('https://outlook.live.com/mail/0/junkemail', 'outlook.com');
   const learn = {
     microsoft: L('<b>On your phone or the web:</b> mark anything that still gets through as junk. Microsoft\'s filter learns from it.',
@@ -1869,8 +1897,21 @@ export function blockAdvice(provider, client, n) {
         '<b>Eén keer:</b> plak het script hieronder in PowerShell. Het zet de regels in Outlook en ruimt op wat er al in Ongewenste e-mail en Postvak IN staat.'),
       learn.microsoft];
     else if (client === 'outlookcom') lines = [...outlookWeb, learn.microsoft];
-    else lines = [L('Your address is on Outlook.com or Hotmail. Choose <b>Apple Mail</b>, <b>Outlook</b> or <b>Outlook.com</b> above, whichever you read it in.',
-      'Je adres is van Outlook.com of Hotmail. Kies hierboven <b>Apple Mail</b>, <b>Outlook</b> of <b>Outlook.com</b>, waar je het ook leest.')];
+    else if (client === 'outlookmac' || client === 'outlooknew') lines = [
+      L(`${CLIENTS()[client]} runs no scripts: it uses the rules on your Outlook.com account. Add them there once, and they work in ${CLIENTS()[client]}, on your phone and on the web.`,
+        `${CLIENTS()[client]} draait geen scripts: het gebruikt de regels van je Outlook.com-account. Zet ze daar één keer in, dan werken ze in ${CLIENTS()[client]}, op je telefoon en op het web.`),
+      outlookAvailable() ? L('<b>One click</b> below does it.', '<b>Eén klik</b> hieronder regelt het.')
+        : (client === 'outlookmac'
+          ? L(`Outlook.com takes them one value at a time (${n} here). Quicker: if this account is also in <b>Apple Mail</b>, choose that above, where one paste does it all.`,
+              `Outlook.com neemt ze één waarde tegelijk aan (hier ${n}). Sneller: staat dit account ook in <b>Apple Mail</b>, kies dat dan hierboven, daar is het één keer plakken.`)
+          : L(`Outlook.com takes them one value at a time (${n} here). Quicker: if you still have <b>classic Outlook</b> (the switch at the top right of the new one), choose <b>Outlook (classic)</b> above, where one paste does it all.`,
+              `Outlook.com neemt ze één waarde tegelijk aan (hier ${n}). Sneller: heb je nog <b>klassiek Outlook</b> (de schakelaar rechtsboven in de nieuwe), kies dan hierboven <b>Outlook (klassiek)</b>, daar is het één keer plakken.`)) + ' ' + emptyJunk,
+      learn.microsoft];
+    else {
+      const fit = CLIENTS_ON[system].filter(k => /^(apple|outlook)/.test(k)).map(k => `<b>${CLIENTS()[k]}</b>`).join(', ');
+      lines = [L(`Your address is on Outlook.com or Hotmail. Choose the app you read it in above: ${fit}.`,
+        `Je adres is van Outlook.com of Hotmail. Kies hierboven de app waarin je het leest: ${fit}.`)];
+    }
   } else if (provider === 'google') {
     lines = client === 'gmail' ? [
       L('<b>Once:</b> import the filter file below. Gmail then deletes these scams on Google\'s server, on every device.',
@@ -1884,8 +1925,10 @@ export function blockAdvice(provider, client, n) {
     lines = client === 'apple' ? [appleRule,
       L('<b>Scams already in Junk:</b> in Mail, open Junk, select all (<b>⌘A</b>) and press Delete.', '<b>Oplichters die al in Ongewenst staan:</b> open in Mail Ongewenst, selecteer alles (<b>⌘A</b>) en druk op Delete.'),
       learn.icloud
-    ] : [L('Your address is iCloud. iCloud\'s own rules cannot look at links, so choose <b>Apple Mail</b> above.',
-      'Je adres is van iCloud. De eigen regels van iCloud kunnen niet naar links kijken, dus kies hierboven <b>Apple Mail</b>.')];
+    ] : system === 'mac' ? [L('Your address is iCloud. iCloud\'s own rules cannot look at links, so choose <b>Apple Mail</b> above.',
+      'Je adres is van iCloud. De eigen regels van iCloud kunnen niet naar links kijken, dus kies hierboven <b>Apple Mail</b>.')]
+      : [L('Your address is iCloud. iCloud\'s own rules cannot look at links; only Apple Mail on a Mac can. Have a Mac? Choose <b>Mac</b> above.',
+        'Je adres is van iCloud. De eigen regels van iCloud kunnen niet naar links kijken; alleen Apple Mail op een Mac kan dat. Heb je een Mac? Kies hierboven <b>Mac</b>.'), learn.icloud];
   } else {
     lines = client === 'sieve' ? [L('<b>Once:</b> copy the version for your mail service below and paste it in its filter settings. It runs on their server, on every device.',
       '<b>Eén keer:</b> kopieer hieronder de versie voor je maildienst en plak die in de filterinstellingen. Hij draait op hun server, op elk apparaat.')]
@@ -1903,7 +1946,10 @@ export function blockAdvice(provider, client, n) {
 export function blockAllCard(state, { closable = false } = {}) {
   const view = blockView(state);
   const bl = view.bl;
-  if (!blockClient) blockClient = state.mailApp || guessClient(state.custom.filter(isBlockable));
+  const provider = mailProvider(state);
+  if (!blockSystem) blockSystem = state.system || (state.mailApp === 'apple' ? 'mac' : state.mailApp === 'outlookwin' ? 'windows' : detectSystem());
+  if (!blockClient) blockClient = state.mailApp || defaultClient(blockSystem, provider);
+  if (!CLIENTS_ON[blockSystem].includes(blockClient)) blockClient = defaultClient(blockSystem, provider);
   const reply = bl.replyTo.length + bl.sharedReplyTo.length;
   const rules = bl.links.length + reply;
   const at = esc(blockDoneAt(state));
@@ -1923,9 +1969,12 @@ export function blockAllCard(state, { closable = false } = {}) {
         <p class="small muted" style="max-width:58ch;margin:0">${L('Only unsafe senders are blocked, never a real company. The rules target what these campaigns reuse: the sites their links go to and where replies go. Not the From address, which in forged mail is made up or borrowed from a real company.',
           'Alleen onveilige afzenders worden geblokkeerd, nooit een echt bedrijf. De regels richten zich op wat deze afzenders steeds opnieuw gebruiken: de websites waar hun links naartoe gaan en de adressen waar antwoorden heen gaan. Niet op het afzenderadres, want dat is bij nepmail verzonnen of geleend van een echt bedrijf.')}</p>
       </div>
-      <div class="row" style="flex-wrap:nowrap">
+      <div class="row block-pick">
+        <select id="block-system" style="width:auto" aria-label="${L('Your computer', 'Je computer')}">
+          ${Object.entries(SYSTEMS()).map(([k, v]) => `<option value="${k}" ${k === blockSystem ? 'selected' : ''}>${v}</option>`).join('')}
+        </select>
         <select id="block-client" style="width:auto" aria-label="${L('Your mail app', 'Je mailapp')}">
-          ${Object.entries(CLIENTS()).map(([k, v]) => `<option value="${k}" ${k === blockClient ? 'selected' : ''}>${v}</option>`).join('')}
+          ${CLIENTS_ON[blockSystem].map(k => `<option value="${k}" ${k === blockClient ? 'selected' : ''}>${CLIENTS()[k]}</option>`).join('')}
         </select>
         ${closable ? `<button class="link-btn" data-action="panel-close">${L('Close', 'Sluiten')}</button>` : ''}
       </div>
@@ -1942,7 +1991,7 @@ export function blockAllCard(state, { closable = false } = {}) {
     ${view.delta ? `<p class="small">${L(`Only what is new since ${at}. Add these to the rules you made then, or make a new rule. Both work.`,
       `Alleen wat nieuw is sinds ${at}. Voeg ze toe aan de regels die je toen maakte, of maak een nieuwe regel. Allebei werkt.`)}</p>` : ''}
 
-    ${rules ? `<div id="block-advice">${blockAdvice(mailProvider(state), blockClient, rules)}</div>` : ''}
+    ${rules ? `<div id="block-advice">${blockAdvice(provider, blockClient, rules, blockSystem)}</div>` : ''}
     <div id="block-panel">${rules ? blockPanel(bl, blockClient) : `<p class="small muted">${L('Nothing blockable yet: these senders left no reusable trace. Drop the messages in again so their links and reply addresses are recorded.',
       'Nog niets te blokkeren: deze afzenders lieten geen herbruikbaar spoor achter. Zet de mails er opnieuw in, zodat hun links en antwoordadressen worden vastgelegd.')}</p>`}</div>
     ${rules ? `
@@ -1999,8 +2048,8 @@ export function blockPanel(bl, client) {
         <li>${L('Open the Start menu, type <b>PowerShell</b> and open it.', 'Open het Startmenu, typ <b>PowerShell</b> en open het.')}</li>
         <li>${L('Paste (<b>Ctrl+V</b> or right-click) and press <b>Enter</b>. If Outlook asks to allow access, allow it.', 'Plak (<b>Ctrl+V</b> of rechtermuisknop) en druk op <b>Enter</b>. Vraagt Outlook om toegang, sta het toe.')}</li>
       </ol>
-      <p class="small muted">${L('The script adds the rules to Outlook and clears the scams already in Junk and Inbox to Deleted Items. It reads nothing and sends nothing. For classic Outlook; in the new Outlook, choose <b>Outlook.com</b> above.',
-        'Het script zet de regels in Outlook en ruimt de oplichtersmails die al in Ongewenste e-mail en Postvak IN staan op naar Verwijderde items. Het leest niets en verstuurt niets. Voor klassiek Outlook; gebruik je het nieuwe Outlook, kies dan hierboven <b>Outlook.com</b>.')}</p>`,
+      <p class="small muted">${L('The script adds the rules to Outlook and clears the scams already in Junk and Inbox to Deleted Items. It reads nothing and sends nothing. For classic Outlook on Windows. The new Outlook and Outlook for Mac cannot run scripts: choose those above.',
+        'Het script zet de regels in Outlook en ruimt de oplichtersmails die al in Ongewenste e-mail en Postvak IN staan op naar Verwijderde items. Het leest niets en verstuurt niets. Voor klassiek Outlook op Windows. Het nieuwe Outlook en Outlook voor Mac kunnen geen scripts draaien: kies die hierboven.')}</p>`,
     gmail: `
       <ol class="small">
         <li>${L('Download the filter file below.', 'Download hieronder het filterbestand.')}</li>
@@ -2037,6 +2086,11 @@ export function blockPanel(bl, client) {
         'Elke versie verplaatst wat matcht naar de eigen spammap van die dienst. Bij Fastmail moet de mapnaam precies kloppen: bestaat hij niet, dan laat Fastmail de mail in de inbox staan.')}</p>`
   };
 
+  // Outlook for Mac and the new Outlook keep these rules on the account: the
+  // same steps, done once on outlook.com.
+  if (client === 'outlookmac' || client === 'outlooknew') steps[client] = `<p class="small">${L(
+    `${CLIENTS()[client]} has no way to run a script, and its rules for an Outlook.com account are the ones on outlook.com. So set them up there, in your browser, once: they then appear in ${CLIENTS()[client]} too.`,
+    `${CLIENTS()[client]} kan geen script draaien, en de regels voor een Outlook.com-account zijn die op outlook.com. Zet ze daar dus één keer in, in je browser: ze verschijnen dan ook in ${CLIENTS()[client]}.`)}</p>` + steps.outlookcom;
   return steps[client] + sharedNote + `
     <p class="small muted" style="margin-top:10px">${L('New variants keep coming: these operations change domains constantly. Scan your junk again in a few weeks and update the rules. The list grows each time. If one address gets little else, see <b>Your addresses</b> on Home.',
       'Er blijven nieuwe varianten komen: deze partijen wisselen voortdurend van domein. Scan over een paar weken je ongewenste mail opnieuw en werk de regels bij. De lijst groeit elke keer. Krijgt één adres weinig anders meer, kijk dan bij <b>Je adressen</b> op Home.')}</p>`;
@@ -2068,13 +2122,20 @@ export function wireBlock(root, state, onChange) {
     if (card) card.outerHTML = blockAllCard(store.get(), { closable: !!card.dataset.closable });
   };
   root.addEventListener('change', e => {
+    if (e.target.id === 'block-system') {
+      blockSystem = e.target.value;
+      blockClient = defaultClient(blockSystem, mailProvider(store.get()));
+      store.update(st => { st.system = blockSystem; st.mailApp = blockClient; });
+      redraw(e.target);
+      return;
+    }
     if (e.target.id !== 'block-client') return;
     blockClient = e.target.value;
-    store.update(st => { st.mailApp = blockClient; });
+    store.update(st => { st.mailApp = blockClient; st.system = blockSystem; });
     const bl = blockView(store.get()).bl;
     root.querySelector('#block-panel').innerHTML = blockPanel(bl, blockClient);
     const advice = root.querySelector('#block-advice');
-    if (advice) advice.innerHTML = blockAdvice(mailProvider(store.get()), blockClient, bl.links.length + bl.replyTo.length + bl.sharedReplyTo.length);
+    if (advice) advice.innerHTML = blockAdvice(mailProvider(store.get()), blockClient, bl.links.length + bl.replyTo.length + bl.sharedReplyTo.length, blockSystem);
   });
   root.addEventListener('click', e => {
     const btn = e.target.closest('[data-action]');
@@ -2142,7 +2203,7 @@ async function finishOutlook(root) {
   }
   const ids = store.get().custom.filter(isBlockable).map(t => t.id);
   showAllRules = false;
-  store.update(st => { st.blockDone = { at: store.today(), ids }; delete st.blockExport; st.mailApp = 'outlookcom'; });
+  store.update(st => { st.blockDone = { at: store.today(), ids }; delete st.blockExport; if (!/^outlook/.test(st.mailApp || '')) st.mailApp = 'outlookcom'; });
   const card = root.querySelector('.block-card');
   if (card) card.outerHTML = blockAllCard(store.get());
   out.innerHTML = `<div class="notice"><p><b>${L(`Done: ${r.added} ${r.added === 1 ? 'rule' : 'rules'} added to Outlook.com`, `Klaar: ${r.added} ${r.added === 1 ? 'regel' : 'regels'} in Outlook.com gezet`)}</b>

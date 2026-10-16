@@ -17,6 +17,7 @@ const EMPTY = {
   addressAnswers: {}, // address -> 'keep' | 'retire': the user's answer on Home
   addressMoves: {},   // address -> steps of the move plan ticked off
   mailApp: '',        // the mail app the block rules are for: from the dropped files, or chosen
+  system: '',         // 'mac' | 'windows' | 'other': the computer the block rules are for
   uiLang: ''      // '' = follow the browser; 'en' | 'nl' once chosen
 };
 

@@ -284,7 +284,7 @@ export function asPowerShell(bl, day) {
   return `# HoopUp: adds block rules to Outlook. Paste into PowerShell and press Enter.
 & {
   try { $ol = New-Object -ComObject Outlook.Application }
-  catch { Write-Host 'HoopUp: could not reach classic Outlook. Is it installed? If this PowerShell window runs as administrator, open a normal one and paste again. In the new Outlook, follow the Outlook.com steps.'; return }
+  catch { Write-Host 'HoopUp: could not reach classic Outlook. Is it installed? If this PowerShell window runs as administrator, open a normal one and paste again. The new Outlook cannot run scripts: on HoopUp, choose New Outlook instead.'; return }
   $rules = $ol.Session.DefaultStore.GetRules()
   # Running it again the same day replaces that day's rules instead of adding copies.
   for ($i = $rules.Count; $i -ge 1; $i--) { if ($rules.Item($i).Name -like '${name} *') { $rules.Remove($i) } }
