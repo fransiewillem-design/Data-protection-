@@ -46,15 +46,17 @@ function minimalBlock(b, nl) {
     : nl ? 'E-mailadres: [vul het adres in waarop u hun bericht ontving]'
          : 'Email address: [fill in the address their message reached you on]';
   const several = lines.length > 1 || /,|;/.test(lines[0]?.[1] || '');
+  // Flowing sentences, no hard line breaks: a mail app wraps them to the
+  // screen, where fixed breaks look ragged on a phone.
   const why = nl
     ? (several
-      ? 'Dit zijn de enige gegevens die ik verstrek. Het zijn precies de gegevens die uw eigen\nberichten aan mij laten zien, dus u heeft ze aantoonbaar al, en ze volstaan om mijn\ngegevens te vinden.'
-      : 'Dit is het enige identificatiegegeven dat ik verstrek, omdat u het aantoonbaar al van mij\nheeft (u heeft mij hierop benaderd) en het volstaat om mijn gegevens te vinden.')
-      + '\nOp grond van artikel 12, lid 2, AVG moet u de uitoefening van mijn rechten faciliteren.\nOp grond van artikel 12, lid 6, mag u alleen om aanvullende gegevens vragen als u redelijke\ntwijfel heeft over mijn identiteit, en dan alleen wat nodig is om die twijfel weg te nemen.'
+      ? 'Dit zijn de enige gegevens die ik verstrek. Het zijn precies de gegevens die uw eigen berichten aan mij laten zien, dus u heeft ze aantoonbaar al, en ze volstaan om mijn gegevens te vinden.'
+      : 'Dit is het enige identificatiegegeven dat ik verstrek, omdat u het aantoonbaar al van mij heeft (u heeft mij hierop benaderd) en het volstaat om mijn gegevens te vinden.')
+      + ' Op grond van artikel 12, lid 2, AVG moet u de uitoefening van mijn rechten faciliteren. Op grond van artikel 12, lid 6, mag u alleen om aanvullende gegevens vragen als u redelijke twijfel heeft over mijn identiteit, en dan alleen wat nodig is om die twijfel weg te nemen.'
     : (several
-      ? 'These are the only details I am providing. They are exactly what your own messages to me\nshow, so you demonstrably hold them already, and they are enough to locate my records.'
-      : 'This is the only identifier I am providing, because it is the one you demonstrably\nalready hold (it is how you contacted me) and it is enough to locate my records.')
-      + '\nUnder Article 12(2) GDPR you must facilitate the exercise of my rights. Under Article\n12(6) you may ask for additional information only if you have reasonable doubts about\nmy identity, and then only what is necessary to resolve them.';
+      ? 'These are the only details I am providing. They are exactly what your own messages to me show, so you demonstrably hold them already, and they are enough to locate my records.'
+      : 'This is the only identifier I am providing, because it is the one you demonstrably already hold (it is how you contacted me) and it is enough to locate my records.')
+      + ' Under Article 12(2) GDPR you must facilitate the exercise of my rights. Under Article 12(6) you may ask for additional information only if you have reasonable doubts about my identity, and then only what is necessary to resolve them.';
   return id + '\n\n' + why;
 }
 

@@ -2531,10 +2531,14 @@ export function profile(state) {
   return `
   <div class="head">
     <h1>${L('Settings', 'Instellingen')}</h1>
-    <p>${L(`These fill in the letters. A request without enough detail to identify you is one a company can
-    legitimately refuse, so this is worth filling in properly.`,
-    `Hiermee worden de brieven ingevuld. Een verzoek waaruit niet blijkt wie je bent mag een bedrijf weigeren,
-    dus vul dit zorgvuldig in.`)}</p>
+    <p>${L(`All optional. Letters to companies found in your mail never use these details: they identify you
+    with exactly what that company's own mail shows. Your name, date of birth and address below only go into
+    letters to the bundled data brokers (who cannot find you by an email address alone) and into a complaint
+    to the regulator. Your addresses and phone numbers help HoopUp recognise which mail was sent to you.`,
+    `Alles is optioneel. Brieven aan bedrijven uit je mail gebruiken deze gegevens nooit: die noemen precies
+    wat de eigen mail van dat bedrijf laat zien. Je naam, geboortedatum en adres hieronder komen alleen in
+    brieven aan de bekende databrokers (die je niet aan alleen een e-mailadres herkennen) en in een klacht bij
+    de toezichthouder. Je adressen en telefoonnummers helpen HoopUp herkennen welke mail aan jou gericht was.`)}</p>
   </div>
 
   <div class="card">
