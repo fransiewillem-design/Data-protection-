@@ -3,7 +3,7 @@
 // stale in another, and the language is read at render time, so switching is
 // just a re-render.
 
-let current = 'en';
+let current = 'nl';
 
 export function setLang(l) {
   current = l === 'nl' ? 'nl' : 'en';

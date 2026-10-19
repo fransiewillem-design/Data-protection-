@@ -38,14 +38,24 @@ function renderNav(path) {
 
 // The interface language: what the user picked, else the browser's own.
 // Separate from profile.language, which only decides the language of letters.
+// What the user picked; otherwise the first of the system's languages that
+// HoopUp speaks (English or Dutch); otherwise Dutch.
+export function systemLang(langs) {
+  for (const l of langs) {
+    if (/^nl\b/i.test(l)) return 'nl';
+    if (/^en\b/i.test(l)) return 'en';
+  }
+  return 'nl';
+}
 function uiLang(state) {
   if (state.uiLang) return state.uiLang;
-  return /^nl\b/i.test(navigator.language || '') ? 'nl' : 'en';
+  return systemLang(navigator.languages?.length ? navigator.languages : [navigator.language || '']);
 }
 
 // The static shell in index.html, re-labelled whenever the language changes.
 function renderChrome() {
   const set = (id, html) => { const el = document.getElementById(id); if (el) el.innerHTML = html; };
+  document.title = L('HoopUp: stop spam, get your data deleted', 'HoopUp: stop spam, laat je gegevens wissen');
   set('skip', L('Skip to content', 'Naar de inhoud'));
   set('local-badge', L('local only', 'alleen lokaal'));
   document.getElementById('local-badge')?.setAttribute('title', L(

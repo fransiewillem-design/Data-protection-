@@ -161,8 +161,9 @@ The send queue follows the same order, so the companies with no business holding
 to first. A full erasure request to your own phone company would be refused for everything the contract
 needs, or acted on by closing the account; the customer letter asks for what is enforceable without that.
 
-**Dutch.** The interface is available in English and Dutch (EN | NL switch in the top bar). It follows
-the browser language on first visit and remembers the choice. Letters follow the interface by default
+**Dutch.** The interface is available in English and Dutch (EN | NL switch in the top bar). On a first
+visit it follows the system language (English or Dutch), and any other language gets Dutch; a choice
+made with the switch is remembered. Letters follow the interface by default
 (Settings → Letter language: same as the app, always English, always Dutch). In Dutch, every company found
 in your own mail, calls or breaches, and every broker operating in the Netherlands or Belgium, gets a Dutch
 letter; international brokers stay in English, with a note saying why. Dutch templates exist for the
