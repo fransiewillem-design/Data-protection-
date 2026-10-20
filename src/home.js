@@ -9,7 +9,7 @@ import { filesFromDrop, isMailFileName } from './mailfile.js';
 import {
   esc, toast, senderClass, unsubTier, ingestFiles, ingestToasts, runOneClickBatch, isWanted, wantedWhy, isBlockable,
   startUnsubQueue, wireQueue, wireBlock, blockAllCard, hostOf, nameOf, akaOf, deleteWork, unsafeReason, writable, coveredBy,
-  blockDoneIds, blockDoneAt, blockView, ruleCount
+  blockDoneIds, blockDoneAt, blockView, ruleCount, detectSystem
 } from './views.js';
 
 const ICONS = {
@@ -161,24 +161,85 @@ function dropZone(compact) {
   </div>`;
 }
 
-const HOWTO = () => `
-  <details class="howto">
-    <summary>${L('How do I get the files out of my mail app?', 'Hoe haal ik de bestanden uit mijn mailapp?')}</summary>
-    <p class="small">${L('Just the junk folder is quick. The whole mailbox also shows what you actually read: newsletters you open, star, file or answer are kept, and only the ones you ignore are offered for unsubscribing.',
+// How to get mail out of each app, one app at a time: the one this computer
+// most likely uses is open, the others are a tap away.
+const HOWTO_APPS = () => [
+  ['apple', 'Apple Mail', L(`
+      <div class="howto-cols">
+        <div><h3>Junk only</h3><ol>
+          <li>Open the <b>Junk</b> mailbox in Mail.</li>
+          <li>Press <code>Cmd+A</code> and drag the messages into a folder in Finder, such as <b>Downloads</b>.</li>
+          <li>Drag that folder here.</li></ol></div>
+        <div><h3>The whole mailbox</h3><ol>
+          <li>Select a mailbox (Inbox, or several).</li>
+          <li><b>Mailbox</b> → <b>Export Mailbox…</b> → choose a folder.</li>
+          <li>Drag the exported <code>.mbox</code> folders here.</li></ol></div>
+      </div>
+      <p class="small muted">Does your Desktop sync with iCloud? Use Downloads instead: a file that is only in iCloud cannot be read until it is downloaded.</p>`, `
+      <div class="howto-cols">
+        <div><h3>Alleen ongewenste mail</h3><ol>
+          <li>Open in Mail de map <b>Ongewenst</b>.</li>
+          <li>Druk op <code>Cmd+A</code> en sleep de berichten naar een map in de Finder, zoals <b>Downloads</b>.</li>
+          <li>Sleep die map hierheen.</li></ol></div>
+        <div><h3>De hele mailbox</h3><ol>
+          <li>Kies een mailbox (Postvak IN, of meerdere).</li>
+          <li><b>Mailbox</b> → <b>Exporteer mailbox…</b> → kies een map.</li>
+          <li>Sleep de geëxporteerde <code>.mbox</code>-mappen hierheen.</li></ol></div>
+      </div>
+      <p class="small muted">Synchroniseert je bureaublad met iCloud? Gebruik dan Downloads: een bestand dat alleen in iCloud staat, kan pas gelezen worden als het gedownload is.</p>`)],
+  ['outlookwin', L('Outlook on Windows', 'Outlook op Windows'), L(`<ol>
+      <li>Open <b>Junk Email</b>, or your Inbox and press <code>Ctrl+A</code> to select everything.</li>
+      <li>Drag the messages into a folder in File Explorer. They become <code>.msg</code> files.</li>
+      <li>Drag that folder here.</li></ol>`, `<ol>
+      <li>Open <b>Ongewenste e-mail</b>, of je Postvak IN en druk op <code>Ctrl+A</code> om alles te selecteren.</li>
+      <li>Sleep de berichten naar een map in Verkenner. Het worden <code>.msg</code>-bestanden.</li>
+      <li>Sleep die map hierheen.</li></ol>`)],
+  ['gmail', 'Gmail', L(`<ol>
+      <li>Open <a href="https://takeout.google.com" target="_blank" rel="noopener noreferrer">Google Takeout</a>, press <b>Deselect all</b>, tick <b>Mail</b> and export.</li>
+      <li>Download the file Google sends you and unzip it.</li>
+      <li>Drag the <code>.mbox</code> here. It holds your whole mailbox with its labels, so reading takes a few minutes, all on your device.</li></ol>`, `<ol>
+      <li>Open <a href="https://takeout.google.com" target="_blank" rel="noopener noreferrer">Google Takeout</a>, klik op <b>Alles deselecteren</b>, vink <b>Mail</b> aan en exporteer.</li>
+      <li>Download het bestand dat Google je stuurt en pak het uit.</li>
+      <li>Sleep de <code>.mbox</code> hierheen. Daarin staat je hele mailbox met labels, dus het lezen duurt een paar minuten, helemaal op je apparaat.</li></ol>`)],
+  ['outlookcom', 'Outlook.com, Hotmail', L(`<p class="small">Outlook.com cannot export mail in the browser. Add the account to a mail app first:</p><ol>
+      <li>Add your Outlook.com or Hotmail account to <b>Apple Mail</b> (Mac) or <b>Thunderbird</b> (Windows).</li>
+      <li>Then follow the steps for that app here.</li></ol>`, `<p class="small">Outlook.com kan in de browser geen mail exporteren. Voeg het account daarom eerst toe aan een mailapp:</p><ol>
+      <li>Voeg je Outlook.com- of Hotmail-account toe aan <b>Apple Mail</b> (Mac) of <b>Thunderbird</b> (Windows).</li>
+      <li>Volg daarna hier de stappen voor die app.</li></ol>`)],
+  ['thunderbird', 'Thunderbird', L(`<ol>
+      <li><b>Account Settings</b> → <b>Server Settings</b> → <b>Local Directory</b> shows where your mail is stored.</li>
+      <li>Each folder there is one file without an extension, like <code>Inbox</code> or <code>Junk</code>: drag those here.</li></ol>`, `<ol>
+      <li><b>Accountinstellingen</b> → <b>Serverinstellingen</b> → <b>Lokale map</b> toont waar je mail staat.</li>
+      <li>Elke map daarin is één bestand zonder extensie, zoals <code>Inbox</code> of <code>Junk</code>: sleep die hierheen.</li></ol>`)]
+];
+
+// The app to open first: the one the last drop came from, else the usual one
+// on this computer.
+function howtoDefault(state) {
+  if (['apple', 'outlookwin', 'gmail'].includes(state.mailApp)) return state.mailApp;
+  const sys = state.system || detectSystem();
+  return sys === 'mac' ? 'apple' : sys === 'windows' ? 'outlookwin' : 'thunderbird';
+}
+
+const onPhone = () => /iPhone|iPad|Android|Mobile/i.test(navigator.userAgent || '')
+  || (/Mac/i.test(navigator.platform || '') && navigator.maxTouchPoints > 1);
+
+const HOWTO = state => {
+  const open = howtoDefault(state);
+  return `
+  <section class="howto-card" aria-labelledby="howto-title">
+    <h2 id="howto-title">${L('Getting your mail out of your mail app', 'Zo haal je je mail uit je mailapp')}</h2>
+    ${onPhone() ? `<p class="notice warn small">${L('A phone cannot export mail. Open hoopup.tech on your computer to drop your mail in.',
+      'Op een telefoon kun je geen mail exporteren. Open hoopup.tech op je computer om je mail erin te slepen.')}</p>` : ''}
+    <p class="small muted">${L('Just the junk folder is quick. The whole mailbox also shows what you actually read: newsletters you open, star, file or answer are kept, and only the ones you ignore are offered for unsubscribing.',
       'Alleen de map Ongewenst gaat snel. De hele mailbox laat ook zien wat je echt leest: nieuwsbrieven die je opent, een ster geeft, opbergt of beantwoordt, blijven staan, en uitschrijven wordt alleen aangeboden voor wat je negeert.')}</p>
-    <ul class="small">${L(`
-      <li><b>Apple Mail:</b> junk only? Open Junk, <code>Cmd+A</code>, drag onto the Desktop, drop the files here. Whole mailbox? Select a mailbox (Inbox, or several) → <b>Mailbox</b> → <b>Export Mailbox…</b> → choose a folder, then drop the exported <code>.mbox</code> folders here.</li>
-      <li><b>Gmail:</b> <a href="https://takeout.google.com" target="_blank" rel="noopener noreferrer">Google Takeout</a> → deselect all → <b>Mail</b> → export, then drop the <code>.mbox</code> here. It holds your whole mailbox with its labels, so reading takes a few minutes, all on your device.</li>
-      <li><b>Outlook on Windows:</b> select the messages (Junk, or <code>Ctrl+A</code> in Inbox) and drag them into a folder in File Explorer. They become <code>.msg</code> files; drop the folder here.</li>
-      <li><b>Outlook.com, Hotmail:</b> add the account to Apple Mail or Thunderbird and export from there.</li>
-      <li><b>Thunderbird:</b> <b>Account Settings</b> → <b>Server Settings</b> → <b>Local Directory</b> shows where your mail is stored. Each folder there is one file without an extension, like <code>Inbox</code>: drop those here.</li>`, `
-      <li><b>Apple Mail:</b> alleen ongewenste mail? Open Ongewenst, <code>Cmd+A</code>, sleep alles naar het bureaublad en dan hierheen. De hele mailbox? Kies een mailbox (Postvak IN, of meerdere) → <b>Mailbox</b> → <b>Exporteer mailbox…</b> → kies een map, en sleep de geëxporteerde <code>.mbox</code>-mappen hierheen.</li>
-      <li><b>Gmail:</b> <a href="https://takeout.google.com" target="_blank" rel="noopener noreferrer">Google Takeout</a> → alles deselecteren → <b>Mail</b> → exporteren, en sleep de <code>.mbox</code> hierheen. Daarin staat je hele mailbox met labels, dus het lezen duurt een paar minuten, helemaal op je apparaat.</li>
-      <li><b>Outlook op Windows:</b> selecteer de berichten (Ongewenste e-mail, of <code>Ctrl+A</code> in Postvak IN) en sleep ze naar een map in Verkenner. Het worden <code>.msg</code>-bestanden; sleep de map hierheen.</li>
-      <li><b>Outlook.com, Hotmail:</b> voeg het account toe aan Apple Mail of Thunderbird en exporteer daarvandaan.</li>
-      <li><b>Thunderbird:</b> <b>Accountinstellingen</b> → <b>Serverinstellingen</b> → <b>Lokale map</b> toont waar je mail staat. Elke map daarin is één bestand zonder extensie, zoals <code>Inbox</code>: sleep die hierheen.</li>`)}
-    </ul>
-  </details>`;
+    <div class="seg" role="tablist" aria-label="${L('Your mail app', 'Je mailapp')}">
+      ${HOWTO_APPS().map(([k, name]) => `<button type="button" role="tab" id="howto-tab-${k}" aria-controls="howto-${k}"
+        aria-selected="${k === open}" tabindex="${k === open ? 0 : -1}" data-action="howto-app" data-app="${k}">${name}</button>`).join('')}
+    </div>
+    ${HOWTO_APPS().map(([k, , steps]) => `<div class="howto-panel small" role="tabpanel" id="howto-${k}" aria-labelledby="howto-tab-${k}" ${k === open ? '' : 'hidden'}>${steps}</div>`).join('')}
+  </section>`;
+};
 
 export function home(state) {
   const mail = state.custom.filter(t => t.source === 'mail');
@@ -200,7 +261,7 @@ export function home(state) {
       <li>${L('No account', 'Geen account')}</li>
       <li>${L('Free', 'Gratis')}</li>
     </ul>
-    ${HOWTO()}
+    ${HOWTO(state)}
     <p class="small muted" style="margin-top:22px">${L(`Already know a company that holds your data?
     <a href="#/delete">Write to it directly</a>.`, `Weet je al welk bedrijf je gegevens heeft?
     <a href="#/delete">Schrijf het direct aan</a>.`)}</p>
@@ -244,19 +305,29 @@ export function home(state) {
   const open = flagged.filter(h => !(state.addressAnswers || {})[h.address]);
   const mails = mail.reduce((n, t) => n + (t.mailCount || 1), 0);
 
-  const card = c => `
-    <article class="action ${c.n ? '' : 'is-done'} ${c.tone || ''}">
+  // One task is the next step: the first that still has work. Only its button
+  // is purple, so the eye knows where to start.
+  const tasks = [['unsub', pending.length], ['block', blockTodo], ['delete', toAsk + followUps], ['addr', open.length]];
+  const nextKey = tasks.find(([, n]) => n)?.[0];
+  const doneCount = tasks.filter(([, n]) => !n).length;
+
+  const card = c => {
+    const next = c.icon === nextKey;
+    return `
+    <article class="action ${c.n ? '' : 'is-done'} ${c.tone || ''} ${next ? 'is-next' : ''}">
       <div class="action-head"><span class="action-icon">${icon(c.icon)}</span>
         <span class="action-n">${c.n ? c.n : '✓'}</span></div>
+      ${next ? `<span class="next-tag">${L('Next step', 'Volgende stap')}</span>` : ''}
       <h3>${c.title}</h3>
       <p>${c.text}</p>
       <div class="action-foot">
-        ${c.n ? (c.href ? `<a class="btn primary" href="${c.href}">${c.cta}</a>`
-                        : `<button class="primary" data-action="${c.action}">${c.cta}</button>`)
+        ${c.n ? (c.href ? `<a class="btn ${next ? 'primary' : ''}" href="${c.href}">${c.cta}</a>`
+                        : `<button class="${next ? 'primary' : ''}" data-action="${c.action}">${c.cta}</button>`)
               : `<span class="done-label">${c.done}</span>`}
         ${c.more ? `<a class="more" href="${c.more}">${L('Details', 'Details')}</a>` : ''}
       </div>
     </article>`;
+  };
 
   const unsubText = (pending.length
       ? L(`${pending.length} verified ${plural(pending.length, 'company', 'companies', '', '')}.`,
@@ -312,6 +383,10 @@ export function home(state) {
       <p class="muted">${L(
         `${mails} ${plural(mails, 'mail', 'mails', '', '')} from ${mail.length} ${plural(mail.length, 'sender', 'senders', '', '')} scanned · nothing left this device`,
         `${mails} ${plural(mails, '', '', 'mail', 'mails')} van ${mail.length} ${plural(mail.length, '', '', 'afzender', 'afzenders')} gescand · niets heeft dit apparaat verlaten`)}</p>
+    </div>
+    <div class="progress">
+      <span>${doneCount === tasks.length ? L('All done', 'Alles gedaan') : L(`${doneCount} of ${tasks.length} done`, `${doneCount} van ${tasks.length} klaar`)}</span>
+      <span class="progress-bar" role="progressbar" aria-label="${L('Progress', 'Voortgang')}" aria-valuemin="0" aria-valuemax="${tasks.length}" aria-valuenow="${doneCount}"><span style="width:${Math.round(100 * doneCount / tasks.length)}%"></span></span>
     </div>
   </div>
 
@@ -444,6 +519,24 @@ export function mountHome(root, state, rerender) {
   const show = html => { panel.innerHTML = html; panel.scrollIntoView({ behavior: 'smooth', block: 'start' }); };
   if (reopenAddr && panel) { reopenAddr = false; panel.innerHTML = addressPanel(store.get()); }
 
+  const selectHowto = app => {
+    for (const t of root.querySelectorAll('[data-action="howto-app"]')) {
+      const on = t.dataset.app === app;
+      t.setAttribute('aria-selected', on); t.tabIndex = on ? 0 : -1;
+      root.querySelector('#howto-' + t.dataset.app).hidden = !on;
+    }
+  };
+  // Arrow keys move between the mail apps, as in any tab list.
+  root.querySelector('.seg')?.addEventListener('keydown', e => {
+    const tabs = [...root.querySelectorAll('[data-action="howto-app"]')];
+    const i = tabs.indexOf(document.activeElement);
+    const step = { ArrowRight: 1, ArrowDown: 1, ArrowLeft: -1, ArrowUp: -1 }[e.key];
+    if (i < 0 || !step) return;
+    e.preventDefault();
+    const next = tabs[(i + step + tabs.length) % tabs.length];
+    selectHowto(next.dataset.app); next.focus();
+  });
+
   root.addEventListener('click', e => {
     const btn = e.target.closest('[data-action]');
     if (!btn) return;
@@ -451,6 +544,7 @@ export function mountHome(root, state, rerender) {
     const now = store.get();
 
     if (act === 'pick') input?.click();
+    if (act === 'howto-app') selectHowto(btn.dataset.app);
     if (act === 'pick-folder') root.querySelector('#folder')?.click();
 
     if (act === 'home-unsub') {

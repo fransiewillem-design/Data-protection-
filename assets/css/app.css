@@ -452,3 +452,76 @@ button, .btn { border-radius: 9px; transition: border-color .12s, color .12s, fi
   .block-pick { justify-content: stretch; width: 100%; }
   .block-pick select { flex: 1 1 100%; }
 }
+
+/* ===== Easier to follow ================================================ */
+
+/* Getting mail out of a mail app: one app at a time. */
+.howto-card {
+  text-align: left; margin-top: 18px; padding: 18px 20px;
+  background: var(--surface); border: 1px solid var(--line); border-radius: var(--radius); box-shadow: var(--shadow);
+}
+.howto-card h2 { font-size: 1rem; margin-bottom: 6px; }
+.howto-card > p.small { margin-bottom: 12px; }
+.seg { display: flex; flex-wrap: wrap; gap: 6px; margin: 0 0 14px; }
+.seg button { border-radius: 20px; padding: 6px 13px; font-size: .84rem; background: var(--surface); }
+.seg button[aria-selected="true"] { background: var(--accent-soft); border-color: var(--accent); color: var(--accent); font-weight: 600; }
+.howto-panel ol { margin: 0 0 8px; padding-left: 20px; }
+.howto-panel li { margin-bottom: 5px; }
+.howto-panel p:last-child { margin-bottom: 0; }
+.howto-cols { display: grid; grid-template-columns: repeat(auto-fit, minmax(230px, 1fr)); gap: 6px 22px; }
+.howto-cols h3 { font-size: .86rem; margin: 0 0 6px; }
+
+/* Home: the one task to do next, and how far along the user is. */
+.action.is-next { border-color: var(--accent); box-shadow: 0 0 0 1px var(--accent), 0 8px 24px rgba(76, 63, 224, .12); }
+.next-tag {
+  align-self: flex-start; font-size: .72rem; font-weight: 700; letter-spacing: .05em; text-transform: uppercase;
+  color: var(--accent); background: var(--accent-soft); padding: 2px 8px; border-radius: 20px; margin-bottom: 2px;
+}
+.home-head { align-items: center; flex-wrap: wrap; }
+.progress { display: flex; flex-direction: column; align-items: flex-end; gap: 6px; font-size: .84rem; color: var(--muted); font-weight: 600; }
+.progress-bar { display: block; width: 160px; height: 6px; border-radius: 6px; background: var(--surface-2); overflow: hidden; }
+.progress-bar span { display: block; height: 100%; border-radius: 6px; background: var(--accent); transition: width .3s; }
+
+/* The letter page: open, send, mark as sent. */
+.send-steps { list-style: none; counter-reset: send; padding: 0; margin: 16px 0 0; }
+.send-steps > li {
+  counter-increment: send; position: relative; padding: 12px 0 12px 40px; margin: 0;
+  border-top: 1px solid var(--line); font-size: .92rem;
+}
+.send-steps > li::before {
+  content: counter(send); position: absolute; left: 0; top: 11px;
+  width: 26px; height: 26px; border-radius: 50%; display: grid; place-items: center;
+  background: var(--accent-soft); color: var(--accent); font-weight: 700; font-size: .82rem;
+}
+.send-steps .row { margin-top: 10px; }
+.send-steps > li:last-child { padding-bottom: 0; }
+
+/* The letter itself reads like a mail, not like code. */
+.letter { font-family: inherit; font-size: .92rem; line-height: 1.65; padding: 20px 22px; }
+.letter.code { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: .84rem; }
+
+/* Shortcuts to the sections of a long page. */
+.jump { display: flex; flex-wrap: wrap; gap: 6px; margin: -6px 0 18px; }
+.jump-chip { border-radius: 20px; padding: 5px 12px; font-size: .84rem; background: var(--surface); }
+.jump-chip .count { padding: 0 7px; }
+[id^="sec-"] { scroll-margin-top: 80px; }
+
+/* Messages long enough to read as a box, not a stretched pill. */
+.toast {
+  width: max-content; max-width: min(540px, calc(100vw - 32px)); text-align: left;
+  border-radius: 12px; padding: 12px 16px; line-height: 1.5; box-shadow: 0 8px 28px rgba(0, 0, 0, .22);
+}
+
+/* Fingers need bigger targets than a mouse. */
+@media (pointer: coarse) {
+  button, .btn { min-height: 44px; }
+  .lang button { min-height: 34px; }
+  .seg button, .jump-chip { min-height: 38px; }
+}
+@media (max-width: 560px) {
+  input, select, textarea { font-size: 16px; }
+  .home-head { align-items: flex-start; }
+  .progress { align-items: flex-start; }
+  [id^="sec-"] { scroll-margin-top: 112px; }
+  .send-steps > li { padding-left: 36px; }
+}

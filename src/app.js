@@ -148,7 +148,7 @@ async function boot() {
         (<code>file://</code>), which browsers block from reading local files. Serve the folder instead:`,
         `Dat betekent bijna altijd dat de pagina direct van schijf is geopend (<code>file://</code>); browsers
         blokkeren dan het lezen van lokale bestanden. Start in plaats daarvan een lokale server:`)}</p>
-        <div class="letter">cd data-protection
+        <div class="letter code">cd data-protection
 python3 -m http.server 8000
 # then open http://localhost:8000</div>
       </div>`;

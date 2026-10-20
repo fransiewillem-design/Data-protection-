@@ -742,7 +742,7 @@ export function brokers(state, catalog, params) {
       ${showBrokers
         ? `${L(`Your ${mine.length} plus ${catalog.length} bundled data brokers.`, `Jouw ${mine.length} bedrijven plus ${catalog.length} bekende databrokers.`)}
            <a href="#/delete">${L('Show only mine', 'Alleen de mijne tonen')}</a>`
-        : `${L('Only what came from your own evidence.', 'Alleen wat uit je eigen mail en meldingen komt.')}
+        : `${L('Only what came from your own evidence. Each letter tells a company nothing it does not already have.', 'Alleen wat uit je eigen mail en meldingen komt. Elke brief vertelt een bedrijf niets wat het nog niet van je heeft.')}
            <a href="#/delete?all=1">${L(`Add the ${catalog.length} bundled data brokers`, `Toon ook ${catalog.length} bekende databrokers`)}</a>`}
       ${spam.length && !showSpam
         ? `<br>${L(`${spam.length} spam or unverified ${spam.length === 1 ? 'sender is' : 'senders are'} hidden: a letter to those bounces and confirms your address is live.`,
@@ -821,9 +821,7 @@ function targetRow(b, state) {
           : L(`Unsubscribed ${esc(keptMailing(b, r).from)}, mail again on ${esc(keptMailing(b, r).last)}. The letter says so.`, `Uitgeschreven op ${esc(keptMailing(b, r).from)}, opnieuw mail op ${esc(keptMailing(b, r).last)}. De brief noemt dat.`)}</div>` : ''}
       <div class="meta">${b.site ? `<span class="mono">${esc(b.site)}</span>` : ''}${r.sentAt
         ? ` · ${L('sent', 'verstuurd')} ${esc(r.sentAt)}` : ''}${b.source ? '' : ` · ${esc(CATEGORIES()[b.category] || b.category)}`}</div>
-      ${b.source === 'mail' && !b.notes ? `<div class="meta">${L(`Found in your own mail: ${esc(b.site)} sent to ${esc(b.evidence?.address || 'an address of yours')}. The letter deliberately tells them nothing they do not already have.`,
-        `Gevonden in je eigen mail: ${esc(b.site)} stuurde naar ${esc(b.evidence?.address || 'een adres van jou')}. De brief vertelt ze bewust niets wat ze nog niet hebben.`)}</div>`
-        : b.notes && lang() === 'en' ? `<div class="meta">${esc(b.notes)}</div>` : ''}
+      ${b.notes && lang() === 'en' ? `<div class="meta">${esc(b.notes)}</div>` : ''}
       <div class="meta rel-pick">${L('You and them:', 'Jouw relatie:')}
         <select data-action="set-relation" data-id="${esc(b.id)}" aria-label="${L(`How you relate to ${esc(b.name)}`, `Jouw relatie met ${esc(b.name)}`)}">
           ${Object.entries(RELATIONS()).map(([k, v]) =>
@@ -1592,6 +1590,14 @@ export function unsubTier(b) {
 
 let unsubPrimed = false;
 
+// Shortcuts to the sections of a long page, with how many each holds.
+function jumpRow(items) {
+  return `<nav class="jump no-print" aria-label="${L('On this page', 'Op deze pagina')}">
+    ${items.filter(([, n, to]) => n && to).map(([label, n, to]) =>
+      `<button type="button" class="jump-chip" data-action="jump" data-to="sec-${to}">${label}${n > 0 ? ` <span class="count">${n}</span>` : ''}</button>`).join('')}
+  </nav>`;
+}
+
 export function unsubscribe(state) {
   const mail = state.custom.filter(b => b.source === 'mail');
   const tiers = { instant: [], link: [], mail: [] };
@@ -1620,7 +1626,7 @@ export function unsubscribe(state) {
   const quiet = unsubscribed.filter(b => !kept.includes(b));
 
   const group = (key, title, blurb, cta, cls) => tiers[key].length ? `
-    <section class="card">
+    <section class="card" id="sec-${key}">
       <div class="row between" style="align-items:flex-start;gap:16px">
         <div>
           <h2>${title} <span class="count">${tiers[key].length}</span></h2>
@@ -1665,6 +1671,17 @@ export function unsubscribe(state) {
            'Nog niets hier. <a href="#/">Scan je mail</a> en afzenders komen hier vanzelf.')}</p>
   </div>` : ''}
 
+  ${mail.length ? jumpRow([
+    [L('Unsubscribe', 'Uitschrijven'), tiers.instant.length + tiers.link.length + tiers.mail.length, ['instant', 'link', 'mail'].find(k => tiers[k].length)],
+    [L('Block', 'Blokkeren'), bait.length + spam.length, 'block'],
+    [L('Still mailing', 'Mailen nog'), kept.length, 'kept'],
+    [L('Kept', 'Gehouden'), wanted.length, 'wanted'],
+    [L('Could not verify', 'Niet te controleren'), unclear.length, 'unclear'],
+    [L('Personal', 'Persoonlijk'), people.length, 'people'],
+    [L('Unsubscribed', 'Uitgeschreven'), quiet.length, 'done'],
+    [L('Post and phone', 'Post en telefoon'), -1, 'offline']
+  ]) : ''}
+
   <div id="outlook-result"></div>
   <div id="unsub-queue"></div>
 
@@ -1684,7 +1701,7 @@ export function unsubscribe(state) {
     n => L(`Email ${n || ''}`, `${n || ''} mailen`), '')}
 
   ${wanted.length ? `
-    <section class="card">
+    <section class="card" id="sec-wanted">
       <h2>${L('Mail you seem to want', 'Mail die je lijkt te willen')} <span class="count">${wanted.length}</span></h2>
       <p class="small muted" style="max-width:62ch">${L('Kept out of every unsubscribe and every deletion letter, because of what you do with it. Changed your mind about one? Unsubscribe from it here.',
         'HoopUp slaat deze over bij uitschrijven en verwijderverzoeken, omdat je deze mail gebruikt. Wil je er toch vanaf? Schrijf je hier uit.')}</p>
@@ -1697,7 +1714,7 @@ export function unsubscribe(state) {
     </section>` : ''}
 
   ${kept.length ? `
-    <section class="card">
+    <section class="card" id="sec-kept">
       <h2>${L('Still mailing you', 'Mailen je nog steeds')} <span class="count bad">${kept.length}</span></h2>
       <p class="small muted" style="max-width:62ch">${L('These sent marketing more than ten days after you unsubscribed. After an unsubscribe they must stop. A deletion letter makes that enforceable, and it says they kept mailing, with the dates.',
         'Deze stuurden nog reclame, meer dan tien dagen nadat je je uitschreef. Na een afmelding moeten ze stoppen. Een verwijderverzoek maakt dat afdwingbaar, en de brief noemt dat ze bleven mailen, met de datums.')}</p>
@@ -1713,17 +1730,17 @@ export function unsubscribe(state) {
     </section>` : ''}
 
   ${quiet.length ? `
-    <section class="card">
+    <section class="card" id="sec-done">
       <h2>${L('Already unsubscribed', 'Al uitgeschreven')} <span class="count">${quiet.length}</span></h2>
       <p class="small muted" style="max-width:60ch">${L('Done. Drop your junk mail in again in a couple of weeks: anyone who keeps mailing shows up above, with a letter ready.',
         'Klaar. Sleep over een paar weken je ongewenste mail opnieuw hierheen: wie blijft mailen verschijnt dan hierboven, met een brief klaar.')}</p>
       ${list(quiet, b => L(`unsubscribed ${b.unsubscribedAt}`, `uitgeschreven op ${b.unsubscribedAt}`))}
     </section>` : ''}
 
-  ${bait.length + spam.length ? blockAllCard(state) : ''}
+  ${bait.length + spam.length ? `<div id="sec-block">${blockAllCard(state)}</div>` : ''}
 
   ${spam.length ? `
-    <section class="card">
+    <section class="card" id="sec-spam">
       <h2>${L('Spam: block, do not reply', 'Spam: blokkeren, niet reageren')} <span class="count">${spam.length}</span></h2>
       <p class="small muted" style="max-width:60ch">${L('These are unsafe (the reason is shown per sender) and offered no way to unsubscribe. Do not click anything in them, and do not send them a letter: any response confirms a person reads this mailbox.',
         'Deze zijn onveilig (de reden staat per afzender) en boden geen manier om je uit te schrijven. Klik nergens op en stuur geen brief: elke reactie bevestigt dat er een mens deze mailbox leest.')}</p>
@@ -1731,7 +1748,7 @@ export function unsubscribe(state) {
     </section>` : ''}
 
   ${unclear.length ? `
-    <section class="card">
+    <section class="card" id="sec-unclear">
       <h2>${L('Could not verify', 'Niet te controleren')} <span class="count">${unclear.length}</span></h2>
       <p class="small muted" style="max-width:60ch">${L('HoopUp cannot tell who really sent these: the sender check could not confirm it, or the name does not match the domain it came from (a "USPS" mailing from an unrelated domain). A sender that is not who it claims to be would send an unsubscribe link straight to the spammer, so HoopUp does not open their links, block them or write to them. If you recognise the company, add it yourself under <a href="#/delete">Delete data</a>. If you do not, mark the mail as junk and click nothing in it.',
         'HoopUp kan niet zien wie deze mail echt stuurde: de afzendercontrole kon het niet bevestigen, of de naam past niet bij het domein waar de mail vandaan kwam (een "USPS" die mailt vanaf een onbekend domein). Een afzender die niet is wie hij zegt, stuurt een uitschrijflink die rechtstreeks naar de spammer leidt. Daarom opent HoopUp hun links niet, blokkeren we ze niet en schrijven we ze niet aan. Ken je het bedrijf, voeg het dan zelf toe bij <a href="#/delete">Gegevens verwijderen</a>. Ken je het niet, markeer de mail als ongewenst en klik nergens op.')}</p>
@@ -1739,14 +1756,14 @@ export function unsubscribe(state) {
     </section>` : ''}
 
   ${people.length ? `
-    <section class="card">
+    <section class="card" id="sec-people">
       <h2>${L('Personal addresses', 'Persoonlijke adressen')} <span class="count">${people.length}</span></h2>
       <p class="small muted" style="max-width:60ch">${L('Sent from a personal account on a free mail service (Gmail, Outlook, Ziggo…), so there is no company to unsubscribe from or write to, and the service itself is never blocked. If you do not know the sender, mark the mail as junk in your mail app; never reply.',
         'Verstuurd vanaf een persoonlijk account bij een gratis maildienst (Gmail, Outlook, Ziggo…). Er is dus geen bedrijf om je bij uit te schrijven of aan te schrijven, en de maildienst zelf blokkeren we nooit. Ken je de afzender niet, markeer de mail dan als ongewenst in je mailapp en reageer nooit.')}</p>
       ${list(people, b => String(b.id || '').replace(/^mail:/, '').replace(/#forged$/, ''))}
     </section>` : ''}
 
-  ${offlineCard(state)}`;
+  <div id="sec-offline">${offlineCard(state)}</div>`;
 }
 
 
@@ -2243,6 +2260,7 @@ export function mountUnsubscribe(root, state, rerender, params) {
     if (!btn) return;
     const act = btn.dataset.action;
 
+    if (act === 'jump') root.querySelector('#' + btn.dataset.to)?.scrollIntoView({ behavior: 'smooth', block: 'start' });
     if (act === 'keep' || act === 'unkeep') {
       e.preventDefault();
       const id = btn.dataset.id;
@@ -2270,6 +2288,18 @@ export function mountUnsubscribe(root, state, rerender, params) {
 }
 
 // ------------------------------------------------------------------- letter
+
+// The last step on the letter page: mark it sent, or what marking it did.
+function sentStep(rec, isReply) {
+  if (!isReply && rec.sentAt && rec.status !== 'todo') return `<b>${L(`Marked as sent on ${esc(longDate(rec.sentAt, false))}.`, `Gemarkeerd als verstuurd op ${esc(longDate(rec.sentAt, true))}.`)}</b>
+    ${L('The one-month deadline runs from then; HoopUp shows a reminder if they do not answer.', 'De termijn van een maand loopt vanaf dan; HoopUp zet een herinnering klaar als ze niet antwoorden.')}
+    <div class="row"><a class="btn" href="#/delete">${L('Back to the list', 'Terug naar de lijst')}</a></div>`;
+  return isReply
+    ? `<b>${L('Mark your reply as sent here.', 'Markeer je reactie hier als verstuurd.')}</b> ${L('Their deadline keeps running.', 'Hun termijn loopt door.')}
+      <div class="row"><button class="primary" data-action="mark-answered">${L('Mark reply as sent', 'Markeer reactie als verstuurd')}</button></div>`
+    : `<b>${L('Mark it as sent here.', 'Markeer hem hier als verstuurd.')}</b> ${L('That starts their one-month deadline, and HoopUp reminds you if they do not answer.', 'Dan start hun termijn van een maand, en HoopUp herinnert je als ze niet antwoorden.')}
+      <div class="row"><button class="primary" data-action="mark-sent">${L('Mark as sent', 'Markeer als verstuurd')}</button></div>`;
+}
 
 export function letter(state, catalog, params) {
   const targets = allTargets(state, catalog);
@@ -2332,14 +2362,18 @@ export function letter(state, catalog, params) {
         ${Object.entries(TEMPLATES).map(([k, t]) =>
           `<option value="${k}" ${k === tid ? 'selected' : ''}>${esc(tplLabel(k, t))}</option>`).join('')}
       </select>
-      <div class="spacer"></div>
-      <button data-action="copy">${L('Copy letter', 'Brief kopiëren')}</button>
-      ${to ? `<a class="btn" href="${mailto}">${L('Open in mail app', 'Openen in je mailapp')}</a>` : ''}
-      <button data-action="print">${L('Print / PDF', 'Afdrukken / PDF')}</button>
-      ${isReply
-        ? `<button class="primary" data-action="mark-answered">${L('Mark reply as sent', 'Markeer reactie als verstuurd')}</button>`
-        : `<button class="primary" data-action="mark-sent">${L('Mark as sent', 'Markeer als verstuurd')}</button>`}
     </div>
+    <ol class="send-steps">
+      <li><b>${to ? L('Open the letter in your mail app.', 'Open de brief in je mailapp.') : L('Copy the letter into a new mail to them.', 'Kopieer de brief naar een nieuwe mail aan hen.')}</b>
+        ${to ? L(' The address, subject and text are filled in.', ' Adres, onderwerp en tekst staan er al in.') : ''}
+        <div class="row">
+          ${to ? `<a class="btn primary" href="${mailto}">${L('Open in mail app', 'Openen in je mailapp')}</a>` : ''}
+          <button class="${to ? '' : 'primary'}" data-action="copy">${L('Copy letter', 'Brief kopiëren')}</button>
+          <button data-action="print">${L('Print / PDF', 'Afdrukken / PDF')}</button>
+        </div></li>
+      <li><b>${L('Send it there.', 'Verstuur hem daar.')}</b> ${L('It goes from your own address, so their answer comes back to you.', 'Hij gaat vanaf je eigen adres, dus hun antwoord komt bij jou terug.')}</li>
+      <li id="sent-step">${sentStep(rec, isReply)}</li>
+    </ol>
   </div>
 
   <div class="card">
@@ -2397,10 +2431,13 @@ export function mountLetter(root, state, rerender, params) {
     if (a === 'mark-answered') {
       store.markAnswered(id);
       toast(L('Reply marked as sent. Their deadline keeps running.', 'Reactie gemarkeerd als verstuurd. Hun termijn loopt door.'));
+      btn.disabled = true;
     }
     if (a === 'mark-sent') {
       store.setStatus(id, 'sent');
       toast(L('Marked as sent, deadline clock started', 'Gemarkeerd als verstuurd, de termijn loopt'));
+      const step = root.querySelector('#sent-step');
+      if (step) step.innerHTML = sentStep(store.getRequest(id), false);
     }
     if (a === 'save-notes') {
       store.setNotes(id, root.querySelector('#notes').value);
