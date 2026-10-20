@@ -58,17 +58,17 @@ function retireSteps(addr) {
   const code = `<code>${esc(addr)}</code>`;
   if (/^(outlook|hotmail|live|msn)\./i.test(d)) return [
     L(`If it is an <b>alias</b> on your Microsoft account: Microsoft account → <b>Manage how you sign in</b> → remove ${code}.`,
-      `Is het een <b>alias</b> van je Microsoft-account: Microsoft-account → <b>Beheren hoe je je aanmeldt</b> → verwijder ${code}.`),
+      `Is het een <b>alias</b> van je Microsoft-account? Ga naar Microsoft-account → <b>Beheren hoe je je aanmeldt</b> → verwijder ${code}.`),
     L(`If it is a <b>separate account</b> you only used for sign-ups: close that account once nothing you need is tied to it.`,
-      `Is het een <b>apart account</b> dat je alleen voor aanmeldingen gebruikte: sluit het zodra er niets meer aan hangt wat je nodig hebt.`),
+      `Is het een <b>apart account</b> dat je alleen voor aanmeldingen gebruikte? Sluit het dan zodra er niets meer aan hangt wat je nodig hebt.`),
     L(`Until then, one Outlook rule (anything sent to ${code} → <b>Delete</b>) keeps it out of sight.`,
       `Tot die tijd houdt één Outlook-regel (alles aan ${code} → <b>Verwijderen</b>) het uit beeld.`)
   ];
   if (/^(icloud|me|mac)\./i.test(d)) return [
     L(`If it is a <b>Hide My Email</b> address: Settings → your name → iCloud → Hide My Email → choose it → <b>Deactivate</b>. Mail to it stops arriving at all.`,
-      `Is het een <b>Verberg mijn e-mailadres</b>-adres: Instellingen → je naam → iCloud → Verberg mijn e-mailadres → kies het → <b>Deactiveer</b>. Er komt dan helemaal geen mail meer op binnen.`),
+      `Is het een adres van <b>Verberg mijn e-mailadres</b>? Ga naar Instellingen → je naam → iCloud → Verberg mijn e-mailadres → kies het → <b>Deactiveer</b>. Er komt dan helemaal geen mail meer op binnen.`),
     L(`If it is your main iCloud address it cannot be retired. Keep it for people, and give every company its own Hide My Email address from now on.`,
-      `Is het je hoofdadres bij iCloud, dan kun je het niet opheffen. Gebruik het alleen nog voor mensen en geef elk bedrijf voortaan een eigen Verberg mijn e-mailadres-adres.`)
+      `Is het je hoofdadres bij iCloud, dan kun je het niet opheffen. Gebruik het alleen nog voor mensen en geef elk bedrijf voortaan een eigen adres via Verberg mijn e-mailadres.`)
   ];
   if (/^(gmail|googlemail)\./i.test(d)) return [
     L(`Gmail cannot drop one address without closing the account. Add a filter (To ${code} → <b>Delete it</b>) and stop giving it out.`,
@@ -165,15 +165,15 @@ const HOWTO = () => `
   <details class="howto">
     <summary>${L('How do I get the files out of my mail app?', 'Hoe haal ik de bestanden uit mijn mailapp?')}</summary>
     <p class="small">${L('Just the junk folder is quick. The whole mailbox also shows what you actually read: newsletters you open, star, file or answer are kept, and only the ones you ignore are offered for unsubscribing.',
-      'Alleen de map Ongewenst gaat snel. De hele mailbox laat ook zien wat je echt leest: nieuwsbrieven die je opent, een ster geeft, opbergt of beantwoordt blijven staan, en alleen wat je negeert wordt aangeboden om je voor uit te schrijven.')}</p>
+      'Alleen de map Ongewenst gaat snel. De hele mailbox laat ook zien wat je echt leest: nieuwsbrieven die je opent, een ster geeft, opbergt of beantwoordt, blijven staan, en uitschrijven wordt alleen aangeboden voor wat je negeert.')}</p>
     <ul class="small">${L(`
-      <li><b>Apple Mail:</b> junk only: open Junk, <code>Cmd+A</code>, drag onto the Desktop, drop the files here. Whole mailbox: select a mailbox (Inbox, or several) → <b>Mailbox</b> → <b>Export Mailbox…</b> → choose a folder, then drop the exported <code>.mbox</code> folders here.</li>
+      <li><b>Apple Mail:</b> junk only? Open Junk, <code>Cmd+A</code>, drag onto the Desktop, drop the files here. Whole mailbox? Select a mailbox (Inbox, or several) → <b>Mailbox</b> → <b>Export Mailbox…</b> → choose a folder, then drop the exported <code>.mbox</code> folders here.</li>
       <li><b>Gmail:</b> <a href="https://takeout.google.com" target="_blank" rel="noopener noreferrer">Google Takeout</a> → deselect all → <b>Mail</b> → export, then drop the <code>.mbox</code> here. It holds your whole mailbox with its labels, so reading takes a few minutes, all on your device.</li>
       <li><b>Outlook on Windows:</b> select the messages (Junk, or <code>Ctrl+A</code> in Inbox) and drag them into a folder in File Explorer. They become <code>.msg</code> files; drop the folder here.</li>
       <li><b>Outlook.com, Hotmail:</b> add the account to Apple Mail or Thunderbird and export from there.</li>
       <li><b>Thunderbird:</b> <b>Account Settings</b> → <b>Server Settings</b> → <b>Local Directory</b> shows where your mail is stored. Each folder there is one file without an extension, like <code>Inbox</code>: drop those here.</li>`, `
-      <li><b>Apple Mail:</b> alleen ongewenst: open Ongewenst, <code>Cmd+A</code>, sleep naar het bureaublad en dan hierheen. Hele mailbox: kies een mailbox (Postvak IN, of meerdere) → <b>Mailbox</b> → <b>Exporteer mailbox…</b> → kies een map, en sleep de geëxporteerde <code>.mbox</code>-mappen hierheen.</li>
-      <li><b>Gmail:</b> <a href="https://takeout.google.com" target="_blank" rel="noopener noreferrer">Google Takeout</a> → alles deselecteren → <b>E-mail</b> → exporteren, en sleep de <code>.mbox</code> hierheen. Daarin staat je hele mailbox met labels, dus het lezen duurt een paar minuten, helemaal op je apparaat.</li>
+      <li><b>Apple Mail:</b> alleen ongewenste mail? Open Ongewenst, <code>Cmd+A</code>, sleep alles naar het bureaublad en dan hierheen. De hele mailbox? Kies een mailbox (Postvak IN, of meerdere) → <b>Mailbox</b> → <b>Exporteer mailbox…</b> → kies een map, en sleep de geëxporteerde <code>.mbox</code>-mappen hierheen.</li>
+      <li><b>Gmail:</b> <a href="https://takeout.google.com" target="_blank" rel="noopener noreferrer">Google Takeout</a> → alles deselecteren → <b>Mail</b> → exporteren, en sleep de <code>.mbox</code> hierheen. Daarin staat je hele mailbox met labels, dus het lezen duurt een paar minuten, helemaal op je apparaat.</li>
       <li><b>Outlook op Windows:</b> selecteer de berichten (Ongewenste e-mail, of <code>Ctrl+A</code> in Postvak IN) en sleep ze naar een map in Verkenner. Het worden <code>.msg</code>-bestanden; sleep de map hierheen.</li>
       <li><b>Outlook.com, Hotmail:</b> voeg het account toe aan Apple Mail of Thunderbird en exporteer daarvandaan.</li>
       <li><b>Thunderbird:</b> <b>Accountinstellingen</b> → <b>Serverinstellingen</b> → <b>Lokale map</b> toont waar je mail staat. Elke map daarin is één bestand zonder extensie, zoals <code>Inbox</code>: sleep die hierheen.</li>`)}
@@ -260,14 +260,14 @@ export function home(state) {
 
   const unsubText = (pending.length
       ? L(`${pending.length} verified ${plural(pending.length, 'company', 'companies', '', '')}.`,
-          `${pending.length} ${plural(pending.length, 'echt bedrijf', 'echte bedrijven', 'echt bedrijf', 'echte bedrijven')}.`)
+          `${pending.length} ${plural(pending.length, 'echt bedrijf', 'echte bedrijven', 'echt bedrijf', 'echte bedrijven')}${pending.length > 1 && instant.length ? `, waarvan ${instant.length} met één klik` : ''}.`)
         + (instant.length ? L(` ${instant.length} ${instant.length === 1 ? 'goes' : 'go'} in one click.`,
-                              ` Waarvan ${instant.length} met één klik.`) : '')
+                              pending.length > 1 ? '' : ' Dat gaat met één klik.') : '')
       : unsub.length && !unchecked.length && !wanted.length
         ? L(`Unsubscribed from all ${unsub.length}.`, `Bij alle ${unsub.length} uitgeschreven.`)
         : L('No verified company left to unsubscribe from.', 'Geen echt bedrijf meer om je bij uit te schrijven.'))
     + (wanted.length ? L(` ${wanted.length} you read or answer ${wanted.length === 1 ? 'is' : 'are'} kept.`,
-                         ` ${wanted.length} die je leest of beantwoordt ${wanted.length === 1 ? 'blijft' : 'blijven'} staan.`) : '')
+                         ` Bij ${wanted.length} ${wanted.length === 1 ? 'afzender' : 'afzenders'} die je leest of beantwoordt, blijf je ingeschreven.`) : '')
     + (kept.length ? L(` ${kept.length} kept mailing after you unsubscribed: a letter is ready in Details.`,
                        ` ${kept.length} ${kept.length === 1 ? 'bleef' : 'bleven'} mailen nadat je je uitschreef: er staat een brief klaar bij Details.`) : '')
     + (unchecked.length ? L(` ${unchecked.length} more could not be verified. Check ${unchecked.length === 1 ? 'it' : 'them'} in Details.`,
@@ -363,7 +363,7 @@ export function home(state) {
 
   ${unclear ? `<p class="small muted">${L(
     `${unclear} ${plural(unclear, 'sender', 'senders', '', '')} could not be verified, so HoopUp does not use ${unclear === 1 ? 'its' : 'their'} links and does not block or write to ${unclear === 1 ? 'it' : 'them'}. Click nothing in ${unclear === 1 ? 'that mail' : 'those mails'}. <a href="#/unsubscribe">See which</a>.`,
-    `${unclear} ${plural(unclear, '', '', 'afzender', 'afzenders')} ${unclear === 1 ? 'kon' : 'konden'} niet gecontroleerd worden. HoopUp gebruikt ${unclear === 1 ? 'zijn' : 'hun'} links niet en blokkeert of schrijft ${unclear === 1 ? 'hem' : 'ze'} niet aan. Klik nergens op in ${unclear === 1 ? 'die mail' : 'die mails'}. <a href="#/unsubscribe">Bekijk welke</a>.`)}</p>` : ''}
+    `${unclear} ${plural(unclear, '', '', 'afzender', 'afzenders')} ${unclear === 1 ? 'kon' : 'konden'} niet gecontroleerd worden. HoopUp gebruikt ${unclear === 1 ? 'zijn' : 'hun'} links niet, blokkeert ${unclear === 1 ? 'hem' : 'ze'} niet en schrijft ${unclear === 1 ? 'hem' : 'ze'} niet aan. Klik nergens op in ${unclear === 1 ? 'die mail' : 'die mails'}. <a href="#/unsubscribe">Bekijk welke</a>.`)}</p>` : ''}
 
   ${people ? `<p class="small muted">${L(
     `${people} ${plural(people, 'sender', 'senders', '', '')} wrote from a personal account (Gmail, Outlook…), so there is no company to unsubscribe from or write to. Do not know ${people === 1 ? 'them' : 'one'}? Mark it as junk. <a href="#/unsubscribe">See which</a>.`,

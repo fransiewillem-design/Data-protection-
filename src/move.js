@@ -47,7 +47,7 @@ export function moveGuide(h, { done = [], letters = 0, retire = [] }) {
 
     letters: [L('Send the erasure letters first', 'Verstuur eerst de verwijderverzoeken'),
       L('Companies that only know the old address can only answer there. Send their letters while it still receives the replies.',
-        'Bedrijven die alleen het oude adres kennen, kunnen alleen daarop antwoorden. Verstuur hun brieven nu het die antwoorden nog ontvangt.')
+        'Bedrijven die alleen het oude adres kennen, kunnen alleen daarop antwoorden. Verstuur hun brieven nu, zolang het oude adres hun antwoorden nog ontvangt.')
       + ' ' + (letters
         ? `<a href="#/delete?send=1">${L(`Send the ${letters} ${letters === 1 ? 'letter' : 'letters'} for this address`, `Verstuur de ${letters} ${letters === 1 ? 'brief' : 'brieven'} voor dit adres`)}</a>.`
         : L('There is nothing waiting for this address.', 'Voor dit adres staat niets klaar.'))],
@@ -72,7 +72,7 @@ export function moveGuide(h, { done = [], letters = 0, retire = [] }) {
     people: [L('Tell the people you know', 'Laat het de mensen weten die je kent'),
       L('Send them your new address, from the new address itself, so it lands in their contacts:', 'Stuur ze je nieuwe adres, vanaf het nieuwe adres zelf, zodat het in hun contacten komt:')
       + `<div class="copy-chips">${copy(L('Hi, I have a new email address: this one. Could you save it? My old address will stop working soon.',
-        'Hoi, ik heb een nieuw e-mailadres: dit adres. Wil je het opslaan? Mijn oude adres stopt binnenkort.'), L('Copy a message', 'Kopieer een bericht'))}</div>`],
+        'Hoi, ik heb een nieuw e-mailadres: het adres waarvan deze mail komt. Wil je het opslaan? Mijn oude adres stopt binnenkort.'), L('Copy a message', 'Kopieer een bericht'))}</div>`],
 
     forward: [L('Forward the old address for a few months', 'Stuur het oude adres een paar maanden door'),
       (sameAccount
@@ -83,7 +83,7 @@ export function moveGuide(h, { done = [], letters = 0, retire = [] }) {
         : L('In the old provider\'s webmail, look for <b>Forwarding</b> under the settings and send everything to the new address.',
             'Zoek in de webmail van de oude aanbieder bij de instellingen naar <b>Doorsturen</b> en stuur alles naar het nieuwe adres.'))
       + ' ' + L('If you set an automatic reply that gives the new address, send it only to your contacts (Gmail and Outlook have that option): a reply to everyone tells spammers the address is alive. In the new mailbox, a rule that moves mail sent to the old address into a folder <i>Old address</i> shows you what still uses it.',
-        'Zet je een automatisch antwoord met het nieuwe adres, stuur het dan alleen naar je contacten (Gmail en Outlook hebben die optie): een antwoord aan iedereen vertelt spammers dat het adres leeft. Een regel in de nieuwe mailbox die mail aan het oude adres naar een map <i>Oud adres</i> verplaatst, laat zien wat het nog gebruikt.')],
+        'Stel je een automatisch antwoord in met je nieuwe adres? Laat het dan alleen naar je contacten gaan (Gmail en Outlook hebben die optie): een antwoord aan iedereen vertelt spammers dat het adres nog werkt. Maak in de nieuwe mailbox een regel die mail aan het oude adres naar een map <i>Oud adres</i> verplaatst; dan zie je wie het oude adres nog gebruikt.')],
 
     keep: [L('Keep your old mail and contacts', 'Bewaar je oude mail en contacten'), {
       microsoft: L('Nothing to do: it all stays in the same account.', 'Niets te doen: alles blijft in hetzelfde account.'),
@@ -103,7 +103,7 @@ export function moveGuide(h, { done = [], letters = 0, retire = [] }) {
     retire: [L('Retire the old address', 'Hef het oude adres op'),
       `<ol class="small">${retire.map(x => `<li>${x}</li>`).join('')}</ol>`
       + L('First check once more that no account you need still logs in with it: password resets go to this address.',
-          'Controleer eerst nog één keer dat geen account dat je nodig hebt ermee inlogt: wachtwoordherstel gaat naar dit adres.')]
+          'Controleer eerst nog één keer of je er bij geen enkel account dat je nodig hebt nog mee inlogt: een nieuw wachtwoord aanvragen gaat via dit adres.')]
   };
 
   const count = MOVE_STEPS.filter(s => done.includes(s)).length;

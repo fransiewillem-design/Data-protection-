@@ -221,7 +221,7 @@ ${keptNote(b, rec, true)}
 Ik verzoek u het volgende.
 
 1. VERWIJDERING (artikel 17 AVG)
-Wis alle persoonsgegevens die u over mij verwerkt, inclusief gegevens die u van derden hebt verkregen, gegevens die u over mij hebt afgeleid of gegenereerd, en kopieën bij verwerkers die namens u handelen. Voor zover u deze gegevens openbaar hebt gemaakt of hebt doorgegeven, verplicht artikel 17, lid 2, u om de ontvangers van dit verzoek op de hoogte te stellen.
+Wis alle persoonsgegevens die u over mij verwerkt, inclusief gegevens die u van derden heeft verkregen, gegevens die u over mij heeft afgeleid of gegenereerd, en kopieën bij verwerkers die namens u handelen. Voor zover u deze gegevens openbaar heeft gemaakt of heeft doorgegeven, verplicht artikel 17, lid 2, u om de ontvangers van dit verzoek op de hoogte te stellen.
 
 2. BEZWAAR (artikel 21 AVG)
 Voor zover de verwerking berust op een gerechtvaardigd belang, maak ik daartegen bezwaar. Voor zover de verwerking plaatsvindt ten behoeve van direct marketing, geldt dit bezwaar absoluut: op grond van artikel 21, lid 3, dient u die verwerking zonder belangenafweging volledig te staken.
@@ -230,7 +230,7 @@ Voor zover de verwerking berust op een gerechtvaardigd belang, maak ik daartegen
 Indien u stelt dat bepaalde gegevens niet gewist kunnen worden, verzoek ik u voor die gegevens op te geven:
    a. om welke categorieën persoonsgegevens het gaat;
    b. de precieze rechtsgrond en, indien van toepassing, de wettelijke bewaarplicht waarop u zich beroept;
-   c. de bron waaruit u de gegevens hebt verkregen;
+   c. de bron waaruit u de gegevens heeft verkregen;
    d. de ontvangers of categorieën ontvangers aan wie de gegevens zijn verstrekt;
    e. de bewaartermijn;
    f. of de gegevens worden gebruikt voor geautomatiseerde besluitvorming of profilering, en zo ja, welke logica daaraan ten grondslag ligt.
@@ -239,7 +239,7 @@ TERMIJN
 Op grond van artikel 12, lid 3, AVG dient u zonder onredelijke vertraging en in elk geval binnen één maand na ontvangst te reageren. Verlengt u die termijn, dan dient u mij daarvan binnen de eerste maand gemotiveerd op de hoogte te stellen.
 
 IDENTIFICATIE
-Kunt u mij werkelijk niet identificeren op basis van bovenstaande gegevens, geef dan precies aan welke aanvullende informatie u nodig hebt. Op grond van artikel 12, lid 6, AVG mag u alleen om aanvullende informatie vragen als u redelijke twijfel heeft over mijn identiteit, en alleen wat nodig is om die te bevestigen. Volgens de Europese toezichthouders (EDPB, richtsnoeren 01/2022 over het recht op inzage) is een kopie van een identiteitsbewijs daarvoor in de regel niet proportioneel.
+Kunt u mij werkelijk niet identificeren op basis van bovenstaande gegevens, geef dan precies aan welke aanvullende informatie u nodig heeft. Op grond van artikel 12, lid 6, AVG mag u alleen om aanvullende informatie vragen als u redelijke twijfel heeft over mijn identiteit, en alleen wat nodig is om die te bevestigen. Volgens de Europese toezichthouders (EDPB, richtsnoeren 01/2022 over het recht op inzage) is een kopie van een identiteitsbewijs daarvoor in de regel niet proportioneel.
 
 Ontvang ik geen tijdige reactie, of wijst u het verzoek zonder geldige grond af, dan dien ik een klacht in bij de Autoriteit Persoonsgegevens op grond van artikel 77 AVG.
 
@@ -318,7 +318,7 @@ ${longDate(todayISO(), false)}`
     subject: (b, p) => `Complaint under Article 77 GDPR concerning ${b.name}`,
     body: (b, p, rec) => `To the supervisory authority${p.country === 'NL' ? ' (Autoriteit Persoonsgegevens)' : ''},
 
-I wish to lodge a complaint under Article 77 GDPR against ${b.name} (${b.site || ''}).
+I wish to lodge a complaint under Article 77 GDPR against ${b.name}${b.site ? ` (${b.site})` : ''}.
 
 COMPLAINANT
 ${identityBlock(p)}
@@ -328,8 +328,7 @@ On ${rec?.sentAt ? longDate(rec.sentAt, false) : '[date]'} I sent ${b.name} a re
 
 The statutory period under Article 12(3) expired on ${rec?.sentAt ? longDate(addDays(rec.sentAt, rec.extended ? 90 : 30), false) : '[date]'}. ${rec?.status === 'refused'
   ? 'The controller refused the request without providing an adequate legal basis.'
-  : 'The controller has not responded, or has not responded adequately.'}${keptMailing(b, rec) ? `
-The controller also kept sending me marketing email after ${keptMailing(b, rec).since === 'request' ? 'my request' : `I unsubscribed on ${longDate(keptMailing(b, rec).from, false)}`}, most recently on ${longDate(keptMailing(b, rec).last, false)}.` : ''}
+  : 'The controller has not responded, or has not responded adequately.'}${keptMailing(b, rec) ? ` The controller also kept sending me marketing email after ${keptMailing(b, rec).since === 'request' ? 'my request' : `I unsubscribed on ${longDate(keptMailing(b, rec).from, false)}`}, most recently on ${longDate(keptMailing(b, rec).last, false)}.` : ''}
 
 WHY I AM COMPLAINING
 The controller has infringed:
@@ -382,18 +381,17 @@ TEMPLATES.complaint_nl = {
   subject: (b, p) => `Klacht op grond van artikel 77 AVG over ${b.name}`,
   body: (b, p, rec) => `Aan de Autoriteit Persoonsgegevens,
 
-Hierbij dien ik een klacht in op grond van artikel 77 AVG tegen ${b.name} (${b.site || ''}).
+Hierbij dien ik een klacht in op grond van artikel 77 AVG tegen ${b.name}${b.site ? ` (${b.site})` : ''}.
 
 KLAGER
 ${identityBlockNL(p)}
 
 WAT ER GEBEURDE
-Op ${rec?.sentAt ? longDate(rec.sentAt, true) : '[datum]'} heb ik ${b.name} verzocht op grond van artikel 15, 17 en 21 AVG mijn persoonsgegevens te wissen, de verwerking voor direct marketing te staken en de bron te noemen van gegevens die zij bewaren.
+Op ${rec?.sentAt ? longDate(rec.sentAt, true) : '[datum]'} heb ik ${b.name} verzocht op grond van artikel 15, 17 en 21 AVG mijn persoonsgegevens te wissen, de verwerking voor direct marketing te staken en de bron te noemen van de gegevens die het over mij bewaart.
 
 De wettelijke termijn uit artikel 12, lid 3, is verstreken op ${rec?.sentAt ? longDate(addDays(rec.sentAt, rec.extended ? 90 : 30), true) : '[datum]'}. ${rec?.status === 'refused'
   ? 'De verwerkingsverantwoordelijke heeft het verzoek geweigerd zonder toereikende rechtsgrond.'
-  : 'De verwerkingsverantwoordelijke heeft niet, of niet toereikend, gereageerd.'}${keptMailing(b, rec) ? `
-Daarnaast bleef de verwerkingsverantwoordelijke mij reclame mailen na ${keptMailing(b, rec).since === 'request' ? 'mijn verzoek' : `mijn afmelding op ${longDate(keptMailing(b, rec).from, true)}`}, voor het laatst op ${longDate(keptMailing(b, rec).last, true)}.` : ''}
+  : 'De verwerkingsverantwoordelijke heeft niet, of niet toereikend, gereageerd.'}${keptMailing(b, rec) ? ` Daarnaast bleef de verwerkingsverantwoordelijke mij reclame sturen na ${keptMailing(b, rec).since === 'request' ? 'mijn verzoek' : `mijn afmelding op ${longDate(keptMailing(b, rec).from, true)}`}, voor het laatst op ${longDate(keptMailing(b, rec).last, true)}.` : ''}
 
 WAAROM IK KLAAG
 De verwerkingsverantwoordelijke heeft gehandeld in strijd met:
@@ -471,7 +469,7 @@ ${isEvidenceDerived(b) ? minimalBlock(b, true) : identityBlockNL(p)}
 ${breachNote(b, true)}${keptNote(b, rec, true)}
 Ik verzoek u:
 
-1. Mijn persoonsgegevens niet langer te verwerken voor direct marketing, inclusief profilering voor dat doel, per e-mail, telefoon, sms, post of online advertenties (artikel 21, lid 2 en 3, AVG). Dit bezwaar is onvoorwaardelijk.
+1. Mijn persoonsgegevens niet langer te verwerken voor direct marketing, inclusief profilering voor dat doel, via e-mail, telefoon, sms, post of online advertenties (artikel 21, lid 2 en 3, AVG). Dit bezwaar is onvoorwaardelijk.
 
 2. Alle persoonsgegevens te wissen die u niet meer nodig heeft om uw dienst aan mij te leveren of om aan een wettelijke plicht te voldoen, bijvoorbeeld gegevens van eerdere contracten of bestellingen waarvan de bewaartermijn is verstreken, gebruiks- en surfprofielen, en gegevens die u van derden heeft verkregen (artikel 17, lid 1, onder a en c, AVG).
 
@@ -561,7 +559,7 @@ Volgens de Europese toezichthouders (EDPB, richtsnoeren 01/2022 over het recht o
 IDENTIFICATIEGEGEVENS
 ${idLines(b, p, true)}
 
-Heeft u een concrete twijfel over mijn identiteit, laat mij dan weten welke en wat u nodig heeft om die weg te nemen. Zo niet, voer dan mijn verzoek uit en bevestig dat binnen de termijn van artikel 12, lid 3, AVG.
+Heeft u een concrete twijfel over mijn identiteit, laat mij dan weten welke twijfel dat is en wat u nodig heeft om die weg te nemen. Zo niet, voer dan mijn verzoek uit en bevestig dat binnen de termijn van artikel 12, lid 3, AVG.
 
 ${closing(b, p, true)}`
 };
@@ -592,7 +590,7 @@ TEMPLATES.reply_form_nl = {
 
 Dat is niet vereist. De AVG schrijft geen vorm voor een verzoek voor. U mag een formulier aanbieden, maar een verzoek dat via een ander kanaal van u binnenkomt, zoals het e-mailadres waaraan ik schreef, is net zo geldig, en u moet het faciliteren (artikel 12, lid 2, AVG; EDPB-richtsnoeren 01/2022 over het recht op inzage). De termijn loopt vanaf de dag van ontvangst.
 
-Mijn verzoek staat zoals ik het verstuurde. Heeft uw formulier gegevens van mij nodig, neem die dan over uit mijn e-mail, of laat mij weten welk gegeven precies ontbreekt.
+Mijn verzoek blijft staan zoals ik het verstuurde. Heeft uw formulier gegevens van mij nodig, neem die dan over uit mijn e-mail, of laat mij weten welk gegeven precies ontbreekt.
 
 IDENTIFICATIEGEGEVENS
 ${idLines(b, p, true)}
@@ -637,7 +635,7 @@ Artikel 17, lid 3, onder b, AVG staat dat alleen toe voor de gegevens waarop die
 
 Ik verzoek u ook te bevestigen dat:
    - u al mijn overige persoonsgegevens heeft gewist;
-   - u de bewaarde gegevens alleen voor die wettelijke verplichting gebruikt: niet voor marketing, niet voor profilering, en u verstrekt ze niet aan anderen;
+   - u de bewaarde gegevens alleen voor die wettelijke verplichting gebruikt, niet voor marketing of profilering, en ze niet aan anderen verstrekt;
    - u ze wist zodra de bewaartermijn verstreken is.
 
 IDENTIFICATIEGEGEVENS
@@ -680,9 +678,9 @@ TEMPLATES.reply_nodata_nl = {
   subject: (b, p, rec) => answerSubject(b, p, rec, true),
   body: (b, p, rec) => `${opening(b, rec, true, 'dat u geen persoonsgegevens van mij verwerkt')}${mailedNote(b, true)}
 
-Ik verzoek u opnieuw te kijken, ook in uw mailinglijsten en bij diensten die namens u mail versturen, en te bevestigen:
+Ik verzoek u opnieuw te zoeken, ook in uw mailinglijsten en bij diensten die namens u mail versturen, en te bevestigen:
    a. dat de gegevens hieronder overal zijn gewist, ook bij uw verwerkers (artikel 17 en 28 AVG);
-   b. waar u ze vandaan heeft, als dat niet van mij was (artikel 15, lid 1, onder g, AVG);
+   b. waar u ze vandaan heeft, als u ze niet van mij kreeg (artikel 15, lid 1, onder g, AVG);
    c. aan wie u ze heeft verstrekt (artikel 15, lid 1, onder c, AVG).
 
 IDENTIFICATIEGEGEVENS
