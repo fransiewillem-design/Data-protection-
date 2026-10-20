@@ -76,7 +76,7 @@ export function toast(msg) {
   el.textContent = msg;
   document.body.appendChild(el);
   // Long enough to read: a sentence takes longer than a word.
-  setTimeout(() => el.remove(), Math.min(9000, Math.max(2600, msg.length * 55)));
+  setTimeout(() => el.remove(), Math.min(16000, Math.max(2600, msg.length * 55)));
 }
 
 const CATEGORIES = () => ({
@@ -595,7 +595,7 @@ export const upsertSender = sn => upsertSenders([sn]) > 0;
 // Dropped mail, wherever it is dropped: delivery failures for letters, answers
 // from companies, and senders. Everything is read on this device.
 export async function ingestFiles(files, onProgress) {
-  const { messages, app } = await readMailFiles(files, onProgress);
+  const { messages, app, unread, broken } = await readMailFiles(files, onProgress);
   const bounced = new Set(messages.flatMap(m => m.bounce || []));
   const { back, partial } = bounced.size ? store.markBounced(bounced) : { back: [], partial: [] };
   const { answers, used } = matchAnswers(messages.filter(m => !m.bounce), store.get());
@@ -623,12 +623,27 @@ export async function ingestFiles(files, onProgress) {
   }
   if (senders.length) upsertSenders(senders);
   if (app && senders.length) store.update(st => { st.mailApp = app; });
-  return { back, partial, answers: answers.filter(a => changed.includes(a.id)), mail, senders };
+  return { back, partial, answers: answers.filter(a => changed.includes(a.id)), mail, senders, unread, broken };
+}
+
+// Files the browser could not read are nearly always in a cloud folder and
+// not downloaded yet. How to fetch them depends on the computer.
+function unreadNote(n) {
+  const which = L(n === 1 ? 'It is' : 'They are', n === 1 ? 'staat het' : 'staan ze');
+  const head = L(`${n} ${n === 1 ? 'file' : 'files'} could not be read.`, `${n} ${n === 1 ? 'bestand kon' : 'bestanden konden'} niet worden gelezen.`);
+  return head + ' ' + ((store.get().system || detectSystem()) === 'mac'
+    ? L(`${which} probably still only in iCloud: in Finder, Control-click the folder → Download Now, wait until the cloud icons are gone, then drop it here again.`,
+        `Waarschijnlijk ${which} alleen nog in iCloud: klik in de Finder met de rechtermuisknop op de map → Download nu, wacht tot de wolkjes weg zijn en sleep de map opnieuw hierheen.`)
+    : L('Is the folder in OneDrive or another cloud folder? Right-click it → Always keep on this device, then drop it here again.',
+        'Staat de map in OneDrive of een andere cloudmap? Klik er met de rechtermuisknop op → Altijd behouden op dit apparaat, en sleep hem daarna opnieuw hierheen.'));
 }
 
 // What dropping the files did, said once.
-export function ingestToasts({ back, partial, answers }) {
+export function ingestToasts({ back, partial, answers, unread = 0, broken = 0, mail = [] }) {
   const said = [];
+  if (unread) said.push((mail.length ? L(`${mail.length} ${mail.length === 1 ? 'mail' : 'mails'} read.`, `${mail.length} ${mail.length === 1 ? 'mail' : 'mails'} gelezen.`) + ' ' : '') + unreadNote(unread));
+  if (broken) said.push(L(`${broken} ${broken === 1 ? 'file was' : 'files were'} not mail HoopUp can read and ${broken === 1 ? 'was' : 'were'} skipped.`,
+    `${broken} ${broken === 1 ? 'bestand was' : 'bestanden waren'} geen mail die HoopUp kan lezen en ${broken === 1 ? 'is' : 'zijn'} overgeslagen.`));
   if (answers.length) said.push(L(`${answers.length} ${answers.length === 1 ? 'answer' : 'answers'} to your letters recognised. See Delete data.`,
     `${answers.length} ${answers.length === 1 ? 'antwoord' : 'antwoorden'} op je brieven herkend. Zie Gegevens verwijderen.`));
   if (partial.length) said.push(L(`${partial.length === 1 ? 'One address' : `${partial.length} addresses`} did not exist, but the letter reached their other addresses: the request stands and the deadline runs.`,

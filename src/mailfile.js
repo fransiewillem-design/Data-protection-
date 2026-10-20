@@ -112,23 +112,31 @@ export async function readMailFiles(files, onProgress = () => {}) {
   // A loop, not push(...list): a mailbox can hold more messages than a
   // function call can take arguments.
   const add = list => { for (const m of list) messages.push(m); };
-  let before = 0;
+  let before = 0, unread = 0, broken = 0;
   const apps = {};
   for (const [i, f] of files.entries()) {
     // A folder of thousands of small files: let the page breathe.
     if (i && i % 25 === 0) await pause();
-    const head = new Uint8Array(await f.slice(0, 512).arrayBuffer());
-    const headText = new TextDecoder().decode(await f.slice(0, 64 * 1024).arrayBuffer());
-    const app = appOf(f, headText, isMsg(head));
-    if (app) apps[app] = (apps[app] || 0) + 1;
-    const folder = folderOf(f);
-    if (isMsg(head)) add(parseMessages(msgToText(await f.arrayBuffer()), { single: true, folder }));
-    else if (/\.emlx$/i.test(f.name)) add(parseMessages(emlxText(new Uint8Array(await f.arrayBuffer())), { single: true, folder }));
-    else if (f.size <= WHOLE) add(parseMessages(await f.text(), { folder }));
-    else await readLarge(f, add, n => onProgress((before + n) / total, f.name), folder);
+    // A file that fails is skipped, not the whole drop. Most often it is
+    // stored only in iCloud or OneDrive (a cloud icon in Finder or Explorer),
+    // which the browser cannot read until it is downloaded.
+    try {
+      const head = new Uint8Array(await f.slice(0, 512).arrayBuffer());
+      const headText = new TextDecoder().decode(await f.slice(0, 64 * 1024).arrayBuffer());
+      const app = appOf(f, headText, isMsg(head));
+      if (app) apps[app] = (apps[app] || 0) + 1;
+      const folder = folderOf(f);
+      if (isMsg(head)) add(parseMessages(msgToText(await f.arrayBuffer()), { single: true, folder }));
+      else if (/\.emlx$/i.test(f.name)) add(parseMessages(emlxText(new Uint8Array(await f.arrayBuffer())), { single: true, folder }));
+      else if (f.size <= WHOLE) add(parseMessages(await f.text(), { folder }));
+      else await readLarge(f, add, n => onProgress((before + n) / total, f.name), folder);
+    } catch (err) {
+      if (['NotReadableError', 'NotFoundError', 'SecurityError', 'AbortError'].includes(err?.name)) unread++;
+      else broken++;
+    }
     before += f.size;
     onProgress(before / total, f.name);
   }
   const app = Object.entries(apps).sort((a, b) => b[1] - a[1])[0]?.[0] || '';
-  return { messages, app };
+  return { messages, app, unread, broken };
 }
