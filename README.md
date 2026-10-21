@@ -419,6 +419,11 @@ whoever runs the site (free, no secret, no certificate):
 3. **Register**, then copy the **Application (client) ID** into `MS_CLIENT_ID` in `src/config.js`.
 4. **API permissions** → Microsoft Graph → Delegated → `MailboxSettings.ReadWrite` (users consent for
    their own mailbox; no admin consent is needed for personal accounts).
+5. Optional, so Microsoft's consent screen names the site rather than the directory's default domain:
+   **Branding & properties** → **Publisher domain** → verify `hoopup.tech`. The file it asks for is already
+   served at `/.well-known/microsoft-identity-association.json`, holding the client ID.
+
+HoopUp's registration is in place: its client ID is in `src/config.js`.
 
 The flow is OAuth 2.0 authorization code with PKCE in the browser (`src/outlook.js`), returning through
 `auth.html` with the code in the URL fragment. Earlier `HoopUp:` rules in the mailbox are replaced; the

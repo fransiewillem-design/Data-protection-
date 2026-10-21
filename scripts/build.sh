@@ -14,7 +14,7 @@ SHA=$(printf '%s' "$SHA" | cut -c1-7)
 rm -rf dist
 mkdir dist
 # Only what the site serves: no README, workflows, scripts or git metadata.
-cp -R index.html unsubscribe.html auth.html manifest.webmanifest _headers LICENSE assets data src dist/
+cp -R index.html unsubscribe.html auth.html manifest.webmanifest _headers LICENSE assets data src .well-known dist/
 
 cd dist
 sed -i "s|src=\"src/app.js\"|src=\"src/app.js?v=$SHA\"|" index.html

@@ -3,7 +3,7 @@
 // app registration at Microsoft. It is public, not a secret: every page that
 // signs in with Microsoft shows its ID in the address bar. Empty means the
 // one-click option is not offered, and Outlook.com rules are added by hand.
-export const MS_CLIENT_ID = '';
+export const MS_CLIENT_ID = '93976912-07bc-4680-ba2a-3f79ccab0830';
 
 // Personal Microsoft accounts (Outlook.com, Hotmail, Live): the accounts whose
 // rules live only on Microsoft's servers.

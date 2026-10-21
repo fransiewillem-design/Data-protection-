@@ -2055,9 +2055,15 @@ export function blockPanel(bl, client) {
 
   const steps = {
     outlookcom: (outlookAvailable() ? `
+      <div class="notice small">
+        <p>${L('<b>Private, before you click:</b> you sign in on Microsoft\'s own page, so HoopUp never sees your password. There is no HoopUp server in between: your browser talks to Microsoft directly. HoopUp asks only to change your mailbox settings, where rules live, not to read or send your mail, and forgets that permission straight after.',
+          '<b>Privé, voor je klikt:</b> je logt in op de eigen pagina van Microsoft, dus HoopUp ziet je wachtwoord nooit. Er zit geen server van HoopUp tussen: je browser praat rechtstreeks met Microsoft. HoopUp vraagt alleen toestemming om je mailboxinstellingen te wijzigen, waar de regels staan, niet om je mail te lezen of te versturen, en vergeet die toestemming meteen daarna.')}</p>
+        <p>${L('Microsoft then asks whether HoopUp may do that. It may call the app unverified: that only means HoopUp is a small project without a Microsoft partner account.',
+          'Microsoft vraagt je daarna of HoopUp dat mag. Daar kan staan dat de app niet geverifieerd is: dat betekent alleen dat HoopUp een klein project is zonder partneraccount bij Microsoft.')}</p>
+      </div>
       <div class="row"><button class="primary" data-action="outlook-connect">${L('Add the rules to Outlook.com', 'Zet de regels in Outlook.com')}</button></div>
-      <p class="small">${L('You sign in on Microsoft\'s own page. HoopUp asks only to change your mailbox settings, where rules live: not to read or send your mail. It adds the rules, replaces earlier HoopUp rules, and forgets the permission straight away. They run on Microsoft\'s server, so they also work on your phone and when your computer is off.',
-        'Je logt in op de eigen pagina van Microsoft. HoopUp vraagt alleen toestemming om je mailboxinstellingen te wijzigen, waar regels staan: niet om je mail te lezen of te versturen. Het zet de regels erin, vervangt eerdere HoopUp-regels en vergeet de toestemming meteen. Ze draaien op de server van Microsoft, dus ze werken ook op je telefoon en als je computer uit staat.')}</p>
+      <p class="small">${L('The rules run on Microsoft\'s server, so they also work on your phone and when your computer is off. Earlier HoopUp rules are replaced; your own rules stay.',
+        'De regels draaien op de server van Microsoft, dus ze werken ook op je telefoon en als je computer uit staat. Eerdere HoopUp-regels worden vervangen; je eigen regels blijven staan.')}</p>
       <details class="small"><summary>${L('Or add them by hand', 'Of zet ze er zelf in')}</summary>` : `
       `) + `
       <ol class="small">
