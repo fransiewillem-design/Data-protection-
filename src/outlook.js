@@ -1,19 +1,26 @@
-// Adds the block rules to an Outlook.com mailbox in one go, through Microsoft's
-// own sign-in. Outlook on the web takes rule values one at a time; Microsoft's
-// API takes a list.
-//
-// What it asks for: permission to change mailbox settings (where rules live),
-// and nothing else. Not the mail itself, not sending, not a refresh token. The
-// permission is used for the requests below, held in memory only, and then
-// forgotten. The sign-in happens on Microsoft's page; HoopUp never sees a
-// password. What goes to Microsoft is the rules: the spam sites and reply
-// addresses, sent to the user's own mailbox.
+// Two things with an Outlook.com mailbox, each through Microsoft's own sign-in
+// and each asking for one permission only:
+// - rules: adds the block rules in one go (Outlook on the web takes rule
+//   values one at a time; Microsoft's API takes a list). Permission to change
+//   mailbox settings, where rules live; not the mail itself.
+// - read: fetches the Junk Email folder straight into the browser, so it can
+//   be read here like dropped files. Permission to read mail; only that one
+//   folder is fetched, nothing is changed and nothing is sent anywhere else.
+// Never sending, never a refresh token. The permission is used for the
+// requests below, held in memory only, and then forgotten. HoopUp never sees
+// a password.
 
 import { MS_CLIENT_ID, MS_TENANT, MS_HOSTS } from './config.js';
 
 const AUTH = `https://login.microsoftonline.com/${MS_TENANT}/oauth2/v2.0`;
-const SCOPE = 'https://graph.microsoft.com/MailboxSettings.ReadWrite';
-const RULES = 'https://graph.microsoft.com/v1.0/me/mailFolders/inbox/messageRules';
+const SCOPES = {
+  rules: 'https://graph.microsoft.com/MailboxSettings.ReadWrite',
+  read: 'https://graph.microsoft.com/Mail.Read'
+};
+const GRAPH = 'https://graph.microsoft.com/v1.0/me';
+const RULES = `${GRAPH}/mailFolders/inbox/messageRules`;
+// Outlook.com empties Junk Email after ten days, so this is rarely reached.
+const MAX_READ = 1000;
 const START = 'hoopup-ms-start', BACK = 'hoopup-ms-back';
 // Values per rule: well within Outlook's size limit for rules.
 const PER_RULE = 150;
@@ -24,16 +31,17 @@ export const outlookAvailable = () => !!MS_CLIENT_ID
 
 const b64url = bytes => btoa(String.fromCharCode(...bytes)).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
 
-// Leaves for Microsoft's sign-in page; auth.html brings the answer back.
-export async function outlookStart() {
+// Leaves for Microsoft's sign-in page; auth.html brings the answer back to
+// the page for this mode.
+export async function outlookStart(mode = 'rules') {
   const verifier = b64url(crypto.getRandomValues(new Uint8Array(32)));
   const challenge = b64url(new Uint8Array(await crypto.subtle.digest('SHA-256', new TextEncoder().encode(verifier))));
   const state = b64url(crypto.getRandomValues(new Uint8Array(16)));
-  sessionStorage.setItem(START, JSON.stringify({ verifier, state, at: Date.now() }));
+  sessionStorage.setItem(START, JSON.stringify({ verifier, state, at: Date.now(), mode }));
   const q = new URLSearchParams({
     client_id: MS_CLIENT_ID, response_type: 'code', redirect_uri: redirectUri(),
     // In the fragment, so the one-time code never reaches a server log.
-    response_mode: 'fragment', scope: SCOPE, state,
+    response_mode: 'fragment', scope: SCOPES[mode], state,
     code_challenge: challenge, code_challenge_method: 'S256', prompt: 'select_account'
   });
   location.assign(`${AUTH}/authorize?${q}`);
@@ -57,9 +65,11 @@ export const ruleBodies = bl => {
   ];
 };
 
-// Finishes the sign-in and replaces any earlier HoopUp rules with the current
-// ones. Returns { added, sites, replies } or { error }.
-export async function outlookFinish(bl) {
+const send = { credentials: 'omit', referrerPolicy: 'no-referrer' };
+
+// Finishes the sign-in for one mode: { token } or { error }, or null when
+// there is nothing to finish.
+async function takeToken(mode) {
   let start, back;
   try {
     start = JSON.parse(sessionStorage.getItem(START) || 'null');
@@ -70,18 +80,26 @@ export async function outlookFinish(bl) {
   }
   if (!back) return null;
   if (back.error) return { error: back.error === 'access_denied' ? 'denied' : 'signin' };
-  if (!start || !back.code || back.state !== start.state || Date.now() - start.at > 15 * 60e3) return { error: 'signin' };
-
-  const send = { credentials: 'omit', referrerPolicy: 'no-referrer' };
-  let token;
+  if (!start || (start.mode || 'rules') !== mode || !back.code || back.state !== start.state
+    || Date.now() - start.at > 15 * 60e3) return { error: 'signin' };
   try {
     const res = await fetch(`${AUTH}/token`, { ...send, method: 'POST',
       headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
       body: new URLSearchParams({ client_id: MS_CLIENT_ID, grant_type: 'authorization_code', code: back.code,
-        redirect_uri: redirectUri(), code_verifier: start.verifier, scope: SCOPE }) });
-    token = (await res.json()).access_token;
-  } catch { /* below */ }
-  if (!token) return { error: 'signin' };
+        redirect_uri: redirectUri(), code_verifier: start.verifier, scope: SCOPES[mode] }) });
+    const token = (await res.json()).access_token;
+    return token ? { token } : { error: 'signin' };
+  } catch {
+    return { error: 'signin' };
+  }
+}
+
+// Finishes the sign-in and replaces any earlier HoopUp rules with the current
+// ones. Returns { added, sites, replies } or { error }.
+export async function outlookFinish(bl) {
+  const got = await takeToken('rules');
+  if (!got || got.error) return got;
+  let token = got.token;
 
   const auth = { ...send, headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' } };
   try {
@@ -103,6 +121,44 @@ export async function outlookFinish(bl) {
     return { added, sites: bl.links.length, replies: bl.replyTo.length + bl.sharedReplyTo.length };
   } catch {
     return { error: 'rules' };
+  } finally {
+    token = '';
+  }
+}
+
+// Finishes the sign-in and fetches the Junk Email folder, each message as it
+// arrived (its full source, headers included), for reading on this device.
+// Returns { mails: [text] } or { error }, or null when nothing to finish.
+export async function outlookReadJunk(onProgress = () => {}) {
+  const got = await takeToken('read');
+  if (!got || got.error) return got;
+  let token = got.token;
+  const auth = { ...send, headers: { Authorization: `Bearer ${token}` } };
+  try {
+    const ids = [];
+    let next = `${GRAPH}/mailFolders/junkemail/messages?$select=id&$top=100`;
+    while (next && ids.length < MAX_READ) {
+      const res = await fetch(next, auth);
+      if (!res.ok) return { error: res.status === 401 || res.status === 403 ? 'denied' : 'read' };
+      const page = await res.json();
+      for (const m of page.value || []) ids.push(m.id);
+      next = page['@odata.nextLink'] || '';
+    }
+    const list = ids.slice(0, MAX_READ), mails = [];
+    let done = 0;
+    // A few at a time: quick, and well inside Microsoft's limits.
+    const worker = async () => {
+      while (list.length) {
+        const id = list.shift();
+        const res = await fetch(`${GRAPH}/messages/${encodeURIComponent(id)}/$value`, auth);
+        if (res.ok) mails.push(await res.text());
+        onProgress(++done, ids.length);
+      }
+    };
+    await Promise.all([worker(), worker(), worker(), worker()]);
+    return { mails };
+  } catch {
+    return { error: 'read' };
   } finally {
     token = '';
   }

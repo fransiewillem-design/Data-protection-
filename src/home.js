@@ -6,6 +6,7 @@ import { L, plural } from './i18n.js';
 import { relationOf, keptMailing } from './letters.js';
 import { moveGuide, MOVE_STEPS } from './move.js';
 import { filesFromDrop, isMailFileName } from './mailfile.js';
+import { outlookAvailable, outlookStart, outlookReadJunk } from './outlook.js';
 import {
   esc, toast, senderClass, unsubTier, ingestFiles, ingestToasts, runOneClickBatch, isWanted, wantedWhy, isBlockable,
   startUnsubQueue, wireQueue, wireBlock, blockAllCard, hostOf, nameOf, akaOf, deleteWork, unsafeReason, writable, coveredBy,
@@ -165,6 +166,16 @@ function dropZone(compact) {
 
 // How to get mail out of each app, one app at a time: the one this computer
 // most likely uses is open, the others are a tap away.
+// Hotmail and Outlook.com without files: the junk folder fetched from
+// Microsoft into this browser. What is private is said before the click.
+const msRead = () => `
+  <div class="ms-read">
+    <p class="small"><b>${L('Hotmail, Outlook.com or Live?', 'Hotmail, Outlook.com of Live?')}</b> ${L('Then it works without files.', 'Dan kan het zonder bestanden.')}</p>
+    <p class="small muted">${L('<b>Private, before you click:</b> you sign in with Microsoft itself, so HoopUp never sees your password. There is no HoopUp server in between: your browser fetches only your Junk Email folder straight from Microsoft and reads it on this device. Nothing is kept. Microsoft asks whether HoopUp may read your mail; that is needed to fetch that folder.',
+      '<b>Privé, voor je klikt:</b> je logt in bij Microsoft zelf, dus HoopUp ziet je wachtwoord nooit. Er zit geen server van HoopUp tussen: je browser haalt alleen je map Ongewenste e-mail rechtstreeks bij Microsoft op en leest die op dit apparaat. Er wordt niets bewaard. Microsoft vraagt of HoopUp je mail mag lezen; dat is nodig om die map op te halen.')}</p>
+    <div class="row"><button class="primary" data-action="ms-read">${L('Read my junk mail via Microsoft', 'Lees mijn ongewenste mail via Microsoft')}</button></div>
+  </div>`;
+
 // A link to another app's steps in the same box.
 const go = (app, text) => `<button type="button" class="link-btn" data-action="howto-go" data-app="${app}">${text}</button>`;
 const steps = (list, tip = '') => `<ol>${list.map(x => `<li>${x}</li>`).join('')}</ol>${tip ? `<p class="muted">${tip}</p>` : ''}`;
@@ -191,11 +202,11 @@ const HOWTO_APPS = () => [
       'Open <b>Junk Email</b> and press <code>Ctrl+A</code>.',
       'Drag the mails into a folder, such as <b>Downloads</b>.',
       'Drag that folder here.'],
-      `Only one file? Then this is the new Outlook, which saves one mail at a time. Use ${go('thunderbird', 'Thunderbird')} instead.`), steps([
+      `Works in the <b>classic Outlook</b> app. Only one file? Then this is the new Outlook, which saves one mail at a time. With a Hotmail or Outlook.com address, ${go('outlookcom', 'read your mail via Microsoft')}; otherwise use ${go('thunderbird', 'Thunderbird')}.`), steps([
       'Open <b>Ongewenste e-mail</b> en druk op <code>Ctrl+A</code>.',
       'Sleep de mails naar een map, zoals <b>Downloads</b>.',
       'Sleep die map hierheen.'],
-      `Maar één bestand? Dan is dit de nieuwe Outlook, die maar één mail tegelijk opslaat. Gebruik dan ${go('thunderbird', 'Thunderbird')}.`))],
+      `Dit werkt in de <b>klassieke Outlook</b>-app. Maar één bestand? Dan is dit de nieuwe Outlook, die maar één mail tegelijk opslaat. Met een Hotmail- of Outlook.com-adres ${go('outlookcom', 'lees je je mail in via Microsoft')}; anders gebruik je ${go('thunderbird', 'Thunderbird')}.`))],
   ['gmail', 'Gmail', L(steps([
       'Open <a href="https://takeout.google.com" target="_blank" rel="noopener noreferrer">Google Takeout</a>, press <b>Deselect all</b> and tick only <b>Mail</b>.',
       'Export, download the file Google sends you and unzip it.',
@@ -203,7 +214,10 @@ const HOWTO_APPS = () => [
       'Open <a href="https://takeout.google.com" target="_blank" rel="noopener noreferrer">Google Takeout</a>, klik op <b>Alles deselecteren</b> en vink alleen <b>Mail</b> aan.',
       'Exporteer, download het bestand dat Google je stuurt en pak het uit.',
       'Sleep het <code>.mbox</code>-bestand hierheen.']))],
-  ['outlookcom', 'Hotmail, Outlook.com', L(steps([
+  ['outlookcom', 'Hotmail, Outlook.com', outlookAvailable()
+    ? msRead() + `<p class="muted">${L(`Rather use files? On a Mac follow ${go('outlookmac', 'the steps via Apple Mail')}, on Windows ${go('thunderbird', 'the steps via Thunderbird')}.`,
+                                      `Liever met bestanden? Op een Mac volg je ${go('outlookmac', 'de stappen via Apple Mail')}, op Windows ${go('thunderbird', 'de stappen via Thunderbird')}.`)}</p>`
+    : L(steps([
       'The website cannot save mail, so use a mail app.',
       `On a Mac: follow ${go('outlookmac', 'the steps via Apple Mail')}.`,
       `On Windows: follow ${go('thunderbird', 'the steps via Thunderbird')}.`]), steps([
@@ -222,7 +236,7 @@ const HOWTO_APPS = () => [
 // The app to open first: the one the last drop came from, else the usual one
 // on this computer.
 function howtoDefault(state) {
-  if (['apple', 'outlookwin', 'gmail'].includes(state.mailApp)) return state.mailApp;
+  if (['apple', 'outlookwin', 'gmail', 'outlookcom'].includes(state.mailApp)) return state.mailApp;
   const sys = state.system || detectSystem();
   return sys === 'mac' ? 'apple' : sys === 'windows' ? 'outlookwin' : 'thunderbird';
 }
@@ -260,6 +274,7 @@ export function home(state) {
       <li><b>${L('Delete', 'Wissen')}</b><span>${L('your data at companies', 'je gegevens bij bedrijven')}</span></li>
     </ol>
     ${dropZone(false)}
+    ${outlookAvailable() ? `<div class="ms-read-hero">${msRead()}</div>` : ''}
     <ul class="trust">
       <li>${L('Nothing is uploaded', 'Er wordt niets geüpload')}</li>
       <li>${L('No account', 'Geen account')}</li>
@@ -480,7 +495,7 @@ export function home(state) {
   datalekken, zoeken in je mailbox, databrokers.`)}</p>`;
 }
 
-export function mountHome(root, state, rerender) {
+export function mountHome(root, state, rerender, params) {
   if (openHelp) { openHelp = ''; requestAnimationFrame(() => root.querySelector('#howto-more')?.scrollIntoView({ behavior: 'smooth', block: 'center' })); }
   wireQueue(root, rerender);
   wireBlock(root, state, rerender);
@@ -497,6 +512,38 @@ export function mountHome(root, state, rerender) {
       'Je browser kreeg geen bestanden mee. Mails rechtstreeks uit je mailapp slepen werkt niet in een browser: sleep ze eerst naar een map op je computer, en die map hierheen. Hieronder staat per mailapp hoe dat gaat.'));
     showHelp();
   }
+
+  // Back from Microsoft's sign-in: fetch the junk folder, then read it like
+  // dropped files.
+  async function readViaMicrosoft() {
+    history.replaceState(null, '', location.pathname + location.search + '#/');
+    const drop = root.querySelector('#drop');
+    if (drop) drop.innerHTML = `<p class="drop-title" aria-live="polite">${L('Fetching your junk mail from Microsoft…', 'Je ongewenste mail wordt bij Microsoft opgehaald…')} <span id="ms-count"></span></p>
+      <p class="small muted">${L('Straight into this browser. Nothing goes to HoopUp.', 'Rechtstreeks naar deze browser. Er gaat niets naar HoopUp.')}</p>`;
+    const r = await outlookReadJunk((done, total) => {
+      const el = root.querySelector('#ms-count');
+      if (el) el.textContent = `${done} / ${total}`;
+    });
+    if (!r) { rerender(); return; }
+    if (r.error) {
+      rerender();
+      toast(r.error === 'denied'
+        ? L('Microsoft did not give permission, so nothing was read.', 'Microsoft gaf geen toestemming, dus er is niets gelezen.')
+        : r.error === 'signin'
+        ? L('The Microsoft sign-in did not complete. Try again.', 'De aanmelding bij Microsoft is niet gelukt. Probeer het opnieuw.')
+        : L('Could not fetch your junk mail from Microsoft. Try again in a moment.', 'Je ongewenste mail kon niet bij Microsoft worden opgehaald. Probeer het zo opnieuw.'));
+      return;
+    }
+    if (!r.mails.length) {
+      rerender();
+      toast(L('Your Junk Email folder is empty: nothing to sort.', 'Je map Ongewenste e-mail is leeg: er is niets te sorteren.'));
+      return;
+    }
+    // The block rules for this mailbox are Outlook.com ones.
+    store.update(st => { st.mailApp = 'outlookcom'; });
+    await handleFiles(r.mails.map((text, i) => new File([text], `outlook-junk-${i + 1}.txt`, { type: 'text/plain' })));
+  }
+  if (params?.get('msread') === '1') readViaMicrosoft();
 
   async function handleFiles(list) {
     // Folders (an Apple Mail .mbox bundle) arrive as empty entries.
@@ -580,6 +627,10 @@ export function mountHome(root, state, rerender) {
 
     if (act === 'pick') input?.click();
     if (act === 'howto-app') selectHowto(btn.dataset.app);
+    if (act === 'ms-read') {
+      btn.disabled = true;
+      outlookStart('read').catch(() => { btn.disabled = false; toast(L('Could not start the Microsoft sign-in.', 'Kon de aanmelding bij Microsoft niet starten.')); });
+    }
     if (act === 'howto-go') { selectHowto(btn.dataset.app); root.querySelector('#howto-tab-' + btn.dataset.app)?.focus(); }
     if (act === 'pick-folder') root.querySelector('#folder')?.click();
 

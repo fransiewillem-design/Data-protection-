@@ -530,3 +530,12 @@ button, .btn { border-radius: 9px; transition: border-color .12s, color .12s, fi
 .howto-more { margin: -4px 0 14px; }
 .howto-more summary { cursor: pointer; color: var(--muted); font-size: .88rem; }
 .howto-card.howto-inline { margin-top: 10px; }
+
+/* Hotmail and Outlook.com without files. */
+.ms-read-hero {
+  margin-top: 14px; text-align: left; padding: 16px 18px;
+  background: var(--surface); border: 1px solid var(--line); border-radius: var(--radius); box-shadow: var(--shadow);
+}
+.ms-read p { margin-bottom: 6px; }
+.ms-read .row { margin-top: 10px; }
+.howto-panel .ms-read { margin-bottom: 8px; }

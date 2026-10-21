@@ -258,7 +258,7 @@ looks up a company's privacy address on request, and it receives only that compa
 | `hoopup.tech/api/privacy-contact?domain=…` | Only the company's domain, when you press *Look it up*; the function reads that company's privacy statement, keeps and logs nothing, and the answer is cached a week per company |
 | Letters | Nothing from the app: they open in your own mail app, and you press Send |
 | Unsubscribe by email, replies to a company's answer | Nothing from the app: they open in your own mail app, and you press Send |
-| `login.microsoftonline.com`, `graph.microsoft.com` | Only when you press *Add the rules to Outlook.com*: you sign in on Microsoft's own page, and HoopUp sends the block rules (spam sites and reply addresses) to your own mailbox. It asks only for `MailboxSettings.ReadWrite` (rules live there; not your mail, not sending), gets no refresh token, keeps the permission in memory for those few requests and then drops it |
+| `login.microsoftonline.com`, `graph.microsoft.com` | Only when you press *Add the rules to Outlook.com* or *Read my junk mail via Microsoft*, each on Microsoft's own sign-in page. Adding rules asks only for `MailboxSettings.ReadWrite` (rules live there; not your mail, not sending) and sends the block rules (spam sites and reply addresses) to your own mailbox. Reading asks only for `Mail.Read` and fetches the Junk Email folder, each message's own source, straight into the browser, where it is read like dropped files; nothing is changed or kept. Neither gets a refresh token; the permission is held in memory for those requests and then dropped |
 | Calendar file, request log | Nothing: both are made on your device and saved where you choose. The calendar file holds company names and dates only; if your calendar syncs, that is your calendar's doing |
 
 **Where letters go.** In order: an address you typed; the privacy or DPO address the company's own mail
@@ -426,7 +426,10 @@ whoever runs the site (free, no secret, no certificate):
    **Branding & properties** → **Publisher domain** → verify `hoopup.tech`. The file it asks for is already
    served at `/.well-known/microsoft-identity-association.json`, holding the client ID.
 
-HoopUp's registration is in place: its client ID is in `src/config.js`.
+HoopUp's registration is in place: its client ID is in `src/config.js`. The same sign-in also reads the Junk Email
+folder of a Hotmail or Outlook.com mailbox into the browser (`Mail.Read`, asked for only when the user presses *Read
+my junk mail via Microsoft*), so those users need no files at all. Adding `Mail.Read` under **API permissions**
+is tidy but not required: personal accounts consent per request.
 
 The flow is OAuth 2.0 authorization code with PKCE in the browser (`src/outlook.js`), returning through
 `auth.html` with the code in the URL fragment. Earlier `HoopUp:` rules in the mailbox are replaced; the
