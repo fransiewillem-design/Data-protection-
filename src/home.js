@@ -142,6 +142,8 @@ function addressPanel(state) {
 
 // Re-open the panel after an answer re-renders the page.
 let reopenAddr = false;
+// The mail app whose help to show open after the next render.
+let openHelp = '';
 
 // ---- the page ----------------------------------------------------------------
 
@@ -163,54 +165,58 @@ function dropZone(compact) {
 
 // How to get mail out of each app, one app at a time: the one this computer
 // most likely uses is open, the others are a tap away.
+// A link to another app's steps in the same box.
+const go = (app, text) => `<button type="button" class="link-btn" data-action="howto-go" data-app="${app}">${text}</button>`;
+const steps = (list, tip = '') => `<ol>${list.map(x => `<li>${x}</li>`).join('')}</ol>${tip ? `<p class="muted">${tip}</p>` : ''}`;
 const HOWTO_APPS = () => [
-  ['apple', 'Apple Mail', L(`
-      <div class="howto-cols">
-        <div><h3>Junk only</h3><ol>
-          <li>Open the <b>Junk</b> mailbox in Mail.</li>
-          <li>Press <code>Cmd+A</code> and drag the messages into a folder in Finder, such as <b>Downloads</b>.</li>
-          <li>Drag that folder here.</li></ol></div>
-        <div><h3>The whole mailbox</h3><ol>
-          <li>Select a mailbox (Inbox, or several).</li>
-          <li><b>Mailbox</b> → <b>Export Mailbox…</b> → choose a folder.</li>
-          <li>Drag the exported <code>.mbox</code> folders here.</li></ol></div>
-      </div>
-      <p class="small muted">Does your Desktop sync with iCloud? Use Downloads instead: a file that is only in iCloud cannot be read until it is downloaded.</p>`, `
-      <div class="howto-cols">
-        <div><h3>Alleen ongewenste mail</h3><ol>
-          <li>Open in Mail de map <b>Ongewenst</b>.</li>
-          <li>Druk op <code>Cmd+A</code> en sleep de berichten naar een map in de Finder, zoals <b>Downloads</b>.</li>
-          <li>Sleep die map hierheen.</li></ol></div>
-        <div><h3>De hele mailbox</h3><ol>
-          <li>Kies een mailbox (Postvak IN, of meerdere).</li>
-          <li><b>Mailbox</b> → <b>Exporteer mailbox…</b> → kies een map.</li>
-          <li>Sleep de geëxporteerde <code>.mbox</code>-mappen hierheen.</li></ol></div>
-      </div>
-      <p class="small muted">Synchroniseert je bureaublad met iCloud? Gebruik dan Downloads: een bestand dat alleen in iCloud staat, kan pas gelezen worden als het gedownload is.</p>`)],
-  ['outlookwin', L('Outlook on Windows', 'Outlook op Windows'), L(`<ol>
-      <li>Open <b>Junk Email</b>, or your Inbox and press <code>Ctrl+A</code> to select everything.</li>
-      <li>Drag the messages into a folder in File Explorer. They become <code>.msg</code> files.</li>
-      <li>Drag that folder here.</li></ol>`, `<ol>
-      <li>Open <b>Ongewenste e-mail</b>, of je Postvak IN en druk op <code>Ctrl+A</code> om alles te selecteren.</li>
-      <li>Sleep de berichten naar een map in Verkenner. Het worden <code>.msg</code>-bestanden.</li>
-      <li>Sleep die map hierheen.</li></ol>`)],
-  ['gmail', 'Gmail', L(`<ol>
-      <li>Open <a href="https://takeout.google.com" target="_blank" rel="noopener noreferrer">Google Takeout</a>, press <b>Deselect all</b>, tick <b>Mail</b> and export.</li>
-      <li>Download the file Google sends you and unzip it.</li>
-      <li>Drag the <code>.mbox</code> here. It holds your whole mailbox with its labels, so reading takes a few minutes, all on your device.</li></ol>`, `<ol>
-      <li>Open <a href="https://takeout.google.com" target="_blank" rel="noopener noreferrer">Google Takeout</a>, klik op <b>Alles deselecteren</b>, vink <b>Mail</b> aan en exporteer.</li>
-      <li>Download het bestand dat Google je stuurt en pak het uit.</li>
-      <li>Sleep de <code>.mbox</code> hierheen. Daarin staat je hele mailbox met labels, dus het lezen duurt een paar minuten, helemaal op je apparaat.</li></ol>`)],
-  ['outlookcom', 'Outlook.com, Hotmail', L(`<p class="small">Outlook.com cannot export mail in the browser. Add the account to a mail app first:</p><ol>
-      <li>Add your Outlook.com or Hotmail account to <b>Apple Mail</b> (Mac) or <b>Thunderbird</b> (Windows).</li>
-      <li>Then follow the steps for that app here.</li></ol>`, `<p class="small">Outlook.com kan in de browser geen mail exporteren. Voeg het account daarom eerst toe aan een mailapp:</p><ol>
-      <li>Voeg je Outlook.com- of Hotmail-account toe aan <b>Apple Mail</b> (Mac) of <b>Thunderbird</b> (Windows).</li>
-      <li>Volg daarna hier de stappen voor die app.</li></ol>`)],
-  ['thunderbird', 'Thunderbird', L(`<ol>
-      <li><b>Account Settings</b> → <b>Server Settings</b> → <b>Local Directory</b> shows where your mail is stored.</li>
-      <li>Each folder there is one file without an extension, like <code>Inbox</code> or <code>Junk</code>: drag those here.</li></ol>`, `<ol>
-      <li><b>Accountinstellingen</b> → <b>Serverinstellingen</b> → <b>Lokale map</b> toont waar je mail staat.</li>
-      <li>Elke map daarin is één bestand zonder extensie, zoals <code>Inbox</code> of <code>Junk</code>: sleep die hierheen.</li></ol>`)]
+  ['apple', 'Apple Mail', L(steps([
+      'Open <b>Junk</b> and press <code>Cmd+A</code>.',
+      'Drag the mails into a folder, such as <b>Downloads</b>.',
+      'Drag that folder here.'],
+      'Your whole mailbox instead? <b>Mailbox</b> → <b>Export Mailbox…</b>, then drag that here.'), steps([
+      'Open <b>Ongewenst</b> en druk op <code>Cmd+A</code>.',
+      'Sleep de mails naar een map, zoals <b>Downloads</b>.',
+      'Sleep die map hierheen.'],
+      'Liever je hele mailbox? <b>Mailbox</b> → <b>Exporteer mailbox…</b>, en sleep die hierheen.'))],
+  ['outlookmac', L('Outlook on Mac', 'Outlook op Mac'), L(steps([
+      'Add your mail account to Apple Mail: <b>System Settings</b> → <b>Internet Accounts</b>.',
+      'In Apple Mail, open <b>Junk</b>, press <code>Cmd+A</code> and drag the mails into a folder.',
+      'Drag that folder here.'],
+      'Why Apple Mail? Outlook for Mac saves only one mail at a time.'), steps([
+      'Zet je mailaccount in Apple Mail: <b>Systeeminstellingen</b> → <b>Internetaccounts</b>.',
+      'Open in Apple Mail <b>Ongewenst</b>, druk op <code>Cmd+A</code> en sleep de mails naar een map.',
+      'Sleep die map hierheen.'],
+      'Waarom Apple Mail? Outlook voor Mac slaat maar één mail tegelijk op.'))],
+  ['outlookwin', L('Outlook on Windows', 'Outlook op Windows'), L(steps([
+      'Open <b>Junk Email</b> and press <code>Ctrl+A</code>.',
+      'Drag the mails into a folder, such as <b>Downloads</b>.',
+      'Drag that folder here.'],
+      `Only one file? That is the new Outlook. Turn off <b>New Outlook</b> at the top right and try again. No switch there? Use ${go('thunderbird', 'Thunderbird')}.`), steps([
+      'Open <b>Ongewenste e-mail</b> en druk op <code>Ctrl+A</code>.',
+      'Sleep de mails naar een map, zoals <b>Downloads</b>.',
+      'Sleep die map hierheen.'],
+      `Maar één bestand? Dan heb je de nieuwe Outlook. Zet rechtsboven <b>Nieuwe Outlook</b> uit en probeer het opnieuw. Geen schakelaar? Gebruik ${go('thunderbird', 'Thunderbird')}.`))],
+  ['gmail', 'Gmail', L(steps([
+      'Open <a href="https://takeout.google.com" target="_blank" rel="noopener noreferrer">Google Takeout</a>, press <b>Deselect all</b> and tick only <b>Mail</b>.',
+      'Export, download the file Google sends you and unzip it.',
+      'Drag the <code>.mbox</code> file here.']), steps([
+      'Open <a href="https://takeout.google.com" target="_blank" rel="noopener noreferrer">Google Takeout</a>, klik op <b>Alles deselecteren</b> en vink alleen <b>Mail</b> aan.',
+      'Exporteer, download het bestand dat Google je stuurt en pak het uit.',
+      'Sleep het <code>.mbox</code>-bestand hierheen.']))],
+  ['outlookcom', 'Hotmail, Outlook.com', L(steps([
+      'The website cannot save mail, so use a mail app.',
+      `On a Mac: follow ${go('outlookmac', 'the steps via Apple Mail')}.`,
+      `On Windows: follow ${go('thunderbird', 'the steps via Thunderbird')}.`]), steps([
+      'De website kan geen mail opslaan, dus gebruik een mailapp.',
+      `Op een Mac: volg ${go('outlookmac', 'de stappen via Apple Mail')}.`,
+      `Op Windows: volg ${go('thunderbird', 'de stappen via Thunderbird')}.`]))],
+  ['thunderbird', 'Thunderbird', L(steps([
+      'Install the free <a href="https://www.thunderbird.net" target="_blank" rel="noopener noreferrer">Thunderbird</a> and add your mail account.',
+      'Open <b>Junk</b>, press <code>Ctrl+A</code>, right-click → <b>Save As…</b> and choose a folder.',
+      'Drag that folder here.']), steps([
+      'Installeer het gratis <a href="https://www.thunderbird.net" target="_blank" rel="noopener noreferrer">Thunderbird</a> en zet je mailaccount erin.',
+      'Open <b>Ongewenst</b>, druk op <code>Ctrl+A</code>, rechtermuisknop → <b>Opslaan als…</b> en kies een map.',
+      'Sleep die map hierheen.']))]
 ];
 
 // The app to open first: the one the last drop came from, else the usual one
@@ -224,20 +230,18 @@ function howtoDefault(state) {
 const onPhone = () => /iPhone|iPad|Android|Mobile/i.test(navigator.userAgent || '')
   || (/Mac/i.test(navigator.platform || '') && navigator.maxTouchPoints > 1);
 
-const HOWTO = state => {
-  const open = howtoDefault(state);
+const HOWTO = (state, { inline = false, app = '' } = {}) => {
+  const open = app || howtoDefault(state);
   return `
-  <section class="howto-card" aria-labelledby="howto-title">
-    <h2 id="howto-title">${L('Getting your mail out of your mail app', 'Zo haal je je mail uit je mailapp')}</h2>
-    ${onPhone() ? `<p class="notice warn small">${L('A phone cannot export mail. Open hoopup.tech on your computer to drop your mail in.',
-      'Op een telefoon kun je geen mail exporteren. Open hoopup.tech op je computer om je mail erin te slepen.')}</p>` : ''}
-    <p class="small muted">${L('Just the junk folder is quick. The whole mailbox also shows what you actually read: newsletters you open, star, file or answer are kept, and only the ones you ignore are offered for unsubscribing.',
-      'Alleen de map Ongewenst gaat snel. De hele mailbox laat ook zien wat je echt leest: nieuwsbrieven die je opent, een ster geeft, opbergt of beantwoordt, blijven staan, en uitschrijven wordt alleen aangeboden voor wat je negeert.')}</p>
-    <div class="seg" role="tablist" aria-label="${L('Your mail app', 'Je mailapp')}">
+  <section class="howto-card ${inline ? 'howto-inline' : ''}" aria-labelledby="howto-title">
+    <h2 id="howto-title">${L('Which mail app do you use?', 'Welke mailapp gebruik je?')}</h2>
+    ${onPhone() ? `<p class="notice warn small">${L('A phone cannot save mail as files. Open hoopup.tech on your computer.',
+      'Een telefoon kan geen mail als bestand opslaan. Open hoopup.tech op je computer.')}</p>` : ''}
+    <div class="seg" role="tablist" aria-labelledby="howto-title">
       ${HOWTO_APPS().map(([k, name]) => `<button type="button" role="tab" id="howto-tab-${k}" aria-controls="howto-${k}"
         aria-selected="${k === open}" tabindex="${k === open ? 0 : -1}" data-action="howto-app" data-app="${k}">${name}</button>`).join('')}
     </div>
-    ${HOWTO_APPS().map(([k, , steps]) => `<div class="howto-panel small" role="tabpanel" id="howto-${k}" aria-labelledby="howto-tab-${k}" ${k === open ? '' : 'hidden'}>${steps}</div>`).join('')}
+    ${HOWTO_APPS().map(([k, , body]) => `<div class="howto-panel small" role="tabpanel" id="howto-${k}" aria-labelledby="howto-tab-${k}" ${k === open ? '' : 'hidden'}>${body}</div>`).join('')}
   </section>`;
 };
 
@@ -448,6 +452,10 @@ export function home(state) {
   <div id="panel"></div>
 
   ${dropZone(true)}
+  <details class="howto-more" id="howto-more" ${openHelp ? 'open' : ''}>
+    <summary>${L('How do I get (more) mail in here?', 'Hoe krijg ik (meer) mail hierin?')}</summary>
+    ${HOWTO(state, { inline: true, app: openHelp })}
+  </details>
 
   <details class="senders">
     <summary>${L(`Every sender scanned (${mail.length})`, `Alle gescande afzenders (${mail.length})`)}</summary>
@@ -473,8 +481,22 @@ export function home(state) {
 }
 
 export function mountHome(root, state, rerender) {
+  if (openHelp) { openHelp = ''; requestAnimationFrame(() => root.querySelector('#howto-more')?.scrollIntoView({ behavior: 'smooth', block: 'center' })); }
   wireQueue(root, rerender);
   wireBlock(root, state, rerender);
+
+  // Mail dragged straight out of a mail app arrives as nothing at all: the
+  // app offers to write files later, which a browser cannot take.
+  const showHelp = () => {
+    const more = document.querySelector('#howto-more');
+    if (more) more.open = true;
+    (more || document.querySelector('.howto-card'))?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+  };
+  function noFiles() {
+    toast(L('Your browser received no files. Dragging mail straight out of a mail app does not work in a browser: drag it into a folder on your computer first, then that folder here. Below is how, per mail app.',
+      'Je browser kreeg geen bestanden mee. Mails rechtstreeks uit je mailapp slepen werkt niet in een browser: sleep ze eerst naar een map op je computer, en die map hierheen. Hieronder staat per mailapp hoe dat gaat.'));
+    showHelp();
+  }
 
   async function handleFiles(list) {
     // Folders (an Apple Mail .mbox bundle) arrive as empty entries.
@@ -489,6 +511,12 @@ export function mountHome(root, state, rerender) {
         const el = root.querySelector('#drop-pct');
         if (el) el.textContent = Math.floor(frac * 100) + '%';
       });
+      // One .eml alone is most likely the new Outlook (Windows) or Outlook for
+      // Mac, which save one mail at a time. The page comes back with the way
+      // to get the whole folder.
+      const sys = store.get().system || detectSystem();
+      const one = result.mail.length > 0 && files.length === 1 && /\.eml$/i.test(files[0].name) && ['mac', 'windows'].includes(sys);
+      openHelp = one ? (sys === 'mac' ? 'outlookmac' : 'outlookwin') : '';
       rerender();
       const said = ingestToasts(result);
       const { mail, senders } = result;
@@ -497,7 +525,12 @@ export function mountHome(root, state, rerender) {
         return;
       }
       if (!said) toast(L(`${mail.length} ${plural(mail.length, 'mail', 'mails', '', '')} from ${senders.length} ${plural(senders.length, 'sender', 'senders', '', '')} sorted`,
-        `${mail.length} ${plural(mail.length, '', '', 'mail', 'mails')} van ${senders.length} ${plural(senders.length, '', '', 'afzender', 'afzenders')} gesorteerd`));
+        `${mail.length} ${plural(mail.length, '', '', 'mail', 'mails')} van ${senders.length} ${plural(senders.length, '', '', 'afzender', 'afzenders')} gesorteerd`)
+        + (!one ? '' : sys === 'mac'
+          ? L('. Only one? Outlook for Mac saves one mail at a time. Below is how to get the whole folder at once.',
+              '. Maar één? Outlook voor Mac slaat één mail tegelijk op. Hieronder staat hoe je de hele map in één keer pakt.')
+          : L('. Only one? The new Outlook saves one mail at a time. Below is how to get the whole folder at once.',
+              '. Maar één? De nieuwe Outlook slaat één mail tegelijk op. Hieronder staat hoe je de hele map in één keer pakt.')));
     } catch (err) {
       if (big) rerender();
       toast(L('Could not read those files: ', 'Kon die bestanden niet lezen: ') + err.message);
@@ -509,7 +542,9 @@ export function mountHome(root, state, rerender) {
   if (drop) {
     ['dragenter', 'dragover'].forEach(ev => drop.addEventListener(ev, e => { e.preventDefault(); drop.classList.add('over'); }));
     ['dragleave', 'drop'].forEach(ev => drop.addEventListener(ev, e => { e.preventDefault(); drop.classList.remove('over'); }));
-    drop.addEventListener('drop', e => { filesFromDrop(e.dataTransfer).then(handleFiles); });
+    drop.addEventListener('drop', e => {
+      filesFromDrop(e.dataTransfer).then(files => files.length ? handleFiles(files) : noFiles());
+    });
   }
   input?.addEventListener('change', () => handleFiles(input.files));
   const folder = root.querySelector('#folder');
@@ -545,6 +580,7 @@ export function mountHome(root, state, rerender) {
 
     if (act === 'pick') input?.click();
     if (act === 'howto-app') selectHowto(btn.dataset.app);
+    if (act === 'howto-go') { selectHowto(btn.dataset.app); root.querySelector('#howto-tab-' + btn.dataset.app)?.focus(); }
     if (act === 'pick-folder') root.querySelector('#folder')?.click();
 
     if (act === 'home-unsub') {

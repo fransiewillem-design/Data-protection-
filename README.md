@@ -37,8 +37,11 @@ So HoopUp does the parts that work, and is honest about the rest:
 
 Drop mail in (`.eml` files, Outlook's `.msg` files, Apple Mail's `.emlx` files, or an `.mbox` of any size: a
 multi-gigabyte Google Takeout is read in slices, on the device), or a whole folder: an Apple Mail *Export
-Mailbox* folder, a folder of `.msg` files, Thunderbird's folder files. Home sorts it into four cards, each with
-one number and one button:
+Mailbox* folder, a folder of `.msg` files, Thunderbird's folder files. Home asks which mail app you use and gives
+three steps for it. The new Outlook on Windows and Outlook for Mac save only one mail at a time, so their steps go
+through classic Outlook, Apple Mail or Thunderbird; a drop of a single mail on a computer points there, and a drag
+straight out of a mail app (which gives the browser no files) is explained. Home sorts the mail into four cards,
+each with one number and one button:
 
 | Card | What the button does |
 | --- | --- |
