@@ -171,8 +171,20 @@ function dropZone(compact) {
 const msRead = () => `
   <div class="ms-read">
     <p class="small"><b>${L('Hotmail, Outlook.com or Live?', 'Hotmail, Outlook.com of Live?')}</b> ${L('Then it works without files.', 'Dan kan het zonder bestanden.')}</p>
-    <p class="small muted">${L('<b>Private, before you click:</b> you sign in with Microsoft itself, so HoopUp never sees your password. There is no HoopUp server in between: your browser fetches only your Junk Email folder straight from Microsoft and reads it on this device. Nothing is kept. Microsoft asks whether HoopUp may read your mail; that is needed to fetch that folder.',
-      '<b>Privé, voor je klikt:</b> je logt in bij Microsoft zelf, dus HoopUp ziet je wachtwoord nooit. Er zit geen server van HoopUp tussen: je browser haalt alleen je map Ongewenste e-mail rechtstreeks bij Microsoft op en leest die op dit apparaat. Er wordt niets bewaard. Microsoft vraagt of HoopUp je mail mag lezen; dat is nodig om die map op te halen.')}</p>
+    <div class="small muted ms-private"><b>${L('Private, before you click:', 'Privé, voor je klikt:')}</b>
+      <ul>${L(`
+        <li>You sign in with Microsoft itself. HoopUp never sees your password.</li>
+        <li>Your browser fetches the mail straight from Microsoft. There is no HoopUp server in between, and nothing goes to HoopUp.</li>
+        <li>Microsoft asks whether HoopUp may read your mail. A permission for one folder does not exist, so Microsoft names your whole mailbox. HoopUp fetches only the Junk Email folder, and only now.</li>
+        <li>Your mail is not kept. As with dropped files, HoopUp remembers only a short summary per sender, on this device.</li>
+        <li>Microsoft remembers your permission until you withdraw it at account.live.com/consent.</li>`, `
+        <li>Je logt in bij Microsoft zelf. HoopUp ziet je wachtwoord nooit.</li>
+        <li>Je browser haalt de mail rechtstreeks bij Microsoft op. Er zit geen server van HoopUp tussen, en er gaat niets naar HoopUp.</li>
+        <li>Microsoft vraagt of HoopUp je mail mag lezen. Een toestemming voor één map bestaat niet, dus Microsoft noemt je hele mailbox. HoopUp haalt alleen de map Ongewenste e-mail op, en alleen nu.</li>
+        <li>Je mail wordt niet bewaard. Net als bij bestanden onthoudt HoopUp alleen per afzender een korte samenvatting, op dit apparaat.</li>
+        <li>Microsoft onthoudt je toestemming tot je die intrekt via account.live.com/consent.</li>`)}
+      </ul>
+    </div>
     <div class="row"><button class="primary" data-action="ms-read">${L('Read my junk mail via Microsoft', 'Lees mijn ongewenste mail via Microsoft')}</button></div>
   </div>`;
 

@@ -65,7 +65,9 @@ export const ruleBodies = bl => {
   ];
 };
 
-const send = { credentials: 'omit', referrerPolicy: 'no-referrer' };
+// Nothing from Microsoft goes into the browser's cache: not the mail, not the
+// permission.
+const send = { credentials: 'omit', referrerPolicy: 'no-referrer', cache: 'no-store' };
 
 // Finishes the sign-in for one mode: { token } or { error }, or null when
 // there is nothing to finish.

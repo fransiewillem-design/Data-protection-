@@ -539,3 +539,5 @@ button, .btn { border-radius: 9px; transition: border-color .12s, color .12s, fi
 .ms-read p { margin-bottom: 6px; }
 .ms-read .row { margin-top: 10px; }
 .howto-panel .ms-read { margin-bottom: 8px; }
+.ms-private ul { margin: 4px 0 0; padding-left: 18px; }
+.ms-private li { margin-bottom: 3px; }
