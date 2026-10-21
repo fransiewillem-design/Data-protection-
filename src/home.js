@@ -58,8 +58,8 @@ function retireSteps(addr) {
   const d = addr.split('@')[1] || '';
   const code = `<code>${esc(addr)}</code>`;
   if (/^(outlook|hotmail|live|msn)\./i.test(d)) return [
-    L(`If it is an <b>alias</b> on your Microsoft account: Microsoft account → <b>Manage how you sign in</b> → remove ${code}.`,
-      `Is het een <b>alias</b> van je Microsoft-account? Ga naar Microsoft-account → <b>Beheren hoe je je aanmeldt</b> → verwijder ${code}.`),
+    L(`If it is an <b>alias</b> on your Microsoft account: go to account.microsoft.com → <b>Your info</b> → <b>Manage how you sign in to Microsoft</b> → <b>Remove</b> next to ${code}. Is it the primary alias? Make another address primary first.`,
+      `Is het een <b>alias</b> van je Microsoft-account? Ga naar account.microsoft.com → <b>Je info</b> → <b>Beheren hoe je je aanmeldt bij Microsoft</b> → <b>Verwijderen</b> naast ${code}. Is het je primaire alias? Maak dan eerst een ander adres primair.`),
     L(`If it is a <b>separate account</b> you only used for sign-ups: close that account once nothing you need is tied to it.`,
       `Is het een <b>apart account</b> dat je alleen voor aanmeldingen gebruikte? Sluit het dan zodra er niets meer aan hangt wat je nodig hebt.`),
     L(`Until then, one Outlook rule (anything sent to ${code} → <b>Delete</b>) keeps it out of sight.`,
@@ -195,38 +195,38 @@ const go = (app, text) => `<button type="button" class="link-btn" data-action="h
 const steps = (list, tip = '') => `<ol>${list.map(x => `<li>${x}</li>`).join('')}</ol>${tip ? `<p class="muted">${tip}</p>` : ''}`;
 const HOWTO_APPS = () => [
   ['apple', 'Apple Mail', L(steps([
-      'Open <b>Junk</b> and press <code>Cmd+A</code>.',
-      'Drag the mails into a folder, such as <b>Downloads</b>.',
+      'Open <b>Junk</b>, click one mail and press <code>Cmd+A</code>.',
+      'Drag the mails into a folder in Finder, such as <b>Downloads</b>.',
       'Drag that folder here.'],
       'Your whole mailbox instead? <b>Mailbox</b> → <b>Export Mailbox…</b>, then drag that here.'), steps([
-      'Open <b>Ongewenst</b> en druk op <code>Cmd+A</code>.',
-      'Sleep de mails naar een map, zoals <b>Downloads</b>.',
+      'Open <b>Ongewenst</b>, klik op één mail en druk op <code>Cmd+A</code>.',
+      'Sleep de mails naar een map in de Finder, zoals <b>Downloads</b>.',
       'Sleep die map hierheen.'],
       'Liever je hele mailbox? <b>Mailbox</b> → <b>Exporteer mailbox…</b>, en sleep die hierheen.'))],
   ['outlookmac', L('Outlook on Mac', 'Outlook op Mac'), L(steps([
       'Add your mail account to Apple Mail: <b>System Settings</b> → <b>Internet Accounts</b>.',
-      'In Apple Mail, open <b>Junk</b>, press <code>Cmd+A</code> and drag the mails into a folder.',
+      'In Apple Mail, open <b>Junk</b>, click one mail, press <code>Cmd+A</code> and drag the mails into a folder in Finder.',
       'Drag that folder here.'],
-      'Why Apple Mail? Outlook for Mac saves only one mail at a time.'), steps([
+      'Why Apple Mail? With Outlook for Mac, dragging often gives only one file.'), steps([
       'Zet je mailaccount in Apple Mail: <b>Systeeminstellingen</b> → <b>Internetaccounts</b>.',
-      'Open in Apple Mail <b>Ongewenst</b>, druk op <code>Cmd+A</code> en sleep de mails naar een map.',
+      'Open in Apple Mail <b>Ongewenst</b>, klik op één mail, druk op <code>Cmd+A</code> en sleep de mails naar een map in de Finder.',
       'Sleep die map hierheen.'],
-      'Waarom Apple Mail? Outlook voor Mac slaat maar één mail tegelijk op.'))],
+      'Waarom Apple Mail? In Outlook voor Mac levert slepen vaak maar één bestand op.'))],
   ['outlookwin', L('Outlook on Windows', 'Outlook op Windows'), L(steps([
-      'Open <b>Junk Email</b> and press <code>Ctrl+A</code>.',
-      'Drag the mails into a folder, such as <b>Downloads</b>.',
+      'Open <b>Junk Email</b>, click one mail and press <code>Ctrl+A</code>.',
+      'Drag the mails into a folder in File Explorer, such as <b>Downloads</b>.',
       'Drag that folder here.'],
       `Works in the <b>classic Outlook</b> app. Only one file? Then this is the new Outlook, which saves one mail at a time. With a Hotmail or Outlook.com address, ${go('outlookcom', 'read your mail via Microsoft')}; otherwise use ${go('thunderbird', 'Thunderbird')}.`), steps([
-      'Open <b>Ongewenste e-mail</b> en druk op <code>Ctrl+A</code>.',
-      'Sleep de mails naar een map, zoals <b>Downloads</b>.',
+      'Open <b>Ongewenste e-mail</b>, klik op één mail en druk op <code>Ctrl+A</code>.',
+      'Sleep de mails naar een map in Verkenner, zoals <b>Downloads</b>.',
       'Sleep die map hierheen.'],
       `Dit werkt in de <b>klassieke Outlook</b>-app. Maar één bestand? Dan is dit de nieuwe Outlook, die maar één mail tegelijk opslaat. Met een Hotmail- of Outlook.com-adres ${go('outlookcom', 'lees je je mail in via Microsoft')}; anders gebruik je ${go('thunderbird', 'Thunderbird')}.`))],
   ['gmail', 'Gmail', L(steps([
       'Open <a href="https://takeout.google.com" target="_blank" rel="noopener noreferrer">Google Takeout</a>, press <b>Deselect all</b> and tick only <b>Mail</b>.',
-      'Export, download the file Google sends you and unzip it.',
+      'Export, then download the file Google emails you (that can take a few hours) and unzip it.',
       'Drag the <code>.mbox</code> file here.']), steps([
       'Open <a href="https://takeout.google.com" target="_blank" rel="noopener noreferrer">Google Takeout</a>, klik op <b>Alles deselecteren</b> en vink alleen <b>Mail</b> aan.',
-      'Exporteer, download het bestand dat Google je stuurt en pak het uit.',
+      'Exporteer, en download het bestand dat Google je mailt (dat kan een paar uur duren). Pak het uit.',
       'Sleep het <code>.mbox</code>-bestand hierheen.']))],
   ['outlookcom', 'Hotmail, Outlook.com', outlookAvailable()
     ? msRead() + `<p class="muted">${L(`Rather use files? On a Mac follow ${go('outlookmac', 'the steps via Apple Mail')}, on Windows ${go('thunderbird', 'the steps via Thunderbird')}.`,
@@ -240,10 +240,10 @@ const HOWTO_APPS = () => [
       `Op Windows: volg ${go('thunderbird', 'de stappen via Thunderbird')}.`]))],
   ['thunderbird', 'Thunderbird', L(steps([
       'Install the free <a href="https://www.thunderbird.net" target="_blank" rel="noopener noreferrer">Thunderbird</a> and add your mail account. You sign in on your mail provider\'s own page.',
-      'Open <b>Junk</b> (at Yahoo: <b>Bulk</b>), click one mail, press <code>Ctrl+A</code>, right-click → <b>Save As…</b> and choose a folder.',
+      'Open <b>Junk</b> (at Yahoo: <b>Bulk</b>), click one mail, press <code>Ctrl+A</code> (<code>Cmd+A</code> on a Mac), right-click → <b>Save As…</b> and choose a folder.',
       'Drag that folder here.'], 'You can keep using your usual mail app; Thunderbird is only for this step.'), steps([
       'Installeer het gratis <a href="https://www.thunderbird.net" target="_blank" rel="noopener noreferrer">Thunderbird</a> en zet je mailaccount erin. Je logt in op de eigen pagina van je mailprovider.',
-      'Open <b>Ongewenst</b> (bij Yahoo: <b>Bulk</b>), klik op één mail, druk op <code>Ctrl+A</code>, rechtermuisknop → <b>Opslaan als…</b> en kies een map.',
+      'Open <b>Ongewenst</b> (bij Yahoo: <b>Bulk</b>), klik op één mail, druk op <code>Ctrl+A</code> (<code>Cmd+A</code> op een Mac), rechtermuisknop → <b>Opslaan als…</b> en kies een map.',
       'Sleep die map hierheen.'], 'Je gewone mailapp kun je blijven gebruiken; Thunderbird is alleen voor deze stap.'))]
 ];
 
@@ -588,8 +588,8 @@ export function mountHome(root, state, rerender, params) {
       if (!said) toast(L(`${mail.length} ${plural(mail.length, 'mail', 'mails', '', '')} from ${senders.length} ${plural(senders.length, 'sender', 'senders', '', '')} sorted`,
         `${mail.length} ${plural(mail.length, '', '', 'mail', 'mails')} van ${senders.length} ${plural(senders.length, '', '', 'afzender', 'afzenders')} gesorteerd`)
         + (!one ? '' : sys === 'mac'
-          ? L('. Only one? Outlook for Mac saves one mail at a time. Below is how to get the whole folder at once.',
-              '. Maar één? Outlook voor Mac slaat één mail tegelijk op. Hieronder staat hoe je de hele map in één keer pakt.')
+          ? L('. Only one? With Outlook for Mac, dragging often gives only one file. Below is how to get the whole folder at once.',
+              '. Maar één? In Outlook voor Mac levert slepen vaak maar één bestand op. Hieronder staat hoe je de hele map in één keer pakt.')
           : L('. Only one? The new Outlook saves one mail at a time. Below is how to get the whole folder at once.',
               '. Maar één? De nieuwe Outlook slaat één mail tegelijk op. Hieronder staat hoe je de hele map in één keer pakt.')));
     } catch (err) {
