@@ -191,11 +191,11 @@ const HOWTO_APPS = () => [
       'Open <b>Junk Email</b> and press <code>Ctrl+A</code>.',
       'Drag the mails into a folder, such as <b>Downloads</b>.',
       'Drag that folder here.'],
-      `Only one file? That is the new Outlook. Turn off <b>New Outlook</b> at the top right and try again. No switch there? Use ${go('thunderbird', 'Thunderbird')}.`), steps([
+      `Only one file? Then this is the new Outlook, which saves one mail at a time. Use ${go('thunderbird', 'Thunderbird')} instead.`), steps([
       'Open <b>Ongewenste e-mail</b> en druk op <code>Ctrl+A</code>.',
       'Sleep de mails naar een map, zoals <b>Downloads</b>.',
       'Sleep die map hierheen.'],
-      `Maar één bestand? Dan heb je de nieuwe Outlook. Zet rechtsboven <b>Nieuwe Outlook</b> uit en probeer het opnieuw. Geen schakelaar? Gebruik ${go('thunderbird', 'Thunderbird')}.`))],
+      `Maar één bestand? Dan is dit de nieuwe Outlook, die maar één mail tegelijk opslaat. Gebruik dan ${go('thunderbird', 'Thunderbird')}.`))],
   ['gmail', 'Gmail', L(steps([
       'Open <a href="https://takeout.google.com" target="_blank" rel="noopener noreferrer">Google Takeout</a>, press <b>Deselect all</b> and tick only <b>Mail</b>.',
       'Export, download the file Google sends you and unzip it.',
@@ -211,12 +211,12 @@ const HOWTO_APPS = () => [
       `Op een Mac: volg ${go('outlookmac', 'de stappen via Apple Mail')}.`,
       `Op Windows: volg ${go('thunderbird', 'de stappen via Thunderbird')}.`]))],
   ['thunderbird', 'Thunderbird', L(steps([
-      'Install the free <a href="https://www.thunderbird.net" target="_blank" rel="noopener noreferrer">Thunderbird</a> and add your mail account.',
-      'Open <b>Junk</b>, press <code>Ctrl+A</code>, right-click → <b>Save As…</b> and choose a folder.',
-      'Drag that folder here.']), steps([
-      'Installeer het gratis <a href="https://www.thunderbird.net" target="_blank" rel="noopener noreferrer">Thunderbird</a> en zet je mailaccount erin.',
-      'Open <b>Ongewenst</b>, druk op <code>Ctrl+A</code>, rechtermuisknop → <b>Opslaan als…</b> en kies een map.',
-      'Sleep die map hierheen.']))]
+      'Install the free <a href="https://www.thunderbird.net" target="_blank" rel="noopener noreferrer">Thunderbird</a> and add your mail account. You sign in on your mail provider\'s own page.',
+      'Open <b>Junk</b> (at Yahoo: <b>Bulk</b>), click one mail, press <code>Ctrl+A</code>, right-click → <b>Save As…</b> and choose a folder.',
+      'Drag that folder here.'], 'You can keep using your usual mail app; Thunderbird is only for this step.'), steps([
+      'Installeer het gratis <a href="https://www.thunderbird.net" target="_blank" rel="noopener noreferrer">Thunderbird</a> en zet je mailaccount erin. Je logt in op de eigen pagina van je mailprovider.',
+      'Open <b>Ongewenst</b> (bij Yahoo: <b>Bulk</b>), klik op één mail, druk op <code>Ctrl+A</code>, rechtermuisknop → <b>Opslaan als…</b> en kies een map.',
+      'Sleep die map hierheen.'], 'Je gewone mailapp kun je blijven gebruiken; Thunderbird is alleen voor deze stap.'))]
 ];
 
 // The app to open first: the one the last drop came from, else the usual one
