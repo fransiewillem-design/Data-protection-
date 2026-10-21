@@ -2751,7 +2751,7 @@ const REPO = 'https://github.com/fransiewillem-design/Data-protection-';
 // The address for privacy questions. Empty until the maintainer sets one; the
 // page then falls back to GitHub, with a warning not to post personal details.
 const CONTACT_EMAIL = 'hello@hoopup.tech';
-const UPDATED = { en: '14 October 2026', nl: '14 oktober 2026' };
+const UPDATED = { en: '21 October 2026', nl: '21 oktober 2026' };
 
 // The statement names whichever host is actually serving this copy, so it
 // stays true before and after the move to the own domain.
@@ -2861,5 +2861,13 @@ export function about() {
     <li>Je verstuurt elke brief en elke uitschrijving zelf, en je bent verantwoordelijk voor wat je verstuurt. Lees elke brief voordat je hem verstuurt.</li>
     <li>Gebruik het voor je eigen gegevens. Namens iemand anders schrijven mag alleen met diens toestemming.</li>
     <li>Contactgegevens van bedrijven kunnen verouderd of gegokt zijn; de app laat zien waar elk adres vandaan komt (hun eigen mail, een gecontroleerde lijst of een gok) en markeert een adres als fout als je een melding dat de mail onbestelbaar was erin sleept. We kunnen niet zien of een bedrijf je gegevens echt heeft gewist; de app houdt de termijnen bij zodat je ze eraan kunt houden.</li>
-    <li>HoopUp is open source onder de MIT-licentie: ${ext(REPO, 'broncode')}.</li>`)}</ul>`)}`;
+    <li>HoopUp is open source onder de MIT-licentie: ${ext(REPO, 'broncode')}.</li>`)}</ul>`)}
+
+  ${sec(L('How the site is protected', 'Hoe de site beveiligd is'), `<ul>${L(`
+    <li>The accounts that run the site (the source code on GitHub, the hosting at Cloudflare and HoopUp's registration at Microsoft) are protected with two-step sign-in, so someone else cannot simply change the site.</li>
+    <li>The site is built from the public ${ext(REPO, 'source code')}, so every change can be seen there.</li>
+    <li>When you read your junk mail via Microsoft, Microsoft asks permission for HoopUp to read your mail. Microsoft has no permission for a single folder, so on paper it covers your whole mailbox. HoopUp asks for it only when you press the button, and uses it only to fetch the Junk Email folder into your own browser; you can check that in the source code. You withdraw the permission at account.live.com/consent.</li>`, `
+    <li>De accounts waarmee de site draait (de broncode op GitHub, de hosting bij Cloudflare en de registratie van HoopUp bij Microsoft) zijn beveiligd met inloggen in twee stappen, zodat een ander de site niet zomaar kan aanpassen.</li>
+    <li>De site wordt gebouwd uit de openbare ${ext(REPO, 'broncode')}, dus elke wijziging is daar terug te zien.</li>
+    <li>Lees je je ongewenste mail in via Microsoft, dan vraagt Microsoft of HoopUp je mail mag lezen. Microsoft kent geen toestemming voor één map, dus op papier geldt die voor je hele mailbox. HoopUp vraagt die alleen aan als jij op de knop drukt, en gebruikt die alleen om de map Ongewenste e-mail naar je eigen browser te halen; dat kun je in de broncode nakijken. Je trekt de toestemming in via account.live.com/consent.</li>`)}</ul>`)}`;
 }
