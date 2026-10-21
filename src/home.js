@@ -184,6 +184,8 @@ const msRead = () => `
         <li>Je mail wordt niet bewaard. Net als bij bestanden onthoudt HoopUp alleen per afzender een korte samenvatting, op dit apparaat.</li>
         <li>Microsoft onthoudt je toestemming tot je die intrekt via account.live.com/consent.</li>`)}
       </ul>
+      <p>${L('Want it as private as possible? Drag in files instead: then HoopUp sees only what you choose.',
+        'Wil je het zo privé mogelijk? Sleep dan bestanden: dan ziet HoopUp alleen wat jij kiest.')}</p>
     </div>
     <div class="row"><button class="primary" data-action="ms-read">${L('Read my junk mail via Microsoft', 'Lees mijn ongewenste mail via Microsoft')}</button></div>
   </div>`;
