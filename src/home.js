@@ -14,6 +14,8 @@ import {
 } from './views.js';
 
 const ICONS = {
+  mail:   '<path d="M4 6h16v12H4z"/><path d="m4 7 8 6 8-6"/>',
+  folder: '<path d="M3 7a2 2 0 0 1 2-2h4l2 2h8a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/>',
   unsub:  '<path d="M4 6h16v12H4z"/><path d="m4 7 8 6 8-6"/><path d="m15 15 4 4m0-4-4 4"/>',
   block:  '<circle cx="12" cy="12" r="8"/><path d="m6.5 6.5 11 11"/>',
   delete: '<path d="M5 7h14M10 7V5h4v2M7 7l1 12h8l1-12"/>',
@@ -160,6 +162,8 @@ function dropZone(compact) {
          <p class="drop-title">${L('Drag your spam here', 'Sleep je spam hierheen')}</p>
          <p class="small muted">${L('A folder of mails from your Junk folder (or your whole mailbox), or loose .eml, .msg or .mbox files.',
            'Een map met mails uit je map Ongewenst (of je hele mailbox), of losse .eml-, .msg- of .mbox-bestanden.')}</p>
+         <p class="small drop-direct">${L(`Dragging mails straight from your mail app usually does not work. Put them in a folder first: <button type="button" class="link-btn" data-action="howto-show">here is how</button>.`,
+           `Mails rechtstreeks uit je mailapp hierheen slepen werkt meestal niet. Zet ze eerst in een map: <button type="button" class="link-btn" data-action="howto-show">zo doe je dat</button>.`)}</p>
          <div class="row drop-buttons">
            <button class="primary" data-action="pick-folder">${L('Choose a folder', 'Kies een map')}</button>
            <button data-action="pick">${L('Choose files', 'Kies bestanden')}</button>
@@ -270,6 +274,15 @@ const HOWTO = (state, { inline = false, app = '' } = {}) => {
   return `
   <section class="howto-card ${inline ? 'howto-inline' : ''}" aria-labelledby="howto-title">
     <h2 id="howto-title">${inline ? L('Which mail app do you use?', 'Welke mailapp gebruik je?') : L('Step 1: put your spam in a folder', 'Stap 1: zet je spam in een map')}</h2>
+    <div class="flow">
+      <span class="flow-step">${icon('mail')}<span>${L('Your mail app', 'Je mailapp')}</span></span>
+      <span class="flow-arrow" aria-hidden="true">→</span>
+      <span class="flow-step">${icon('folder')}<span>${L('A folder on your computer', 'Een map op je computer')}</span></span>
+      <span class="flow-arrow" aria-hidden="true">→</span>
+      <span class="flow-step">${icon('drop')}<span>HoopUp</span></span>
+    </div>
+    <p class="small muted">${L('Why a folder first? Dragging mails straight from your mail app onto this site usually does not work: the mail app then hands over no real files, and a browser can only read files.',
+      'Waarom eerst een map? Mails rechtstreeks uit je mailapp naar deze site slepen werkt meestal niet: je mailapp geeft dan geen echte bestanden mee, en een browser kan alleen bestanden lezen.')}</p>
     ${inline ? '' : `<p class="small muted">${L('Which mail app do you use? Choose it, and follow the three steps.', 'Welke mailapp gebruik je? Kies hem en volg de drie stappen.')}</p>`}
     ${onPhone() ? `<p class="notice warn small">${L('A phone cannot save mail as files. Open hoopup.tech on your computer.',
       'Een telefoon kan geen mail als bestand opslaan. Open hoopup.tech op je computer.')}</p>` : ''}
@@ -652,6 +665,7 @@ export function mountHome(root, state, rerender, params) {
 
     if (act === 'pick') input?.click();
     if (act === 'howto-app') selectHowto(btn.dataset.app);
+    if (act === 'howto-show') showHelp();
     if (act === 'ms-read') {
       btn.disabled = true;
       outlookStart('read').catch(() => { btn.disabled = false; toast(L('Could not start the Microsoft sign-in.', 'Kon de aanmelding bij Microsoft niet starten.')); });

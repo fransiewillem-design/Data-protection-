@@ -572,3 +572,17 @@ button, .btn { border-radius: 9px; transition: border-color .12s, color .12s, fi
 }
 .drop-buttons button { justify-content: center; }
 .ms-line { margin-top: 18px; }
+
+/* Why mail goes through a folder first. */
+.drop-direct { margin: 6px auto 0 !important; max-width: 52ch; color: var(--text); }
+.flow { display: flex; flex-wrap: wrap; align-items: center; gap: 6px 8px; margin: 8px 0 8px; }
+.flow-step {
+  display: inline-flex; align-items: center; gap: 7px; padding: 6px 11px; border-radius: 20px;
+  background: var(--accent-soft); color: var(--accent); font-size: .84rem; font-weight: 600;
+}
+.flow-step svg { width: 17px; height: 17px; flex: none; }
+.flow-arrow { color: var(--muted); font-weight: 600; }
+@media (max-width: 560px) {
+  .flow { flex-direction: column; align-items: flex-start; gap: 2px; }
+  .flow-arrow { transform: rotate(90deg); margin-left: 16px; line-height: 1.2; }
+}
