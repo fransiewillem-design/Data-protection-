@@ -154,11 +154,18 @@ function dropZone(compact) {
   return `
   <div id="drop" class="drop ${compact ? 'drop-compact' : 'drop-hero'}">
     ${compact
-      ? `<span>${icon('drop')}</span><span>${L(`<b>Drop more mail</b> to update, or ${pick}`,
-                                             `<b>Sleep meer mail hierheen</b> om bij te werken, of ${pick}`)}</span>`
+      ? `<span>${icon('drop')}</span><span>${L(`<b>More spam?</b> Drag it here to update, or ${pick}`,
+                                             `<b>Meer spam?</b> Sleep hem hierheen om bij te werken, of ${pick}`)}</span>`
       : `<div class="drop-icon">${icon('drop')}</div>
-         <p class="drop-title">${L('Drop your junk mail here, or your whole mailbox', 'Sleep je ongewenste mail hierheen, of je hele mailbox')}</p>
-         <p class="small muted">${L(`.eml, .msg or .mbox files, or a mailbox folder · or ${pick}`, `.eml-, .msg- of .mbox-bestanden, of een mailboxmap · of ${pick}`)}</p>`}
+         <p class="drop-title">${L('Drag your spam here', 'Sleep je spam hierheen')}</p>
+         <p class="small muted">${L('A folder of mails from your Junk folder (or your whole mailbox), or loose .eml, .msg or .mbox files.',
+           'Een map met mails uit je map Ongewenst (of je hele mailbox), of losse .eml-, .msg- of .mbox-bestanden.')}</p>
+         <div class="row drop-buttons">
+           <button class="primary" data-action="pick-folder">${L('Choose a folder', 'Kies een map')}</button>
+           <button data-action="pick">${L('Choose files', 'Kies bestanden')}</button>
+         </div>
+         <p class="small muted drop-note">${L('Your mail stays on your computer: HoopUp reads it here, in your browser. Does your browser ask whether to "upload" the files? That is its standard wording; nothing is sent.',
+           'Je mail blijft op je computer: HoopUp leest hem hier, in je browser. Vraagt je browser of je de bestanden wilt "uploaden"? Dat is zijn standaardtekst; er wordt niets verstuurd.')}</p>`}
     <input type="file" id="files" multiple accept=".eml,.emlx,.msg,.mbox,.txt,message/rfc822,application/vnd.ms-outlook" hidden>
     <input type="file" id="folder" webkitdirectory multiple hidden>
   </div>`;
@@ -262,10 +269,11 @@ const HOWTO = (state, { inline = false, app = '' } = {}) => {
   const open = app || howtoDefault(state);
   return `
   <section class="howto-card ${inline ? 'howto-inline' : ''}" aria-labelledby="howto-title">
-    <h2 id="howto-title">${L('Which mail app do you use?', 'Welke mailapp gebruik je?')}</h2>
+    <h2 id="howto-title">${inline ? L('Which mail app do you use?', 'Welke mailapp gebruik je?') : L('Step 1: put your spam in a folder', 'Stap 1: zet je spam in een map')}</h2>
+    ${inline ? '' : `<p class="small muted">${L('Which mail app do you use? Choose it, and follow the three steps.', 'Welke mailapp gebruik je? Kies hem en volg de drie stappen.')}</p>`}
     ${onPhone() ? `<p class="notice warn small">${L('A phone cannot save mail as files. Open hoopup.tech on your computer.',
       'Een telefoon kan geen mail als bestand opslaan. Open hoopup.tech op je computer.')}</p>` : ''}
-    <div class="seg" role="tablist" aria-labelledby="howto-title">
+    <div class="seg" role="tablist" aria-label="${L('Your mail app', 'Je mailapp')}">
       ${HOWTO_APPS().map(([k, name]) => `<button type="button" role="tab" id="howto-tab-${k}" aria-controls="howto-${k}"
         aria-selected="${k === open}" tabindex="${k === open ? 0 : -1}" data-action="howto-app" data-app="${k}">${name}</button>`).join('')}
     </div>
@@ -280,15 +288,16 @@ export function home(state) {
   <section class="hero">
     <img class="hero-mark" src="assets/img/icon.svg" alt="" width="56" height="56">
     <h1>${L('Stop spam. Get your data deleted.', 'Stop spam. Laat je gegevens wissen.')}</h1>
-    <p>${L('Drop in the mail from your junk folder, or your whole mailbox. HoopUp tells you what to do with each sender, and keeps the mail you actually read.',
-           'Sleep de mail uit je map Ongewenst hierheen, of je hele mailbox. HoopUp vertelt je per afzender wat je ermee kunt doen, en houdt de mail die je echt leest.')}</p>
+    <p>${L('Give HoopUp the mail from your Junk folder. For each sender you then see what you can do: unsubscribe, block, or have your data deleted. Mail you actually read stays.',
+           'Geef HoopUp de mail uit je map Ongewenst. Je ziet dan per afzender wat je ermee kunt doen: uitschrijven, blokkeren of je gegevens laten wissen. Mail die je echt leest, blijft staan.')}</p>
     <ol class="steps">
-      <li><b>${L('Unsubscribe', 'Uitschrijven')}</b><span>${L('from real companies', 'bij echte bedrijven')}</span></li>
-      <li><b>${L('Block', 'Blokkeren')}</b><span>${L('scams and fake senders', 'oplichters en nepafzenders')}</span></li>
-      <li><b>${L('Delete', 'Wissen')}</b><span>${L('your data at companies', 'je gegevens bij bedrijven')}</span></li>
+      <li><b>${L('Put your spam in a folder', 'Zet je spam in een map')}</b><span>${L('with your mail app, see below', 'met je mailapp, zie hieronder')}</span></li>
+      <li><b>${L('Drag that folder here', 'Sleep die map hierheen')}</b><span>${L('or choose it with the button', 'of kies hem met de knop')}</span></li>
+      <li><b>${L('Choose what happens', 'Kies wat er gebeurt')}</b><span>${L('unsubscribe, block, delete', 'uitschrijven, blokkeren, wissen')}</span></li>
     </ol>
     ${dropZone(false)}
-    ${outlookAvailable() ? `<div class="ms-read-hero">${msRead()}</div>` : ''}
+    ${outlookAvailable() ? `<p class="ms-line">${L(`Hotmail or Outlook.com? It also works without files: ${go('outlookcom', 'this is how')}.`,
+      `Hotmail of Outlook.com? Het kan ook zonder bestanden: ${go('outlookcom', 'zo werkt dat')}.`)}</p>` : ''}
     <ul class="trust">
       <li>${L('Nothing is uploaded', 'Er wordt niets geüpload')}</li>
       <li>${L('No account', 'Geen account')}</li>
@@ -603,6 +612,8 @@ export function mountHome(root, state, rerender, params) {
   if (drop) {
     ['dragenter', 'dragover'].forEach(ev => drop.addEventListener(ev, e => { e.preventDefault(); drop.classList.add('over'); }));
     ['dragleave', 'drop'].forEach(ev => drop.addEventListener(ev, e => { e.preventDefault(); drop.classList.remove('over'); }));
+    // Anywhere in the big drop zone opens the file picker, not only its buttons.
+    if (drop.classList.contains('drop-hero')) drop.addEventListener('click', e => { if (!e.target.closest('button, a, input')) input?.click(); });
     drop.addEventListener('drop', e => {
       filesFromDrop(e.dataTransfer).then(files => files.length ? handleFiles(files) : noFiles());
     });
@@ -645,7 +656,12 @@ export function mountHome(root, state, rerender, params) {
       btn.disabled = true;
       outlookStart('read').catch(() => { btn.disabled = false; toast(L('Could not start the Microsoft sign-in.', 'Kon de aanmelding bij Microsoft niet starten.')); });
     }
-    if (act === 'howto-go') { selectHowto(btn.dataset.app); root.querySelector('#howto-tab-' + btn.dataset.app)?.focus(); }
+    if (act === 'howto-go') {
+      selectHowto(btn.dataset.app);
+      const tab = root.querySelector('#howto-tab-' + btn.dataset.app);
+      tab?.focus({ preventScroll: true });
+      tab?.closest('.howto-card')?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    }
     if (act === 'pick-folder') root.querySelector('#folder')?.click();
 
     if (act === 'home-unsub') {

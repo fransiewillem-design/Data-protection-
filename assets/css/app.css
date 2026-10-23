@@ -544,3 +544,31 @@ button, .btn { border-radius: 9px; transition: border-color .12s, color .12s, fi
 .ms-private p { margin: 6px 0 0; }
 /* Nothing to add in this app, so nothing to confirm. */
 #block-panel:has(.no-rules) + .block-done { display: none; }
+
+/* The drop zone is where everything starts: big, clickable, with real buttons. */
+.drop-hero {
+  padding: 40px 24px 30px; cursor: pointer;
+  background: linear-gradient(180deg, var(--accent-soft), var(--surface) 75%);
+  border: 2px dashed color-mix(in srgb, var(--accent) 60%, var(--line));
+  box-shadow: 0 10px 30px rgba(76, 63, 224, .10);
+}
+.drop-hero .drop-icon { width: 60px; height: 60px; background: var(--accent); color: #fff; }
+.drop-hero .drop-icon svg { width: 26px; height: 26px; }
+.drop-hero .drop-title { font-size: 1.3rem; }
+.drop-buttons { justify-content: center; gap: 10px; margin: 16px 0 12px; }
+.drop-buttons button { min-height: 46px; padding: 0 22px; font-size: .98rem; border-radius: 10px; }
+.drop-note { max-width: 54ch; margin: 0 auto !important; font-size: .8rem !important; }
+.ms-line { margin: 12px 0 0; font-size: .9rem; color: var(--muted); }
+.howto-card > h2 + p.small { margin-top: -2px; }
+@media (prefers-color-scheme: dark) {
+  .drop-hero .drop-icon { color: #0d0d14; }
+}
+.ms-line { margin-top: 16px; }
+@media (max-width: 560px) {
+  .steps li { display: grid; grid-template-columns: auto 1fr; column-gap: 12px; row-gap: 1px; text-align: left; align-items: center; padding: 11px 14px; }
+  .steps li::before { grid-row: 1 / span 2; margin: 0; }
+  .steps li b, .steps li span { grid-column: 2; }
+  .drop-buttons button { flex: 1 1 100%; }
+}
+.drop-buttons button { justify-content: center; }
+.ms-line { margin-top: 18px; }
