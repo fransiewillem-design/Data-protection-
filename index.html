@@ -23,7 +23,8 @@
 <meta name="referrer" content="no-referrer">
 <!--
   The local-first promise, enforced by the browser rather than by our own discipline.
-  connect-src names the only two hosts this app may ever talk to, so even a bug that
+  connect-src names the only hosts this app may ever talk to (itself, the two breach
+  services and Microsoft's sign-in and mail API), so even a bug that
   injected script could not post your identity file to an arbitrary server.
   style-src allows 'unsafe-inline' because the views use inline style attributes;
   script-src does not, and there are no inline handlers or third-party scripts.

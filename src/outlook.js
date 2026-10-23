@@ -19,8 +19,9 @@ const SCOPES = {
 };
 const GRAPH = 'https://graph.microsoft.com/v1.0/me';
 const RULES = `${GRAPH}/mailFolders/inbox/messageRules`;
-// Outlook.com empties Junk Email after ten days, so this is rarely reached.
-const MAX_READ = 1000;
+// Outlook.com empties Junk Email after ten days, so these are rarely reached:
+// a thousand messages, or 300 MB in all, whichever comes first.
+const MAX_READ = 1000, MAX_BYTES = 300 * 1024 * 1024;
 const START = 'hoopup-ms-start', BACK = 'hoopup-ms-back';
 // Values per rule: well within Outlook's size limit for rules.
 const PER_RULE = 150;
@@ -144,16 +145,18 @@ export async function outlookReadJunk(onProgress = () => {}) {
       if (!res.ok) return { error: res.status === 401 || res.status === 403 ? 'denied' : 'read' };
       const page = await res.json();
       for (const m of page.value || []) ids.push(m.id);
-      next = page['@odata.nextLink'] || '';
+      // The permission only ever goes to Microsoft's own mail API.
+      next = String(page['@odata.nextLink'] || '');
+      try { if (next && new URL(next).origin !== 'https://graph.microsoft.com') next = ''; } catch { next = ''; }
     }
     const list = ids.slice(0, MAX_READ), mails = [];
-    let done = 0;
+    let done = 0, bytes = 0;
     // A few at a time: quick, and well inside Microsoft's limits.
     const worker = async () => {
-      while (list.length) {
+      while (list.length && bytes < MAX_BYTES) {
         const id = list.shift();
         const res = await fetch(`${GRAPH}/messages/${encodeURIComponent(id)}/$value`, auth);
-        if (res.ok) mails.push(await res.text());
+        if (res.ok) { const text = await res.text(); bytes += text.length; mails.push(text); }
         onProgress(++done, ids.length);
       }
     };

@@ -3,8 +3,12 @@
 // nothing is sent anywhere, and the app never touches the mailbox itself.
 
 import { registrableDomain, cleanHost, isPersonalDomain } from './mailscan.js';
+import { L } from './i18n.js';
 
-// A plain address, with nothing that could break out of a rule or a script.
+// A plain host name or address, with nothing that could break out of a rule
+// or a script. Reply-To is decoded from the header, so it can hold any
+// character, curly quotes included, which PowerShell treats as quotes.
+const HOST = /^[a-z0-9](?:[a-z0-9-]*[a-z0-9])?(?:\.[a-z0-9](?:[a-z0-9-]*[a-z0-9])?)+$/;
 const ADDRESS = /^[a-z0-9._+-]+@[a-z0-9](?:[a-z0-9-]*[a-z0-9])?(?:\.[a-z0-9](?:[a-z0-9-]*[a-z0-9])?)+$/;
 
 // Mail services shared by many senders, legitimate ones included. Blocking one
@@ -58,6 +62,7 @@ export function buildBlockList(targets, classOf) {
       // An exact address (a scammer on a free mail service) is narrow enough
       // to match as is.
       if (h.includes('@')) { if (ADDRESS.test(h)) replyTo.add(h); continue; }
+      if (!HOST.test(h)) continue;
       const reg = registrableDomain(h);
       if (safe.has(reg)) continue;
       (SHARED_SERVICES.has(reg) || isPersonalDomain(reg) ? sharedReplyTo : replyTo).add(h);
@@ -180,7 +185,7 @@ export function guessClient(targets) {
 // the rule is the one thing the user can copy once and paste once. Every value
 // in these lists comes from received mail, i.e. from the scammer, so only plain
 // hostnames are let through: nothing else can reach the script's syntax.
-const HOST = /^[a-z0-9](?:[a-z0-9-]*[a-z0-9])?(?:\.[a-z0-9](?:[a-z0-9-]*[a-z0-9])?)+$/;
+// (buildBlockList already keeps only those; this is the second lock.)
 const hosts = arr => arr.filter(h => HOST.test(h) || ADDRESS.test(h));
 const scriptName = day => `HoopUp ${/^\d{4}-\d\d-\d\d$/.test(day) ? day : ''}`.trim();
 
@@ -195,7 +200,7 @@ export function asAppleScript(bl, day) {
   const name = scriptName(day);
   const links = hosts(bl.links), replies = hosts([...bl.replyTo, ...bl.sharedReplyTo]);
   if (!links.length && !replies.length) return '-- Nothing to block yet.\n';
-  const list = arr => '{' + arr.map(h => `"${h}"`).join(', ') + '}';
+  const list = arr => '{' + arr.map(h => `"${String(h).replace(/[\\"]/g, '\\$&')}"`).join(', ') + '}';
   return `-- HoopUp: adds the rule "${name}" to Apple Mail. Press Run.
 set siteList to ${list(links)}
 set replyList to ${list(replies)}
@@ -251,14 +256,15 @@ tell application "Mail"
     if not safe then error "checks failed"
     set delete message of r to true
     set enabled of r to true
-    set msg to "HoopUp: rule \\"${name}\\" added with " & added & " conditions."
-    if skipped > 0 then set msg to msg & " " & skipped & " could not be added; please tell HoopUp."
-    set msg to msg & return & return & "New scams now go straight to the Trash. To clear what is already in Junk, empty it in one go: for an Outlook.com, Hotmail or Exchange account on outlook.com (Junk Email > Empty folder), which also avoids Mail's 'Invalid base64 string' error; for other accounts in Mail (Junk, Cmd-A, Delete)."
+    set msg to "${L(`HoopUp: rule \\"${name}\\" added with `, `HoopUp: regel \\"${name}\\" toegevoegd met `)}" & added & "${L(' conditions.', ' voorwaarden.')}"
+    if skipped > 0 then set msg to msg & " " & skipped & "${L(' could not be added; please tell HoopUp.', ' konden niet worden toegevoegd; laat het HoopUp weten.')}"
+    set msg to msg & return & return & "${L("New scams now go straight to the Trash. To clear what is already in Junk, empty it in one go: for an Outlook.com, Hotmail or Exchange account on outlook.com (Junk Email > Empty folder), which also avoids Mail's 'Invalid base64 string' error; for other accounts in Mail (Junk, Cmd-A, Delete).",
+      "Nieuwe oplichtersmail gaat nu meteen naar de prullenmand. Wat al in Ongewenst staat, ruim je in één keer op: bij een Outlook.com-, Hotmail- of Exchange-account op outlook.com (Ongewenste e-mail > Map leegmaken), wat ook de foutmelding 'Invalid base64 string' in Mail voorkomt; bij andere accounts in Mail (Ongewenst, Cmd-A, Delete).")}"
   on error errText
     try
       delete r
     end try
-    set msg to "HoopUp: Mail did not accept the rule (" & errText & "), so nothing was changed. Please tell HoopUp."
+    set msg to "${L('HoopUp: Mail did not accept the rule (', 'HoopUp: Mail accepteerde de regel niet (')}" & errText & "${L('), so nothing was changed. Please tell HoopUp.', '), dus er is niets veranderd. Laat het HoopUp weten.')}"
   end try
 end tell
 display dialog msg buttons {"OK"} default button "OK"
@@ -269,7 +275,9 @@ display dialog msg buttons {"OK"} default button "OK"
 // because within one Outlook rule every condition must match at once.
 export function asPowerShell(bl, day) {
   const name = scriptName(day);
-  const list = arr => '@(' + arr.map(h => `'${h}'`).join(',') + ')';
+  // Every single-quote form PowerShell accepts is doubled, even though the
+  // values are plain host names by now.
+  const list = arr => '@(' + arr.map(h => `'${String(h).replace(/['\u2018\u2019\u201A\u201B]/g, "''")}'`).join(',') + ')';
   const links = hosts(bl.links), replies = hosts([...bl.replyTo, ...bl.sharedReplyTo]);
   if (!links.length && !replies.length) return '# Nothing to block yet.\n';
   // Exchange limits how large a mailbox's rules may be, so long lists are
@@ -287,16 +295,17 @@ export function asPowerShell(bl, day) {
   return `# HoopUp: adds block rules to Outlook. Paste into PowerShell and press Enter.
 & {
   try { $ol = New-Object -ComObject Outlook.Application }
-  catch { Write-Host 'HoopUp: could not reach classic Outlook. Is it installed? If this PowerShell window runs as administrator, open a normal one and paste again. The new Outlook cannot run scripts: on HoopUp, choose New Outlook instead.'; return }
+  catch { Write-Host '${L('HoopUp: could not reach classic Outlook. Is it installed? If this PowerShell window runs as administrator, open a normal one and paste again. The new Outlook cannot run scripts: on HoopUp, choose New Outlook instead.',
+    'HoopUp: kan de klassieke Outlook niet bereiken. Is die geïnstalleerd? Draait dit PowerShell-venster als administrator, open dan een gewoon venster en plak opnieuw. De nieuwe Outlook kan geen scripts draaien: kies op HoopUp dan Nieuwe Outlook.')}'; return }
   $rules = $ol.Session.DefaultStore.GetRules()
   # Running it again the same day replaces that day's rules instead of adding copies.
   for ($i = $rules.Count; $i -ge 1; $i--) { if ($rules.Item($i).Name -like '${name} *') { $rules.Remove($i) } }
   $made = @()
 ${rules.map(rule).join('\n')}
   try { $rules.Save($false) }
-  catch { Write-Host "HoopUp: Outlook did not accept the rules ($($_.Exception.Message)), so nothing was saved. Please tell HoopUp."; return }
+  catch { Write-Host "${L('HoopUp: Outlook did not accept the rules', 'HoopUp: Outlook accepteerde de regels niet')} ($($_.Exception.Message)), ${L('so nothing was saved. Please tell HoopUp.', 'dus er is niets opgeslagen. Laat het HoopUp weten.')}"; return }
   foreach ($f in 23, 6) { foreach ($r in $made) { try { $r.Execute($false, $ol.Session.GetDefaultFolder($f)) } catch {} } }
-  Write-Host "HoopUp: $($made.Count) rules added to Outlook. Scams already in Junk and Inbox were moved to Deleted Items."
+  Write-Host "HoopUp: $($made.Count) ${L('rules added to Outlook. Scams already in Junk and Inbox were moved to Deleted Items.', 'regels toegevoegd aan Outlook. Oplichtersmail die al in Ongewenste e-mail en Postvak IN stond, is verplaatst naar Verwijderde items.')}"
 }
 `;
 }

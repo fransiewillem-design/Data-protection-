@@ -254,6 +254,7 @@ looks up a company's privacy address on request, and it receives only that compa
 | `data/brokers.json` | Nothing: it is a file in this repo |
 | `haveibeenpwned.com/api/v3/breaches` | Nothing about you: the public breach list |
 | `api.pwnedpasswords.com/range/XXXXX` | Five characters of your password's SHA-1 hash |
+| `haveibeenpwned.com/api/v3/breachedaccount/…` | Only if you added your own API key and press *Check*: the address you check, and your key (the one exception, below) |
 | A sender's one-click unsubscribe URL | `List-Unsubscribe=One-Click`, no cookies, no referrer (see below) |
 | `hoopup.tech/api/privacy-contact?domain=…` | Only the company's domain, when you press *Look it up*; the function reads that company's privacy statement, keeps and logs nothing, and the answer is cached a week per company |
 | Letters | Nothing from the app: they open in your own mail app, and you press Send |
@@ -328,7 +329,7 @@ class as sensitive are hidden from the public search; to see those, verify the a
 Nothing else goes anywhere. The letters are generated on your device and sent by your own mail client.
 
 **This is enforced, not just intended.** `index.html` carries a Content Security Policy whose
-`connect-src` names only those two hosts, so even a bug in this code could not post your data to
+`connect-src` names only the hosts in the table above, so even a bug in this code could not post your data to
 another server: the browser refuses the connection. `script-src` is `'self'`: no third-party scripts,
 no CDN, no fonts, no analytics, no tracking pixels. Verified by test: an attempt to `POST` the stored
 profile to an arbitrary host is blocked, while the legitimate hosts still work.
@@ -342,7 +343,7 @@ was rendered, and the payloads appeared as visible text.
 host the sender nominates, so it needs `connect-src https:`, a permission the page holding the identity
 file must not have. That permission lives in `unsubscribe.html`, loaded in a hidden same-origin iframe.
 A framed document served from its own URL gets its own policy instead of inheriting its parent's, so the
-worker can reach any host while `index.html` still cannot reach anything but the two breach endpoints.
+worker can reach any host while `index.html` still cannot reach anything but the hosts in that table.
 The worker never reads `localStorage`, holds nothing, and acts only on a URL list handed to it by
 postMessage from its own origin. It sends no cookies (`credentials: 'omit'`) and no referrer.
 
